@@ -3,11 +3,13 @@ from __future__ import annotations
 import logging
 import re
 import threading
+import xml.etree.ElementTree as ET
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import NamedTuple
+from typing import Callable, TypeVar
 
-import xmltodict
+from pydantic import BaseModel, computed_field
 
 from murfey.client.context import Context
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
@@ -18,13 +20,192 @@ logger = logging.getLogger("murfey.client.contexts.fib")
 lock = threading.Lock()
 
 
-class Lamella(NamedTuple):
-    name: str
-    number: int
-    angle: float | None = None
+class StagePositionValues(BaseModel):
+    # Coordinates are in metres
+    x: float | None = None
+    y: float | None = None
+    z: float | None = None
+    # Angles are in degrees
+    rotation: float | None = None
+    tilt_alpha: float | None = None
+
+    @computed_field
+    def slot_number(self) -> int | None:
+        if self.x is None:
+            return None
+        return 1 if self.x < 0 else 2
 
 
-class MillingImage(NamedTuple):
+class StagePositionInfo(BaseModel):
+    thinning: StagePositionValues | None = None
+    chunk_coincidence: StagePositionValues | None = None
+    thinning_stage: StagePositionValues | None = None
+    preparation: StagePositionValues | None = None
+    chunk_site: StagePositionValues | None = None
+
+
+class WidthOverlap(BaseModel):
+    front_left: float | None = None
+    front_right: float | None = None
+    rear_left: float | None = None
+    rear_right: float | None = None
+
+
+class MillingStepInfo(BaseModel):
+    """
+    These are the parameters configured per milling step that we are interested
+    in tracking. Some attributes are present only for certain steps.
+    """
+
+    # Step setup
+    enabled: bool | None = None
+    status: str | None = None
+    execution_time: float | None = None
+
+    # Beam info
+    beam_type: str | None = None
+    voltage: float | None = None
+    current: float | None = None
+
+    # Lamella dimensions
+
+    # Milling info
+    milling_angle: float | None = None
+    depth_correction: float | None = None
+    lamella_offset: float | None = None
+    trench_height_front: float | None = None
+    trench_height_rear: float | None = None
+    width_overlap_front_left: float | None = None
+    width_overlap_front_right: float | None = None
+    width_overlap_rear_left: float | None = None
+    width_overlap_rear_right: float | None = None
+
+
+class LamellaSiteInfo(BaseModel):
+    """
+    These parameters are not associated with a single milling step
+    """
+
+    site_name: str | None = None
+    stage_info: StagePositionInfo | None = None
+
+    """
+    These are all the possible processing steps found in the ProjectData.dat file.
+    It contains information on whether the step has been enabled as well as its
+    current staate.
+    """
+    # Preparation stage
+    eucentric_tilt: MillingStepInfo | None = None
+    artificial_features: MillingStepInfo | None = None
+    milling_angle: MillingStepInfo | None = None
+    image_acquisition: MillingStepInfo | None = None
+    lamella_placement: MillingStepInfo | None = None
+    # Milling stage
+    delay_1: MillingStepInfo | None = None
+    reference_definition_1: MillingStepInfo | None = None
+    reference_definition_1_electron: MillingStepInfo | None = None
+    stress_relief_cuts: MillingStepInfo | None = None
+    reference_definition_2: MillingStepInfo | None = None
+    rough_milling: MillingStepInfo | None = None
+    rough_milling_electron: MillingStepInfo | None = None
+    reference_definition_3: MillingStepInfo | None = None
+    medium_milling: MillingStepInfo | None = None
+    medium_milling_electron: MillingStepInfo | None = None
+    fine_milling: MillingStepInfo | None = None
+    fine_milling_electron: MillingStepInfo | None = None
+    finer_milling: MillingStepInfo | None = None
+    finer_milling_electron: MillingStepInfo | None = None
+    # Thinning stage
+    delay_2: MillingStepInfo | None = None
+    polishing_1: MillingStepInfo | None = None
+    polishing_1_electron: MillingStepInfo | None = None
+    polishing_2: MillingStepInfo | None = None
+    polishing_2_ion: MillingStepInfo | None = None
+    polishing_2_electron: MillingStepInfo | None = None
+
+
+MILLING_STEP_NAMES = {
+    # Map unique activity name to class attribute
+    # Preparation stage
+    "Preparation - Eucentric Tilt": "eucentric_tilt",
+    "Preparation - Artificial Features": "artificial_features",
+    "Preparation - Milling Angle": "milling_angle",
+    "Preparation - Image Acquisition": "image_acquisition",
+    "Preparation - Lamella Placement": "lamella_placement",
+    # Milling stage
+    "Milling - Delay": "delay_1",
+    "Milling - Reference Definition": "reference_definition_1",
+    "Milling - Electron Reference Definition": "reference_definition_1_electron",
+    "Milling - Stress Relief Cuts": "stress_relief_cuts",
+    "Milling - Reference Redefinition 1": "reference_definition_2",
+    "Milling - Rough Milling": "rough_milling",
+    "Milling - Rough Milling - Electron Image": "rough_milling_electron",
+    "Milling - Reference Redefinition 2": "reference_definition_3",
+    "Milling - Medium Milling": "medium_milling",
+    "Milling - Medium Milling - Electron Image": "medium_milling_electron",
+    "Milling - Fine Milling": "fine_milling",
+    "Milling - Fine Milling - Electron Image": "fine_milling_electron",
+    "Milling - Finer Milling": "finer_milling",
+    "Milling - Finer Milling - Electron Image": "finer_milling_electron",
+    # Thinning stage
+    "Thinning - Delay": "delay_2",
+    "Thinning - Polishing 1": "polishing_1",
+    "Thinning - Polishing 1 - Electron Image": "polishing_1_electron",
+    "Thinning - Polishing 2": "polishing_2",
+    "Thinning - Polishing 2 - Ion Image": "polishing_2_ion",
+    "Thinning - Polishing 2 - Electron Image": "polishing_2_electron",
+}
+
+
+STAGE_POSITION_VALUES = {
+    # Map class attribute to element name
+    # Paths are relative to the "StagePosition" node
+    "x": "X",
+    "y": "Y",
+    "z": "Z",
+    "rotation": "R",
+    "tilt_alpha": "AT",
+}
+
+
+STAGE_POSITION_NAMES = {
+    # Map class attribute to element name
+    # Paths are relative to the "Site" node
+    "thinning": "ThinningSiteLocation/StagePosition/StagePosition",
+    # These stage position fields are also present
+    # but it's unclear which milling steps they correspond to
+    "chunk_coincidence": "Parameters/ChunkCoincidenceStagePosition/StagePosition",
+    "thinning_stage": "Parameters/ThinningStagePosition/StagePosition",
+    "preparation": "PreparationSiteLocation/StagePosition/StagePosition",
+    "chunk_site": "ChunkSiteLocation/StagePosition/StagePosition",
+}
+
+
+BEAM_VALUES = {
+    # Map class attribute to element name
+    # These are relative to the "MillingPreset" or "BeamPreset" node
+    "beam_type": "BeamType",
+    "voltage": "HighVoltage",
+    "current": "BeamCurrent",
+}
+
+
+LAMELLA_MILLING_VALUES = {
+    # Map class atrribute to element name
+    # These are relative to the "Activity" node
+    "milling_angle": "MillingAngle",
+    "lamella_offset": "OffsetFromLamella",
+    "trench_height_front": "FrontTrenchHeight",
+    "trench_height_rear": "RearTrenchHeight",
+    "width_overlap_front_left": "LamellaFrontLeftWidthOverlap",
+    "width_overlap_front_right": "LamellaFrontRightWidthOverlap",
+    "width_overlap_rear_left": "LamellaRearLeftWidthOverlap",
+    "width_overlap_rear_right": "LamellaRearRightWidthOverlap",
+}
+
+
+@dataclass
+class MillingImage:
     file: Path
     timestamp: float
 
@@ -43,6 +224,81 @@ def _number_from_name(name: str) -> int:
         if (match := re.search(r"^[\w\s]+\((\d+)\)$", name)) is not None
         else 1
     )
+
+
+T = TypeVar("T")
+
+
+def _parse_xml_text(
+    node: ET.Element,
+    path: str,
+    func: Callable[[str], T],
+) -> T | None:
+    """
+    Searches the XML Element using the provided path. If a matching node is found,
+    and it has a text attribute, processes the text using the provided function.
+    Otherwise, returns None.
+    """
+    if (match := node.find(path)) is None or (text := match.text) is None:
+        return None
+    try:
+        return func(text)
+    except (ValueError, TypeError):
+        logger.error(f"Error parsing XML text {text} at path {path}", exc_info=True)
+        return None
+
+
+SI_UNITS_KEY = {
+    # Length
+    "mm": 1e-3,
+    "um": 1e-6,
+    "μm": 1e-6,
+    "nm": 1e-9,
+    # Current
+    "mA": 1e-3,
+    "uA": 1e-6,
+    "μA": 1e-6,
+    "nA": 1e-9,
+    "pA": 1e-12,
+    # Voltage
+    "kV": 1e3,
+    "mV": 1e-3,
+    # Time
+    "ms": 1e-3,
+    "us": 1e-6,
+    "μs": 1e-6,
+    # Miscallenous
+    "%": 0.01,
+}
+
+
+def _parse_measurement(text: str):
+    """
+    The measurements in the ProjectData.dat file are stored in a human-readable format
+    as strings. This helper function converts them into their base SI unit and returns
+    the value as a float.
+
+    E.g. 5 um will be parsed as 0.000005
+    """
+    try:
+        value, unit = (s.strip() for s in text.split(" ", 1))
+        return float(value) * SI_UNITS_KEY.get(unit, 1)
+    except ValueError:
+        logger.warning(f"Could not parse {value} as a measurement")
+        return None
+
+
+def _parse_boolean(text: str):
+    """
+    Parses the XML element's text field and returns it as a Python boolean
+    """
+    if text.strip().lower() in ("true", "t", "1"):
+        return True
+    elif text.strip().lower() in ("false", "f", "0"):
+        return False
+    else:
+        logger.warning(f"Could not parse {text} as a boolean")
+        return None
 
 
 def _get_source(file_path: Path, environment: MurfeyInstanceEnvironment) -> Path | None:
@@ -84,8 +340,8 @@ class FIBContext(Context):
         super().__init__("FIBContext", acquisition_software, token)
         self._basepath = basepath
         self._machine_config = machine_config
-        self._lamellae: dict[int, Lamella] = {}
-        self._milling_images: dict[int, list[MillingImage]] = {}
+        self._site_info: dict[int, LamellaSiteInfo] = {}
+        self._drift_correction_images: dict[int, list[MillingImage]] = {}
 
     def post_transfer(
         self,
@@ -103,7 +359,25 @@ class FIBContext(Context):
         # -----------------------------------------------------------------------------
         if self._acquisition_software == "autotem":
             parts = transferred_file.parts
-            if "DCImages" in parts and transferred_file.suffix == ".png":
+            if transferred_file.name == "ProjectData.dat":
+                logger.info(f"Found metadata file {transferred_file} for parsing")
+                all_site_info_new = self._parse_autotem_metadata(transferred_file)
+                for site_num, site_info_new in all_site_info_new.items():
+                    # Post the data to the backend if it's been changed
+                    if site_info_new.model_dump(
+                        exclude_none=True
+                    ) != self._site_info.get(site_num, LamellaSiteInfo()).model_dump(
+                        exclude_none=True
+                    ):
+                        ##############
+                        # Do POST here
+                        ##############
+
+                        # Update existing dict
+                        self._site_info[site_num] = site_info_new
+                        logger.info(f"Updated metadata for site {site_num}")
+
+            elif "DCImages" in parts and transferred_file.suffix == ".png":
                 lamella_name = parts[parts.index("Sites") + 1]
                 lamella_number = _number_from_name(lamella_name)
                 time_from_name = transferred_file.name.split("-")[:6]
@@ -117,11 +391,6 @@ class FIBContext(Context):
                         second=int(time_from_name[5]),
                     )
                 )
-                if not self._lamellae.get(lamella_number):
-                    self._lamellae[lamella_number] = Lamella(
-                        name=lamella_name,
-                        number=lamella_number,
-                    )
                 if not (source := _get_source(transferred_file, environment)):
                     logger.warning(f"No source found for file {transferred_file}")
                     return
@@ -139,15 +408,15 @@ class FIBContext(Context):
                         f"File {transferred_file.name!r} not found on storage system"
                     )
                     return
-                if not self._milling_images.get(lamella_number):
-                    self._milling_images[lamella_number] = [
+                if not self._drift_correction_images.get(lamella_number):
+                    self._drift_correction_images[lamella_number] = [
                         MillingImage(
                             timestamp=timestamp,
                             file=destination_file,
                         )
                     ]
                 else:
-                    self._milling_images[lamella_number].append(
+                    self._drift_correction_images[lamella_number].append(
                         MillingImage(
                             timestamp=timestamp,
                             file=destination_file,
@@ -156,7 +425,8 @@ class FIBContext(Context):
                 gif_list = [
                     l.file
                     for l in sorted(
-                        self._milling_images[lamella_number], key=lambda x: x.timestamp
+                        self._drift_correction_images[lamella_number],
+                        key=lambda x: x.timestamp,
                     )
                 ]
                 raw_directory = Path(
@@ -178,24 +448,7 @@ class FIBContext(Context):
                         "raw_directory": raw_directory,
                     },
                 )
-            elif transferred_file.name == "ProjectData.dat":
-                with open(transferred_file, "r") as dat:
-                    try:
-                        for_parsing = dat.read()
-                    except Exception:
-                        logger.warning(f"Failed to parse file {transferred_file}")
-                        return
-                    metadata = xmltodict.parse(for_parsing)
-                sites = metadata["AutoTEM"]["Project"]["Sites"]["Site"]
-                for site in sites:
-                    number = _number_from_name(site["Name"])
-                    milling_angle = site["Workflow"]["Recipe"][0]["Activities"][
-                        "MillingAngleActivity"
-                    ].get("MillingAngle")
-                    if self._lamellae.get(number) and milling_angle:
-                        self._lamellae[number]._replace(
-                            angle=float(milling_angle.split(" ")[0])
-                        )
+
         # -----------------------------------------------------------------------------
         # Maps
         # -----------------------------------------------------------------------------
@@ -232,6 +485,156 @@ class FIBContext(Context):
         # -----------------------------------------------------------------------------
         elif self._acquisition_software == "meteor":
             pass
+
+    def _parse_autotem_metadata(self, file: Path):
+        """
+        Helper function to parse the 'ProjectData.dat' file produced by the AutoTEM.
+        This file contains metadata information on the milling sites set by the user,
+        along with the configured milling steps and their completion status.
+        """
+
+        try:
+            root = ET.parse(file).getroot()
+        except Exception:
+            logger.warning(f"Error parsing file {str(file)}", exc_info=True)
+            return None
+
+        # Find all the Site nodes
+        if not (sites := root.findall(".//Sites/Site")):
+            logger.warning(f"No site information found in {str(file)}")
+            return None
+
+        # Iterate through Site nodes
+        all_site_info: dict[int, LamellaSiteInfo] = {}
+        for site in sites:
+            # Extract site name and number
+            if (site_name := _parse_xml_text(site, "Name", str)) is None:
+                logger.warning("Current site doesn't have a name")
+                continue
+            site_num = _number_from_name(site_name)
+            site_info = LamellaSiteInfo(site_name=site_name)
+
+            # Extract stage position information for all known stages in current site
+            stage_info = StagePositionInfo(
+                **{
+                    stage_name: StagePositionValues(
+                        **{
+                            value_name: value
+                            for value_name, value_path in STAGE_POSITION_VALUES.items()
+                            if (
+                                value := _parse_xml_text(
+                                    stage, value_path, _parse_measurement
+                                )
+                            )
+                            is not None
+                        }
+                    )
+                    for stage_name, stage_path in STAGE_POSITION_NAMES.items()
+                    if (stage := site.find(stage_path)) is not None
+                }
+            )
+            site_info.stage_info = stage_info
+
+            # Find all Recipe nodes for the Site
+            if not (recipes := site.findall("Workflow/Recipe")):
+                # Early skip if no recipes are found
+                logger.warning(f"No recipes found for site {site_name}")
+                continue
+
+            # Create dataclasses for each site
+            for recipe in recipes:
+                if (recipe_name := _parse_xml_text(recipe, "Name", str)) is None:
+                    # Early skip if the Recipe has no Name
+                    logger.warning("Recipe doesn't have a name, skipping")
+                    continue
+
+                # Find all the nodes under Activities
+                if (activities := recipe.find("Activities")) is None:
+                    # Early skip if none exist
+                    logger.warning(f"Recipe {recipe_name} doesn't have any activities")
+                    continue
+
+                # Iterate through the activities
+                for activity in activities:
+                    if (
+                        activity_name := _parse_xml_text(activity, "Name", str)
+                    ) is None:
+                        # Early skip if activity has no name
+                        logger.warning(
+                            f"Activitiy in recipe {recipe_name} doesn't have a name, skipping"
+                        )
+                        continue
+
+                    # Create a unique name based on recipe and activity names
+                    unique_name = f"{recipe_name} - {activity_name}"
+                    step_info = MillingStepInfo()
+
+                    # Update the corresponding milling activity field
+                    step_info.enabled = _parse_xml_text(
+                        activity, "IsEnabled", _parse_boolean
+                    )
+                    step_info.status = _parse_xml_text(
+                        activity, "ActivityMetadata/ExecutionResult", str
+                    )
+                    step_info.execution_time = _parse_xml_text(
+                        activity, "ExecutionTime", _parse_measurement
+                    )
+
+                    # Additional metadata extraction if elements are present
+                    if activity.find("DepthCorrection") is not None:
+                        step_info.depth_correction = _parse_xml_text(
+                            activity, "DepthCorrection", float
+                        )
+                    # Lamella milling geometries
+                    for value_name, value_path in LAMELLA_MILLING_VALUES.items():
+                        step_info.__setattr__(
+                            value_name,
+                            _parse_xml_text(
+                                activity,
+                                value_path,
+                                _parse_measurement,
+                            ),
+                        )
+                    # Beam information stored in either "BeamPreset" or "MillingPreset"
+                    if activity.find("BeamPreset") is not None:
+                        for value_name, value_path in BEAM_VALUES.items():
+                            match value_name:
+                                case "beam_type":
+                                    step_info.beam_type = _parse_xml_text(
+                                        activity, f"BeamPreset/{value_path}", str
+                                    )
+                                case _:
+                                    step_info.__setattr__(
+                                        value_name,
+                                        _parse_xml_text(
+                                            activity,
+                                            f"BeamPreset/{value_path}",
+                                            _parse_measurement,
+                                        ),
+                                    )
+                    elif activity.find("MillingPreset") is not None:
+                        for value_name, value_path in BEAM_VALUES.items():
+                            match value_name:
+                                case "beam_type":
+                                    step_info.beam_type = _parse_xml_text(
+                                        activity, f"MillingPreset/{value_path}", str
+                                    )
+                                case _:
+                                    step_info.__setattr__(
+                                        value_name,
+                                        _parse_xml_text(
+                                            activity,
+                                            f"MillingPreset/{value_path}",
+                                            _parse_measurement,
+                                        ),
+                                    )
+                    # Add info for current step to the site info model
+                    site_info.__setattr__(MILLING_STEP_NAMES[unique_name], step_info)
+            # Add info for current site to the dict
+            all_site_info[site_num] = site_info
+
+        logger.info(f"Successfully extracted AutoTEM metadata from file {file}")
+        return all_site_info
 
     def _register_atlas(self, file: Path, environment: MurfeyInstanceEnvironment):
         """
