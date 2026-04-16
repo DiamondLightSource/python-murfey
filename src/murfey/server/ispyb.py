@@ -56,7 +56,7 @@ if security_config.ispyb_credentials:
         log.error("Error loading ISPyB session", exc_info=True)
         ISPyBSession = lambda: None
 else:
-    log.info("No ISPyB credentials set, using local database", exc_info=True)
+    log.info("No ISPyB credentials set, using local database")
     ISPyBSession = lambda: None
 
 
