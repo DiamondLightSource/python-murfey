@@ -7,14 +7,19 @@ from typing import Any, Optional, OrderedDict
 
 import xmltodict
 
-from murfey.client.context import Context, ProcessingParameter
+from murfey.client.context import (
+    Context,
+    ProcessingParameter,
+    _file_transferred_to,
+    _get_source,
+)
 from murfey.client.destinations import find_longest_data_directory
 from murfey.client.instance_environment import (
     MovieTracker,
     MurfeyID,
     MurfeyInstanceEnvironment,
 )
-from murfey.util.client import capture_get, capture_post, get_machine_config_client
+from murfey.util.client import capture_get, capture_post
 from murfey.util.spa_metadata import (
     foil_hole_data,
     foil_hole_from_file,
@@ -24,28 +29,6 @@ from murfey.util.spa_metadata import (
 )
 
 logger = logging.getLogger("murfey.client.contexts.spa")
-
-
-def _file_transferred_to(
-    environment: MurfeyInstanceEnvironment, source: Path, file_path: Path, token: str
-):
-    machine_config = get_machine_config_client(
-        str(environment.url.geturl()),
-        token,
-        instrument_name=environment.instrument_name,
-    )
-    if environment.visit in environment.default_destinations[source]:
-        return (
-            Path(machine_config.get("rsync_basepath", ""))
-            / Path(environment.default_destinations[source])
-            / file_path.relative_to(source)  # need to strip out the rsync_module name
-        )
-    return (
-        Path(machine_config.get("rsync_basepath", ""))
-        / Path(environment.default_destinations[source])
-        / environment.visit
-        / file_path.relative_to(source)
-    )
 
 
 def _grid_square_metadata_file(
@@ -66,22 +49,6 @@ def _grid_square_metadata_file(
     return metadata_file
 
 
-def _get_source(file_path: Path, environment: MurfeyInstanceEnvironment) -> Path | None:
-    possible_sources = []
-    for s in environment.sources:
-        if file_path.is_relative_to(s):
-            possible_sources.append(s)
-    if not possible_sources:
-        return None
-    elif len(possible_sources) == 1:
-        return possible_sources[0]
-    source = possible_sources[0]
-    for extra_source in possible_sources[1:]:
-        if extra_source.is_relative_to(source):
-            source = extra_source
-    return source
-
-
 def _get_xml_list_index(key: str, xml_list: list) -> int:
     for i, elem in enumerate(xml_list):
         if elem["a:Key"] == key:
@@ -89,7 +56,7 @@ def _get_xml_list_index(key: str, xml_list: list) -> int:
     raise ValueError(f"Key not found in XML list: {key}")
 
 
-class SPAModularContext(Context):
+class SPAContext(Context):
     user_params = [
         ProcessingParameter(
             "dose_per_frame",
@@ -108,9 +75,16 @@ class SPAModularContext(Context):
         ProcessingParameter("motion_corr_binning", "Motion Correction Binning"),
     ]
 
-    def __init__(self, acquisition_software: str, basepath: Path, token: str):
-        super().__init__("SPA", acquisition_software, token)
+    def __init__(
+        self,
+        acquisition_software: str,
+        basepath: Path,
+        machine_config: dict,
+        token: str,
+    ):
+        super().__init__("SPAContext", acquisition_software, token)
         self._basepath = basepath
+        self._machine_config = machine_config
         self._processing_job_stash: dict = {}
         self._foil_holes: dict[int, list[int]] = {}
 
@@ -339,7 +313,10 @@ class SPAModularContext(Context):
             )
             image_path = (
                 _file_transferred_to(
-                    environment, metadata_source, Path(gs.image), self._token
+                    environment,
+                    metadata_source,
+                    Path(gs.image),
+                    Path(self._machine_config.get("rsync_basepath", "")),
                 )
                 if gs.image
                 else ""
@@ -349,6 +326,7 @@ class SPAModularContext(Context):
                 router_name="session_control.spa_router",
                 function_name="register_grid_square",
                 token=self._token,
+                instrument_name=environment.instrument_name,
                 session_id=environment.murfey_session,
                 gsid=grid_square,
                 data={
@@ -388,7 +366,10 @@ class SPAModularContext(Context):
                 )
                 image_path = (
                     _file_transferred_to(
-                        environment, metadata_source, Path(fh.image), self._token
+                        environment,
+                        metadata_source,
+                        Path(fh.image),
+                        Path(self._machine_config.get("rsync_basepath", "")),
                     )
                     if fh.image
                     else ""
@@ -398,6 +379,7 @@ class SPAModularContext(Context):
                     router_name="session_control.spa_router",
                     function_name="register_foil_hole",
                     token=self._token,
+                    instrument_name=environment.instrument_name,
                     session_id=environment.murfey_session,
                     gs_name=grid_square,
                     data={
@@ -422,6 +404,7 @@ class SPAModularContext(Context):
                     router_name="session_control.spa_router",
                     function_name="register_foil_hole",
                     token=self._token,
+                    instrument_name=environment.instrument_name,
                     session_id=environment.murfey_session,
                     gs_name=grid_square,
                     data={
@@ -447,16 +430,8 @@ class SPAModularContext(Context):
         if "gain" not in transferred_file.name:
             if transferred_file.suffix in data_suffixes:
                 if self._acquisition_software == "epu":
-                    if environment:
-                        machine_config = get_machine_config_client(
-                            str(environment.url.geturl()),
-                            self._token,
-                            instrument_name=environment.instrument_name,
-                        )
-                    else:
-                        machine_config = {}
                     required_strings = (
-                        machine_config.get("data_required_substrings", {})
+                        self._machine_config.get("data_required_substrings", {})
                         .get("epu", {})
                         .get(transferred_file.suffix, ["fractions"])
                     )
@@ -476,7 +451,10 @@ class SPAModularContext(Context):
 
                     if environment:
                         file_transferred_to = _file_transferred_to(
-                            environment, source, transferred_file, self._token
+                            environment,
+                            source,
+                            transferred_file,
+                            Path(self._machine_config.get("rsync_basepath", "")),
                         )
                         if not environment.movie_counters.get(str(source)):
                             movie_counts_get = capture_get(
@@ -501,6 +479,7 @@ class SPAModularContext(Context):
                                 router_name="file_io_instrument.router",
                                 function_name="write_eer_fractionation_file",
                                 token=self._token,
+                                instrument_name=environment.instrument_name,
                                 visit_name=environment.visit,
                                 session_id=environment.murfey_session,
                                 data={
@@ -522,7 +501,10 @@ class SPAModularContext(Context):
 
                         try:
                             foil_hole: Optional[int] = self._position_analysis(
-                                transferred_file, environment, source, machine_config
+                                transferred_file,
+                                environment,
+                                source,
+                                self._machine_config,
                             )
                         except Exception as e:
                             # try to continue if position information gathering fails so that movie is processed anyway
@@ -561,6 +543,7 @@ class SPAModularContext(Context):
                             router_name="workflow.spa_router",
                             function_name="request_spa_preprocessing",
                             token=self._token,
+                            instrument_name=environment.instrument_name,
                             visit_name=environment.visit,
                             session_id=environment.murfey_session,
                             data={

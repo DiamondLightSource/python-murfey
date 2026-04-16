@@ -3,33 +3,66 @@ from __future__ import annotations
 import logging
 from importlib.metadata import entry_points
 from pathlib import Path
-from typing import Any, List, NamedTuple
+from typing import Any, NamedTuple, OrderedDict
 
 import xmltodict
 
 from murfey.client.instance_environment import MurfeyInstanceEnvironment, SampleInfo
-from murfey.util.client import capture_post, get_machine_config_client
+from murfey.util.client import capture_post
 
 logger = logging.getLogger("murfey.client.context")
 
 
-def _atlas_destination(
-    environment: MurfeyInstanceEnvironment, source: Path, token: str
-) -> Path:
-    machine_config = get_machine_config_client(
-        str(environment.url.geturl()),
-        token,
-        instrument_name=environment.instrument_name,
+def _file_transferred_to(
+    environment: MurfeyInstanceEnvironment,
+    source: Path,
+    file_path: Path,
+    rsync_basepath: Path,
+):
+    if environment.visit in environment.default_destinations[source]:
+        return (
+            rsync_basepath
+            / Path(environment.default_destinations[source])
+            / file_path.relative_to(source)  # need to strip out the rsync_module name
+        )
+    return (
+        rsync_basepath
+        / Path(environment.default_destinations[source])
+        / environment.visit
+        / file_path.relative_to(source)
     )
+
+
+def _get_source(file_path: Path, environment: MurfeyInstanceEnvironment) -> Path | None:
+    possible_sources = []
+    for s in environment.sources:
+        if file_path.is_relative_to(s):
+            possible_sources.append(s)
+    if not possible_sources:
+        return None
+    elif len(possible_sources) == 1:
+        return possible_sources[0]
+    source = possible_sources[0]
+    for extra_source in possible_sources[1:]:
+        if extra_source.is_relative_to(source):
+            source = extra_source
+    return source
+
+
+def _atlas_destination(
+    environment: MurfeyInstanceEnvironment,
+    source: Path,
+    rsync_basepath: Path,
+) -> Path:
     for i, destination_part in enumerate(
         Path(environment.default_destinations[source]).parts
     ):
         if destination_part == environment.visit:
-            return Path(machine_config.get("rsync_basepath", "")) / "/".join(
+            return rsync_basepath / "/".join(
                 Path(environment.default_destinations[source]).parent.parts[: i + 1]
             )
     return (
-        Path(machine_config.get("rsync_basepath", ""))
+        rsync_basepath
         / Path(environment.default_destinations[source]).parent
         / environment.visit
     )
@@ -39,6 +72,7 @@ def ensure_dcg_exists(
     collection_type: str,
     metadata_source: Path,
     environment: MurfeyInstanceEnvironment,
+    machine_config: dict,
     token: str,
 ) -> str | None:
     """Create  a data collection group"""
@@ -61,6 +95,10 @@ def ensure_dcg_exists(
                     )
             except Exception as e:
                 logger.warning(f"Get EPU session hook failed: {e}")
+    elif collection_type == "sxt":
+        experiment_type_id = 47
+        session_file = metadata_source / "Session.dm"
+        source_visit_dir = metadata_source.parent
     else:
         logger.error(f"Unknown collection type {collection_type}")
         return None
@@ -141,7 +179,11 @@ def ensure_dcg_exists(
                 "experiment_type_id": experiment_type_id,
                 "tag": dcg_tag,
                 "atlas": str(
-                    _atlas_destination(environment, session_file.parent, token)
+                    _atlas_destination(
+                        environment,
+                        session_file.parent,
+                        Path(machine_config.get("rsync_basepath", "")),
+                    )
                     / environment.samples[metadata_source].atlas.parent
                     / atlas_xml_path.with_suffix(".jpg").name
                 ).replace("//", "/"),
@@ -159,17 +201,12 @@ def ensure_dcg_exists(
         router_name="workflow.router",
         function_name="register_dc_group",
         token=token,
+        instrument_name=environment.instrument_name,
         visit_name=environment.visit,
         session_id=environment.murfey_session,
         data=dcg_data,
     )
     return dcg_tag
-
-
-class ProcessingParameter(NamedTuple):
-    name: str
-    label: str
-    default: Any = None
 
 
 def detect_acquisition_software(dir_for_transfer: Path) -> str:
@@ -182,9 +219,15 @@ def detect_acquisition_software(dir_for_transfer: Path) -> str:
     return ""
 
 
+class ProcessingParameter(NamedTuple):
+    name: str
+    label: str
+    default: Any = None
+
+
 class Context:
-    user_params: List[ProcessingParameter] = []
-    metadata_params: List[ProcessingParameter] = []
+    user_params: list[ProcessingParameter] = []
+    metadata_params: list[ProcessingParameter] = []
 
     def __init__(self, name: str, acquisition_software: str, token: str):
         self._acquisition_software = acquisition_software
@@ -213,7 +256,7 @@ class Context:
 
     def gather_metadata(
         self, metadata_file: Path, environment: MurfeyInstanceEnvironment | None = None
-    ):
+    ) -> OrderedDict | None:
         raise NotImplementedError(
             f"gather_metadata must be declared in derived class to be used: {self}"
         )

@@ -12,7 +12,7 @@ from pydantic_settings import BaseSettings
 import murfey.server
 import murfey.server.api.auth
 import murfey.server.api.bootstrap
-#import murfey.server.api.clem
+import murfey.server.api.clem
 import murfey.server.api.display
 import murfey.server.api.file_io_frontend
 import murfey.server.api.file_io_instrument
@@ -26,10 +26,11 @@ import murfey.server.api.session_control
 import murfey.server.api.session_info
 import murfey.server.api.websocket
 import murfey.server.api.workflow
+import murfey.server.api.workflow_fib
 from murfey.server import template_files
 from murfey.util.config import get_security_config
 
-log = logging.getLogger("murfey.server.main")
+logger = logging.getLogger("murfey.server.main")
 
 tags_metadata = [murfey.server.api.bootstrap.tag]
 
@@ -96,7 +97,8 @@ app.include_router(murfey.server.api.workflow.router)
 app.include_router(murfey.server.api.workflow.correlative_router)
 app.include_router(murfey.server.api.workflow.spa_router)
 app.include_router(murfey.server.api.workflow.tomo_router)
-#app.include_router(murfey.server.api.clem.router)
+app.include_router(murfey.server.api.clem.router)
+app.include_router(murfey.server.api.workflow_fib.router)
 
 app.include_router(murfey.server.api.prometheus.router)
 
@@ -104,4 +106,7 @@ app.include_router(murfey.server.api.websocket.ws)
 
 # Search external packages for additional routers to include in Murfey
 for r in entry_points(group="murfey.routers"):
-    app.include_router(r.load())
+    try:
+        app.include_router(r.load())
+    except Exception:
+        logger.warning(f"Failed to load router {r.name!r}", exc_info=True)

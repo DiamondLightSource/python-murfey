@@ -1,4 +1,4 @@
 from __future__ import annotations
 
-__version__ = "0.23.4"
-__supported_client_version__ = "0.23.4"
+__version__ = "0.24.2"
+__supported_client_version__ = "0.24.2"

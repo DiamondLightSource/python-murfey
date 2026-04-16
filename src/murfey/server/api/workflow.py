@@ -4,6 +4,7 @@ from logging import getLogger
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import numpy as np
 import sqlalchemy
 from fastapi import APIRouter, Depends
 from ispyb.sqlalchemy import (
@@ -25,6 +26,20 @@ except ImportError:
     Image = None
 
 import murfey.server
+
+try:
+    from smartem_backend.api_client import SmartEMAPIClient
+    from smartem_common.schemas import (
+        AcquisitionData as SmartEMAcquisitionData,
+        GridData as SmartEMGridData,
+        MicrographData as SmartEMMicrographData,
+        MicrographManifest as SmartEMMicrographManifest,
+    )
+
+    SMARTEM_ACTIVE = True
+except ImportError:
+    SMARTEM_ACTIVE = False
+
 import murfey.server.prometheus as prom
 from murfey.server.api.auth import (
     MurfeySessionIDInstrument as MurfeySessionID,
@@ -70,9 +85,14 @@ from murfey.util.processing_params import (
     motion_corrected_mrc,
 )
 from murfey.util.tomo import midpoint
+from murfey.workflows.sxt.process_sxt_tilt_series import (
+    SXTTiltSeriesInfo,
+    process_sxt_tilt_series_workflow,
+)
 from murfey.workflows.tomo.tomo_metadata import register_search_map_in_database
 
 logger = getLogger("murfey.server.api.workflow")
+
 
 router = APIRouter(
     prefix="/workflow",
@@ -88,6 +108,8 @@ class DCGroupParameters(BaseModel):
     atlas: str = ""
     sample: Optional[int] = None
     atlas_pixel_size: float = 0
+    create_smartem_grid: bool = False
+    acquisition_uuid: Optional[str] = None
 
 
 @router.post(
@@ -106,6 +128,35 @@ def register_dc_group(
         db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
     )
     logger.info(f"Registering data collection group on microscope {instrument_name}")
+    smartem_grid_uuid = None
+    if (
+        dcg_params.create_smartem_grid
+        and SMARTEM_ACTIVE
+        and dcg_params.acquisition_uuid
+    ):
+        machine_config = get_machine_config(instrument_name=instrument_name)[
+            instrument_name
+        ]
+        if machine_config.smartem_api_url:
+            try:
+                smartem_client = SmartEMAPIClient(
+                    base_url=machine_config.smartem_api_url, logger=logger
+                )
+                grid_data = SmartEMGridData(
+                    data_dir=Path(dcg_params.tag),
+                    atlas_dir=Path(dcg_params.atlas) if dcg_params.atlas else None,
+                    acquisition_data=SmartEMAcquisitionData(
+                        uuid=dcg_params.acquisition_uuid,
+                        name=f"{visit_name}-sample-{dcg_params.sample}"
+                        if dcg_params.sample
+                        else f"{visit_name}-sample-unknown",
+                    ),
+                )
+                smartem_grid_uuid = smartem_client.create_acquisition_grid(
+                    grid_data
+                ).uuid
+            except Exception:
+                logger.warning("Failed to register SmartEM grid", exc_info=True)
     if (
         dcg_murfey := db.exec(
             select(DataCollectionGroup)
@@ -131,6 +182,8 @@ def register_dc_group(
             dcg_instance.atlas_pixel_size = (
                 dcg_params.atlas_pixel_size or dcg_instance.atlas_pixel_size
             )
+            if smartem_grid_uuid:
+                dcg_instance.smartem_grid_uuid = smartem_grid_uuid
 
             if murfey.server._transport_object:
                 if dcg_instance.atlas_id is not None:
@@ -180,6 +233,7 @@ def register_dc_group(
         )
     ).all():
         # Case where we switch from atlas to processing
+        original_tag = dcg_murfey[0].tag
         dcg_murfey[0].tag = dcg_params.tag or dcg_murfey[0].tag
         if murfey.server._transport_object:
             murfey.server._transport_object.send(
@@ -191,6 +245,13 @@ def register_dc_group(
                 },
             )
         db.add(dcg_murfey[0])
+        for grid_square in db.exec(
+            select(GridSquare)
+            .where(GridSquare.tag == original_tag)
+            .where(GridSquare.session_id == session_id)
+        ).all():
+            grid_square.tag = dcg_params.tag or original_tag
+            db.add(grid_square)
         db.commit()
     else:
         dcg_parameters = {
@@ -213,6 +274,11 @@ def register_dc_group(
                     "proposal_code": ispyb_proposal_code,
                     "proposal_number": ispyb_proposal_number,
                     "visit_number": ispyb_visit_number,
+                    **(
+                        {"smartem_grid_uuid": smartem_grid_uuid}
+                        if smartem_grid_uuid
+                        else {}
+                    ),
                 },
             )
     return dcg_params
@@ -505,6 +571,58 @@ async def request_spa_preprocessing(
         )
         db.add(movie)
         db.commit()
+
+        if (
+            SMARTEM_ACTIVE
+            and machine_config.smartem_api_url
+            and foil_hole_id is not None
+        ):
+            try:
+                fh_with_gs = db.exec(
+                    select(FoilHole, GridSquare)
+                    .where(FoilHole.id == foil_hole_id)
+                    .where(GridSquare.id == FoilHole.grid_square_id)
+                ).one_or_none()
+                if fh_with_gs is not None:
+                    fh, gs = fh_with_gs
+                    if fh.smartem_uuid:
+                        smartem_client = SmartEMAPIClient(
+                            base_url=machine_config.smartem_api_url, logger=logger
+                        )
+                        movie_path = Path(proc_file.path)
+                        micrograph_manifest = SmartEMMicrographManifest(
+                            unique_id=movie_path.stem,
+                            acquisition_datetime=datetime.now(),
+                            defocus=None,
+                            detector_name="",
+                            energy_filter=True,
+                            phase_plate=False,
+                            image_size_x=None,
+                            image_size_y=None,
+                            binning_x=1,
+                            binning_y=1,
+                        )
+                        micrograph_data = SmartEMMicrographData(
+                            id=movie_path.stem,
+                            gridsquare_id=str(gs.name),
+                            foilhole_uuid=fh.smartem_uuid,
+                            foilhole_id=str(fh.name),
+                            location_id=str(murfey_ids[0]),
+                            high_res_path=movie_path,
+                            manifest_file=movie_path,
+                            manifest=micrograph_manifest,
+                        )
+                        response = smartem_client.create_foilhole_micrograph(
+                            micrograph_data
+                        )
+                        movie.smartem_uuid = response.uuid
+                        db.add(movie)
+                        db.commit()
+            except Exception:
+                logger.warning(
+                    "Failed to register micrograph with smartem", exc_info=True
+                )
+
         db.close()
 
         if not mrc_out.parent.exists():
@@ -990,6 +1108,25 @@ async def register_tilt(
         _add_tilt()
 
 
+sxt_router = APIRouter(
+    prefix="/workflow/sxt",
+    dependencies=[Depends(validate_instrument_token)],
+    tags=["Workflows: Soft x-ray tomography"],
+)
+
+
+@sxt_router.post("/visits/{visit_name}/sessions/{session_id}/sxt_tilt_series")
+def process_sxt_tilt_series(
+    visit_name: str,
+    session_id: MurfeySessionID,
+    tilt_series_info: SXTTiltSeriesInfo,
+    db=murfey_db,
+):
+    return process_sxt_tilt_series_workflow(
+        visit_name, session_id, tilt_series_info, db
+    )
+
+
 correlative_router = APIRouter(
     prefix="/workflow/correlative",
     dependencies=[Depends(validate_instrument_token)],
@@ -1112,7 +1249,7 @@ async def make_gif(
     ]
     output_dir = (
         (machine_config.rsync_basepath or Path("")).resolve()
-        / secure_filename(year)
+        / secure_filename(str(year))
         / secure_filename(visit_name)
         / "processed"
     )
@@ -1120,21 +1257,35 @@ async def make_gif(
     output_dir = output_dir / secure_filename(gif_params.raw_directory)
     output_dir.mkdir(exist_ok=True)
     output_path = output_dir / f"lamella_{gif_params.lamella_number}_milling.gif"
-    image_full_paths = [
-        output_dir.parent / gif_params.raw_directory / i for i in gif_params.images
-    ]
+
     if Image is not None:
-        images = [Image.open(f) for f in image_full_paths]
+        images = [Image.open(f) for f in gif_params.images]
     else:
         images = []
     for im in images:
         im.thumbnail((512, 512))
-    images[0].save(
+
+    # Normalize and convert individual frames to 8-bit
+    arr: list[np.ndarray] = []
+    for im in images:
+        frame = np.array(im).astype(np.float32)
+        vmin, vmax = np.percentile(frame, (0.5, 99.5))
+        scale = 255 / ((vmax - vmin) or 1)
+        np.clip(frame, a_min=vmin, a_max=vmax, out=frame)
+        np.subtract(frame, vmin, out=frame)
+        np.multiply(frame, scale, out=frame)
+        arr.append(frame.astype(np.uint8))
+    arr = np.array(arr).astype(np.uint8)
+
+    # Convert back to Image objects and save as GIF
+    converted = [Image.fromarray(arr[f], mode="L") for f in range(len(images))]
+    converted[0].save(
         output_path,
         format="GIF",
-        append_images=images[1:],
+        append_images=converted[1:],
         save_all=True,
         duration=30,
         loop=0,
     )
+
     return {"output_gif": str(output_path)}

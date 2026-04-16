@@ -81,6 +81,12 @@ def machine_info_by_instrument(
     return get_machine_config(instrument_name)[instrument_name]
 
 
+@router.get("/instruments/{instrument_name}/smartem")
+def check_smartem_availability(instrument_name: str):
+    machine_config = get_machine_config(instrument_name)[instrument_name]
+    return {"available": bool(machine_config.smartem_api_url)}
+
+
 @router.get("/instruments/{instrument_name}/visits_raw", response_model=List[Visit])
 def get_current_visits(instrument_name: MurfeyInstrumentName, db=ispyb_db):
     logger.debug(
@@ -136,7 +142,9 @@ class SessionClients(BaseModel):
 
 
 @router.get("/sessions/{session_id}")
-async def get_session(session_id: MurfeySessionID, db: Session = murfey_db) -> SessionClients:
+async def get_session(
+    session_id: MurfeySessionID, db: Session = murfey_db
+) -> SessionClients:
     session = db.exec(select(Session).where(Session.id == session_id)).one()
     clients = db.exec(
         select(ClientEnvironment).where(ClientEnvironment.session_id == session_id)
@@ -452,14 +460,18 @@ async def get_upstream_file(
 @correlative_router.get(
     "/visits/{visit_name}/sessions/{session_id}/upstream_tiff_paths"
 )
-async def gather_upstream_tiffs(visit_name: str, session_id: int, db: Session = murfey_db):
+async def gather_upstream_tiffs(
+    visit_name: str, session_id: int, db: Session = murfey_db
+):
     return _gather_upstream_tiffs(visit_name=visit_name, session_id=session_id, db=db)
 
 
 @correlative_router.get(
     "/visits/{visit_name}/sessions/{session_id}/upstream_tiff/{tiff_path:path}"
 )
-async def get_tiff_file(visit_name: str, session_id: int, tiff_path: str, db: Session = murfey_db):
+async def get_tiff_file(
+    visit_name: str, session_id: int, tiff_path: str, db: Session = murfey_db
+):
     tiff_file = _get_tiff_file(
         visit_name=visit_name, session_id=session_id, tiff_path=tiff_path, db=db
     )

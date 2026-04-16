@@ -15,7 +15,7 @@ def test_ensure_dcg_exists_tomo(mock_capture_post, tmp_path):
             tmp_path
             / "cm12345-6/metadata_folder": f"{tmp_path}/destination/cm12345-6/raw"
         },
-        instrument_name="",
+        instrument_name="m01",
         visit="cm12345-6",
         murfey_session=1,
     )
@@ -41,6 +41,7 @@ def test_ensure_dcg_exists_tomo(mock_capture_post, tmp_path):
         collection_type="tomo",
         metadata_source=metadata_source,
         environment=env,
+        machine_config={},
         token="token",
     )
 
@@ -56,6 +57,7 @@ def test_ensure_dcg_exists_tomo(mock_capture_post, tmp_path):
         router_name="workflow.router",
         function_name="register_dc_group",
         token="token",
+        instrument_name="m01",
         visit_name="cm12345-6",
         session_id=1,
         data=dcg_data,
@@ -72,7 +74,7 @@ def test_ensure_dcg_exists_spa(mock_capture_post, tmp_path):
             tmp_path
             / "cm12345-6/metadata_folder": f"{tmp_path}/destination/cm12345-6/raw",
         },
-        instrument_name="",
+        instrument_name="m01",
         visit="cm12345-6",
         murfey_session=1,
     )
@@ -101,6 +103,7 @@ def test_ensure_dcg_exists_spa(mock_capture_post, tmp_path):
         collection_type="spa",
         metadata_source=metadata_source / "Images-Disc1",
         environment=env,
+        machine_config={},
         token="token",
     )
 
@@ -116,6 +119,7 @@ def test_ensure_dcg_exists_spa(mock_capture_post, tmp_path):
         router_name="workflow.router",
         function_name="register_dc_group",
         token="token",
+        instrument_name="m01",
         visit_name="cm12345-6",
         session_id=1,
         data=dcg_data,
@@ -129,7 +133,7 @@ def test_ensure_dcg_exists_spa_missing_xml(mock_capture_post, tmp_path):
         client_id=0,
         sources=[tmp_path],
         default_destinations={tmp_path: str(tmp_path)},
-        instrument_name="",
+        instrument_name="m01",
         visit="cm12345-6",
         murfey_session=1,
     )
@@ -139,6 +143,7 @@ def test_ensure_dcg_exists_spa_missing_xml(mock_capture_post, tmp_path):
         collection_type="spa",
         metadata_source=metadata_source,
         environment=env,
+        machine_config={},
         token="token",
     )
 
@@ -151,6 +156,7 @@ def test_ensure_dcg_exists_spa_missing_xml(mock_capture_post, tmp_path):
         router_name="workflow.router",
         function_name="register_dc_group",
         token="token",
+        instrument_name="m01",
         visit_name="cm12345-6",
         session_id=1,
         data=dcg_data,

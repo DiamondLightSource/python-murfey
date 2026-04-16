@@ -4,18 +4,25 @@ from typing import Optional
 
 import xmltodict
 
-from murfey.client.context import Context, _atlas_destination
-from murfey.client.contexts.spa import _get_source
+from murfey.client.context import Context, _atlas_destination, _get_source
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.util.client import capture_post
+from murfey.util.spa_metadata import get_grid_square_atlas_positions
 
 logger = logging.getLogger("murfey.client.contexts.atlas")
 
 
 class AtlasContext(Context):
-    def __init__(self, acquisition_software: str, basepath: Path, token: str):
-        super().__init__("Atlas", acquisition_software, token)
+    def __init__(
+        self,
+        acquisition_software: str,
+        basepath: Path,
+        machine_config: dict,
+        token: str,
+    ):
+        super().__init__("AtlasContext", acquisition_software, token)
         self._basepath = basepath
+        self._machine_config = machine_config
 
     def post_transfer(
         self,
@@ -28,7 +35,49 @@ class AtlasContext(Context):
             environment=environment,
             **kwargs,
         )
+        if self._acquisition_software == "serialem":
+            self.post_transfer_serialem(
+                transferred_file, environment=environment, **kwargs
+            )
+        else:
+            self.post_transfer_epu(transferred_file, environment=environment, **kwargs)
 
+    def post_transfer_serialem(
+        self,
+        transferred_file: Path,
+        environment: Optional[MurfeyInstanceEnvironment] = None,
+        **kwargs,
+    ):
+        if environment and transferred_file.suffix == ".mrc":
+            source = _get_source(transferred_file, environment)
+            if source:
+                capture_post(
+                    base_url=str(environment.url.geturl()),
+                    router_name="session_control.spa_router",
+                    function_name="register_atlas",
+                    token=self._token,
+                    instrument_name=environment.instrument_name,
+                    session_id=environment.murfey_session,
+                    data={
+                        "name": transferred_file.stem,
+                        "acquisition_uuid": environment.acquisition_uuid,
+                        "storage_folder": str(
+                            _atlas_destination(
+                                environment,
+                                source,
+                                Path(self._machine_config.get("rsync_basepath", "")),
+                            )
+                            / "atlas"
+                        ),
+                    },
+                )
+
+    def post_transfer_epu(
+        self,
+        transferred_file: Path,
+        environment: Optional[MurfeyInstanceEnvironment] = None,
+        **kwargs,
+    ):
         if (
             environment
             and "Atlas_" in transferred_file.stem
@@ -37,13 +86,16 @@ class AtlasContext(Context):
             source = _get_source(transferred_file, environment)
             if source:
                 transferred_atlas_name = _atlas_destination(
-                    environment, source, self._token
+                    environment,
+                    source,
+                    Path(self._machine_config.get("rsync_basepath", "")),
                 ) / transferred_file.relative_to(source.parent)
                 capture_post(
                     base_url=str(environment.url.geturl()),
                     router_name="session_control.spa_router",
                     function_name="make_atlas_jpg",
                     token=self._token,
+                    instrument_name=environment.instrument_name,
                     session_id=environment.murfey_session,
                     data={"path": str(transferred_atlas_name).replace("//", "/")},
                 )
@@ -59,7 +111,9 @@ class AtlasContext(Context):
             if source:
                 atlas_mrc = transferred_file.with_suffix(".mrc")
                 transferred_atlas_jpg = _atlas_destination(
-                    environment, source, self._token
+                    environment,
+                    source,
+                    Path(self._machine_config.get("rsync_basepath", "")),
                 ) / atlas_mrc.relative_to(source.parent).with_suffix(".jpg")
 
                 with open(transferred_file, "rb") as atlas_xml:
@@ -89,16 +143,68 @@ class AtlasContext(Context):
                     "atlas": str(transferred_atlas_jpg).replace("//", "/"),
                     "sample": sample,
                     "atlas_pixel_size": atlas_pixel_size,
+                    "create_smartem_grid": bool(environment.acquisition_uuid),
+                    "acquisition_uuid": environment.acquisition_uuid,
                 }
                 capture_post(
                     base_url=str(environment.url.geturl()),
                     router_name="workflow.router",
                     function_name="register_dc_group",
                     token=self._token,
+                    instrument_name=environment.instrument_name,
                     visit_name=environment.visit,
                     session_id=environment.murfey_session,
                     data=dcg_data,
                 )
                 logger.info(
                     f"Registered data collection group for atlas {str(transferred_atlas_jpg)!r}"
+                )
+
+        elif environment and transferred_file.name == "Atlas.dm":
+            # Register all grid squares on this atlas
+            gs_pix_positions = get_grid_square_atlas_positions(transferred_file)
+            for gs, pos_data in gs_pix_positions.items():
+                if pos_data:
+                    capture_post(
+                        base_url=str(environment.url.geturl()),
+                        router_name="session_control.spa_router",
+                        function_name="register_grid_square",
+                        token=self._token,
+                        instrument_name=environment.instrument_name,
+                        session_id=environment.murfey_session,
+                        gsid=int(gs),
+                        data={
+                            "tag": str(transferred_file.parent),
+                            "x_location": pos_data[0],
+                            "y_location": pos_data[1],
+                            "x_stage_position": pos_data[2],
+                            "y_stage_position": pos_data[3],
+                            "width": pos_data[4],
+                            "height": pos_data[5],
+                            "angle": pos_data[6],
+                        },
+                    )
+            if gs_pix_positions:
+                for p in transferred_file.parts:
+                    if p.startswith("Sample"):
+                        sample = int(p.replace("Sample", ""))
+                        break
+                else:
+                    logger.warning(
+                        f"Sample could not be identified for {transferred_file}"
+                    )
+                    return
+                capture_post(
+                    base_url=str(environment.url.geturl()),
+                    router_name="session_control.spa_router",
+                    function_name="register_atlas",
+                    token=self._token,
+                    instrument_name=environment.instrument_name,
+                    session_id=environment.murfey_session,
+                    data={
+                        "name": f"{environment.visit}-sample-{sample}",
+                        "acquisition_uuid": environment.acquisition_uuid,
+                        "register_grid": True,
+                        "tag": str(transferred_file.parent),
+                    },
                 )

@@ -7,7 +7,7 @@ requires = [
 
 [project]
 name = "murfey"
-version = "0.23.4"
+version = "0.24.2"
 description = "Client-Server architecture hauling Cryo-EM data"
 readme = "README.md"
 keywords = [
@@ -58,7 +58,7 @@ server = [
     "ispyb>=10.2.4", # Responsible for setting requirements for SQLAlchemy and mysql-connector-python;
     "jinja2",
     "mrcfile",
-    "numpy<2",
+    "numpy<3",
     "packaging",
     "passlib",
     "pillow",
@@ -67,6 +67,12 @@ server = [
     "sqlmodel",
     "stomp-py>8.1.1", # 8.1.1 (released 2024-04-06) doesn't work with our project
     "zocalo>=1",
+]
+smartem = [
+    "smartem-decisions[backend]",
+]
+sxt = [
+    "txrm2tiff",
 ]
 [project.urls]
 Bug-Tracker = "https://github.com/DiamondLightSource/python-murfey/issues"
@@ -90,21 +96,33 @@ GitHub = "https://github.com/DiamondLightSource/python-murfey"
 "murfey.transfer" = "murfey.cli.transfer:run"
 [project.entry-points."murfey.config.extraction"]
 "murfey_machine" = "murfey.util.config:get_extended_machine_config"
+[project.entry-points."murfey.contexts"]
+AtlasContext = "murfey.client.contexts.atlas:AtlasContext"
+CLEMContext = "murfey.client.contexts.clem:CLEMContext"
+FIBContext = "murfey.client.contexts.fib:FIBContext"
+SPAContext = "murfey.client.contexts.spa:SPAContext"
+SPAMetadataContext = "murfey.client.contexts.spa_metadata:SPAMetadataContext"
+SXTContext = "murfey.client.contexts.sxt:SXTContext"
+TomographyContext = "murfey.client.contexts.tomo:TomographyContext"
+TomographyMetadataContext = "murfey.client.contexts.tomo_metadata:TomographyMetadataContext"
 [project.entry-points."murfey.workflows"]
 "atlas_update" = "murfey.workflows.register_atlas_update:run"
-"clem.align_and_merge" = "murfey.workflows.clem.align_and_merge:submit_cluster_request"
-"clem.process_raw_lifs" = "murfey.workflows.clem.process_raw_lifs:zocalo_cluster_request"
-"clem.process_raw_tiffs" = "murfey.workflows.clem.process_raw_tiffs:zocalo_cluster_request"
-"clem.register_align_and_merge_result" = "murfey.workflows.clem.register_align_and_merge_results:register_align_and_merge_result"
+"clem.align_and_merge" = "murfey.workflows.clem.align_and_merge:run"
+"clem.process_raw_lifs" = "murfey.workflows.clem.process_raw_lifs:run"
+"clem.process_raw_tiffs" = "murfey.workflows.clem.process_raw_tiffs:run"
+"clem.register_align_and_merge_result" = "murfey.workflows.clem.register_align_and_merge_results:run"
 "clem.register_preprocessing_result" = "murfey.workflows.clem.register_preprocessing_results:run"
 "data_collection" = "murfey.workflows.register_data_collection:run"
 "data_collection_group" = "murfey.workflows.register_data_collection_group:run"
 "experiment_type_update" = "murfey.workflows.register_experiment_type_update:run"
+"fib.register_atlas" = "murfey.workflows.fib.register_atlas:run"
 "pato" = "murfey.workflows.notifications:notification_setup"
 "picked_particles" = "murfey.workflows.spa.picking:particles_picked"
 "picked_tomogram" = "murfey.workflows.tomo.picking:picked_tomogram"
 "processing_job" = "murfey.workflows.register_processing_job:run"
+"spa.ctf_estimated" = "murfey.workflows.spa.ctf_estimation:ctf_estimated"
 "spa.flush_spa_preprocess" = "murfey.workflows.spa.flush_spa_preprocess:flush_spa_preprocess"
+"spa.motion_corrected" = "murfey.workflows.spa.motion_correction:motion_corrected"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

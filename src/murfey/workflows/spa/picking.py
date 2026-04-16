@@ -5,13 +5,11 @@ import numpy as np
 from sqlalchemy import func
 from sqlmodel import Session, select
 
-import murfey.server.prometheus as prom
 import murfey.server
+import murfey.server.prometheus as prom
 from murfey.server.feedback import (
     _app_id,
-    _flush_class2d,
     _pj_id,
-    _register_class_selection,
 )
 from murfey.util.config import get_machine_config
 from murfey.util.db import (
@@ -24,13 +22,22 @@ from murfey.util.db import (
     NotificationValue,
     ParticleSizes,
     ProcessingJob,
-    SelectionStash,
     Session as MurfeySession,
     SPARelionParameters,
 )
 from murfey.util.processing_params import default_spa_parameters
 
 logger = getLogger("murfey.workflows.spa.picking")
+
+try:
+    from smartem_backend.api_client import SmartEMAPIClient
+    from smartem_backend.model.http_request import MicrographUpdateRequest
+    from smartem_backend.model.http_response import MicrographResponse
+    from smartem_common.entity_status import MicrographStatus
+
+    SMARTEM_ACTIVE = True
+except ImportError:
+    SMARTEM_ACTIVE = False
 
 
 def _register_picked_particles_use_diameter(message: dict, _db: Session):
@@ -74,47 +81,14 @@ def _register_picked_particles_use_diameter(message: dict, _db: Session):
             select(SPARelionParameters).where(SPARelionParameters.pj_id == pj_id)
         ).one()
         relion_options = dict(relion_params)
-        feedback_params = _db.exec(
-            select(ClassificationFeedbackParameters).where(
-                ClassificationFeedbackParameters.pj_id == pj_id
-            )
-        ).one()
-
         particle_diameter = relion_params.particle_diameter
-
-        if feedback_params.picker_ispyb_id is None:
-            if not murfey.server._transport_object:
-                feedback_params.picker_ispyb_id = 1000
-            else:
-                assert feedback_params.picker_murfey_id is not None
-                """feedback_params.picker_ispyb_id = murfey.server._transport_object.do_buffer_lookup(
-                    message["program_id"], feedback_params.picker_murfey_id
-                )"""
-
-                if feedback_params.picker_ispyb_id is not None:
-                    _flush_class2d(message["session_id"], message["program_id"], _db)
-            _db.add(feedback_params)
-            _db.commit()
-            selection_stash = _db.exec(
-                select(SelectionStash).where(SelectionStash.pj_id == pj_id)
-            ).all()
-            for s in selection_stash:
-                _register_class_selection(
-                    {
-                        "session_id": s.session_id,
-                        "class_selection_score": s.class_selection_score or 0,
-                    },
-                    _db=_db,
-                )
-                _db.delete(s)
-                _db.commit()
 
         if not particle_diameter:
             # If the diameter has not been calculated then find it
             picking_db = _db.exec(
                 select(ParticleSizes.particle_size).where(ParticleSizes.pj_id == pj_id)
             ).all()
-            particle_diameter = np.quantile(list(picking_db), 0.75)
+            particle_diameter = float(np.quantile(list(picking_db), 0.75))
             relion_params.particle_diameter = particle_diameter
             _db.add(relion_params)
             _db.commit()
@@ -247,34 +221,6 @@ def _register_picked_particles_use_boxsize(message: dict, _db: Session):
     relion_params = _db.exec(
         select(SPARelionParameters).where(SPARelionParameters.pj_id == pj_id)
     ).one()
-    feedback_params = _db.exec(
-        select(ClassificationFeedbackParameters).where(
-            ClassificationFeedbackParameters.pj_id == pj_id
-        )
-    ).one()
-
-    if feedback_params.picker_ispyb_id is None and murfey.server._transport_object:
-        assert feedback_params.picker_murfey_id is not None
-        """feedback_params.picker_ispyb_id = murfey.server._transport_object.do_buffer_lookup(
-            message["program_id"], feedback_params.picker_murfey_id
-        )"""
-        if feedback_params.picker_ispyb_id is not None:
-            _flush_class2d(message["session_id"], message["program_id"], _db)
-        _db.add(feedback_params)
-        _db.commit()
-        selection_stash = _db.exec(
-            select(SelectionStash).where(SelectionStash.pj_id == pj_id)
-        ).all()
-        for s in selection_stash:
-            _register_class_selection(
-                {
-                    "session_id": s.session_id,
-                    "class_selection_score": s.class_selection_score or 0,
-                },
-                _db=_db,
-            )
-            _db.delete(s)
-            _db.commit()
 
     # Send the message to extraction with the box sizes
     zocalo_message: dict = {
@@ -307,7 +253,9 @@ def _register_picked_particles_use_boxsize(message: dict, _db: Session):
         zocalo_message["parameters"]["feedback_queue"] = (
             murfey.server._transport_object.feedback_queue
         )
-        murfey.server._transport_object.send("processing_recipe", zocalo_message, new_connection=True)
+        murfey.server._transport_object.send(
+            "processing_recipe", zocalo_message, new_connection=True
+        )
     _db.close()
 
 
@@ -435,6 +383,32 @@ def particles_picked(message: dict, murfey_db: Session) -> dict[str, bool]:
     movie.preprocessed = True
     murfey_db.add(movie)
     murfey_db.commit()
+    if SMARTEM_ACTIVE and movie.smartem_uuid:
+        try:
+            session = murfey_db.exec(
+                select(MurfeySession).where(MurfeySession.id == message["session_id"])
+            ).one()
+            machine_config = get_machine_config(
+                instrument_name=session.instrument_name
+            )[session.instrument_name]
+            if machine_config.smartem_api_url:
+                smartem_client = SmartEMAPIClient(
+                    base_url=machine_config.smartem_api_url, logger=logger
+                )
+                update = MicrographUpdateRequest(
+                    status=MicrographStatus.PARTICLE_PICKING_COMPLETED
+                )
+                smartem_client._request(
+                    "put",
+                    f"micrographs/{movie.smartem_uuid}",
+                    update,
+                    MicrographResponse,
+                )
+        except Exception:
+            logger.warning(
+                "Failed to emit particle picking complete event to smartem",
+                exc_info=True,
+            )
     feedback_params = murfey_db.exec(
         select(ClassificationFeedbackParameters).where(
             ClassificationFeedbackParameters.pj_id

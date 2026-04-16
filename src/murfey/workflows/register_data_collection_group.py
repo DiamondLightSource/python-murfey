@@ -7,7 +7,6 @@ import ispyb.sqlalchemy._auto_db_schema as ISPyBDB
 from sqlmodel import select
 from sqlmodel.orm.session import Session as SQLModelSession
 
-import murfey.util.db as MurfeyDB
 import murfey.server
 from murfey.server.ispyb import ISPyBSession, get_session_id
 from murfey.util.db import DataCollectionGroup
@@ -42,6 +41,7 @@ def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
             murfey_dcg = DataCollectionGroup(
                 session_id=message["session_id"],
                 tag=message.get("tag"),
+                smartem_grid_uuid=message.get("smartem_grid_uuid"),
             )
             dcgid = murfey_dcg.id
         else:
@@ -50,9 +50,9 @@ def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
                 experimentTypeId=message["experiment_type_id"],
             )
 
-            dcgid = murfey.server._transport_object.do_insert_data_collection_group(record).get(
-                "return_value", None
-            )
+            dcgid = murfey.server._transport_object.do_insert_data_collection_group(
+                record
+            ).get("return_value", None)
 
             if dcgid is None:
                 time.sleep(2)
@@ -75,9 +75,9 @@ def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
             if color_flags := message.get("color_flags", {}):
                 for col_name, value in color_flags.items():
                     setattr(atlas_record, col_name, value)
-            atlas_id = murfey.server._transport_object.do_insert_atlas(atlas_record).get(
-                "return_value", None
-            )
+            atlas_id = murfey.server._transport_object.do_insert_atlas(
+                atlas_record
+            ).get("return_value", None)
 
             murfey_dcg = DataCollectionGroup(
                 id=dcgid,
@@ -87,6 +87,7 @@ def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
                 sample=message.get("sample"),
                 session_id=message["session_id"],
                 tag=message.get("tag"),
+                smartem_grid_uuid=message.get("smartem_grid_uuid"),
             )
         murfey_db.add(murfey_dcg)
         murfey_db.commit()

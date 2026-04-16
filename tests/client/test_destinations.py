@@ -112,6 +112,7 @@ def test_determine_default_destinations_suggested_path(mock_post, mock_get, sour
         router_name="file_io_instrument.router",
         function_name="suggest_path",
         token="token",
+        instrument_name="m01",
         visit_name="cm12345-6",
         session_id=2,
         data={
@@ -162,6 +163,7 @@ def test_determine_default_destinations_short_path(mock_post, mock_get):
         router_name="file_io_instrument.router",
         function_name="suggest_path",
         token="token",
+        instrument_name="m01",
         visit_name="cm12345-6",
         session_id=2,
         data={

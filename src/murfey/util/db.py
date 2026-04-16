@@ -52,29 +52,8 @@ class Session(SQLModel, table=True):  # type: ignore
     process: bool = Field(default=True)
     visit_end_time: Optional[datetime] = Field(default=None)
 
-    # CLEM Workflow
-
-    # LIF files collected, if any
-    lif_files: List["CLEMLIFFile"] = Relationship(
-        back_populates="session",
-        sa_relationship_kwargs={"cascade": "delete"},
-    )
-    # TIFF files collected, if any
-    tiff_files: List["CLEMTIFFFile"] = Relationship(
-        back_populates="session",
-        sa_relationship_kwargs={"cascade": "delete"},
-    )
-    # Metadata files generated
-    metadata_files: List["CLEMImageMetadata"] = Relationship(
-        back_populates="session", sa_relationship_kwargs={"cascade": "delete"}
-    )
-    # Image series associated with this session
-    image_series: List["CLEMImageSeries"] = Relationship(
-        back_populates="session",
-        sa_relationship_kwargs={"cascade": "delete"},
-    )
-    # Image stacks associated with this session
-    image_stacks: List["CLEMImageStack"] = Relationship(
+    # Image sites associated with this session
+    imaging_sites: List["ImagingSite"] = Relationship(
         back_populates="session",
         sa_relationship_kwargs={"cascade": "delete"},
     )
@@ -107,194 +86,53 @@ class Session(SQLModel, table=True):  # type: ignore
     )
 
 
-"""
-CLEM WORKFLOW
-"""
-
-
-class CLEMLIFFile(SQLModel, table=True):  # type: ignore
+class ImagingSite(SQLModel, table=True):  # type: ignore
     """
-    Database recording the different LIF files acquired during the CLEM session, as
-    well as the different image series stored within them.
+    Table for recording unique imaging sites in the session. These can then be linked
+    to DataCollectionGroup or GridSquare entries as needed.
     """
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    file_path: str = Field(index=True)  # Path to LIF file
+    site_name: str = Field(index=True)
 
-    # The CLEM session this series belongs to
-    session: Optional["Session"] = Relationship(
-        back_populates="lif_files"
-    )  # Many to one
-    session_id: Optional[int] = Field(
-        foreign_key="session.id",
-        default=None,
-    )
-
-    master_metadata: Optional[str] = Field(
-        index=True
-    )  # Path to master metadata generated from LIF file
-
-    # Offspring
-    child_metadata: List["CLEMImageMetadata"] = Relationship(
-        back_populates="parent_lif",
-        sa_relationship_kwargs={"cascade": "delete"},
-    )  # One to many
-    child_series: List["CLEMImageSeries"] = Relationship(
-        back_populates="parent_lif",
-        sa_relationship_kwargs={"cascade": "delete"},
-    )  # One to many
-    child_stacks: List["CLEMImageStack"] = Relationship(
-        back_populates="parent_lif",
-        sa_relationship_kwargs={"cascade": "delete"},
-    )  # One to many
-
-
-class CLEMTIFFFile(SQLModel, table=True):  # type: ignore
-    """
-    Database to record each raw TIFF file acquired during a CLEM session, which are
-    used to create an image stack
-    """
-
-    id: Optional[int] = Field(default=None, primary_key=True)
-    file_path: str = Field(index=True)  # File path to TIFF file on system
-
-    session: Optional["Session"] = Relationship(
-        back_populates="tiff_files"
-    )  # Many to one
-    session_id: Optional[int] = Field(
-        foreign_key="session.id",
-        default=None,
-    )
-
-    # Metadata associated with this TIFF file
-    associated_metadata: Optional["CLEMImageMetadata"] = Relationship(
-        back_populates="associated_tiffs",
-    )  # Many to one
-    metadata_id: Optional[int] = Field(
-        foreign_key="clemimagemetadata.id",
-        default=None,
-    )
-
-    # Image series it contributes to
-    child_series: Optional["CLEMImageSeries"] = Relationship(
-        back_populates="parent_tiffs"
-    )  # Many to one
-    series_id: Optional[int] = Field(
-        foreign_key="clemimageseries.id",
-        default=None,
-    )
-
-    # Image stack it contributes to
-    child_stack: Optional["CLEMImageStack"] = Relationship(
-        back_populates="parent_tiffs"
-    )  # Many to one
-    stack_id: Optional[int] = Field(
-        foreign_key="clemimagestack.id",
-        default=None,
-    )
-
-
-class CLEMImageMetadata(SQLModel, table=True):  # type: ignore
-    id: Optional[int] = Field(default=None, primary_key=True)
-    file_path: str = Field(index=True)  # Full path to metadata file
-
-    session: Optional["Session"] = Relationship(back_populates="metadata_files")
-    session_id: Optional[int] = Field(foreign_key="session.id")  # Many to one
-
-    # The parent LIF file this metadata originates from, if any
-    parent_lif: Optional[CLEMLIFFile] = Relationship(
-        back_populates="child_metadata",
-    )  # Many to one
-    parent_lif_id: Optional[int] = Field(
-        foreign_key="clemliffile.id",
-        default=None,
-    )
-    # The TIFF files related to this file
-    associated_tiffs: List["CLEMTIFFFile"] = Relationship(
-        back_populates="associated_metadata",
-        sa_relationship_kwargs={"cascade": "delete"},
-    )  # One to many
-
-    # Associated series
-    associated_series: Optional["CLEMImageSeries"] = Relationship(
-        back_populates="associated_metadata",
-        sa_relationship_kwargs={"cascade": "delete"},
-    )  # One to one
-
-    # Associated image stacks
-    associated_stacks: List["CLEMImageStack"] = Relationship(
-        back_populates="associated_metadata",
-        sa_relationship_kwargs={"cascade": "delete"},
-    )  # One to many
-
-
-class CLEMImageSeries(SQLModel, table=True):  # type: ignore
-    """
-    Database recording the files and metadata associated with a series, which are to be
-    processed together as a group. These files could stem from a parent LIF file, or
-    have been compiled together from individual TIFF files.
-    """
-
-    id: Optional[int] = Field(default=None, primary_key=True)
-    series_name: str = Field(
-        index=True
-    )  # Name of the series, as determined from the metadata
-    image_search_string: Optional[str] = Field(default=None)
-    thumbnail_search_string: Optional[str] = Field(default=None)
-
-    session: Optional["Session"] = Relationship(
-        back_populates="image_series"
-    )  # Many to one
-    session_id: Optional[int] = Field(
-        foreign_key="session.id", default=None, unique=False
-    )
+    # File paths to images and thumbnails; can be a glob search string
+    image_path: Optional[str] = Field(default=None)
+    thumbnail_path: Optional[str] = Field(default=None)
 
     # Type of data (atlas/overview or grid square)
     data_type: Optional[str] = Field(default=None)  # "atlas" or "grid_square"
 
-    # Link to data collection group
-    data_collection_group: Optional["DataCollectionGroup"] = Relationship(
-        back_populates="clem_image_series"
-    )
-    dcg_id: Optional[int] = Field(
-        foreign_key="datacollectiongroup.dataCollectionGroupId", default=None
-    )
-    dcg_name: Optional[str] = Field(default=None)
+    # Stage position (image centre) and rotation
+    pos_x: Optional[float] = Field(default=None)
+    pos_y: Optional[float] = Field(default=None)
+    pos_z: Optional[float] = Field(default=None)
+    rotation: Optional[float] = Field(default=None)
+    tilt_alpha: Optional[float] = Field(default=None)
+    tilt_beta: Optional[float] = Field(default=None)
 
-    # Link to grid squares
-    grid_square: Optional["GridSquare"] = Relationship(
-        back_populates="clem_image_series"
-    )
-    grid_square_id: Optional[int] = Field(foreign_key="gridsquare.id", default=None)
+    # Field and depth of view
+    len_x: Optional[float] = Field(default=None)
+    len_y: Optional[float] = Field(default=None)
+    len_z: Optional[float] = Field(default=None)
 
-    # The parent LIF file this series originates from, if any
-    parent_lif: Optional["CLEMLIFFile"] = Relationship(
-        back_populates="child_series",
-    )  # Many to one
-    parent_lif_id: Optional[int] = Field(
-        foreign_key="clemliffile.id",
-        default=None,
-    )
+    # Extent of the imaged area in real space
+    x0: Optional[float] = Field(default=None)
+    x1: Optional[float] = Field(default=None)
+    y0: Optional[float] = Field(default=None)
+    y1: Optional[float] = Field(default=None)
 
-    # The parent TIFF files used to build up the image stacks in the series, if any
-    parent_tiffs: List["CLEMTIFFFile"] = Relationship(
-        back_populates="child_series", sa_relationship_kwargs={"cascade": "delete"}
-    )  # One to many
+    # Shape and resolution information
+    image_pixels_x: Optional[int] = Field(default=None)
+    image_pixels_y: Optional[int] = Field(default=None)
+    image_pixel_size: Optional[float] = Field(default=None)
+    thumbnail_pixels_x: Optional[int] = Field(default=None)
+    thumbnail_pixels_y: Optional[int] = Field(default=None)
+    thumbnail_pixel_size: Optional[float] = Field(default=None)
 
-    # Metadata file for this series
-    associated_metadata: Optional["CLEMImageMetadata"] = Relationship(
-        back_populates="associated_series",
-    )  # One to one
-    metadata_id: Optional[int] = Field(
-        foreign_key="clemimagemetadata.id",
-        default=None,
-    )
+    # Spatial units
+    units: Optional[str] = Field(default=None)
 
-    # Image stack entries that are part of this series
-    child_stacks: List["CLEMImageStack"] = Relationship(
-        back_populates="parent_series",
-        sa_relationship_kwargs={"cascade": "delete"},
-    )  # One to many
+    # Colour channel-related fields
     number_of_members: Optional[int] = Field(default=None)
     has_grey: Optional[bool] = Field(default=None)
     has_red: Optional[bool] = Field(default=None)
@@ -304,69 +142,34 @@ class CLEMImageSeries(SQLModel, table=True):  # type: ignore
     has_magenta: Optional[bool] = Field(default=None)
     has_yellow: Optional[bool] = Field(default=None)
     collection_mode: Optional[str] = Field(default=None)
-
-    # Shape and resolution information
-    image_pixels_x: Optional[int] = Field(default=None)
-    image_pixels_y: Optional[int] = Field(default=None)
-    image_pixel_size: Optional[float] = Field(default=None)
-    thumbnail_pixels_x: Optional[int] = Field(default=None)
-    thumbnail_pixels_y: Optional[int] = Field(default=None)
-    thumbnail_pixel_size: Optional[float] = Field(default=None)
-    units: Optional[str] = Field(default=None)
-
-    # Extent of the imaged area in real space
-    x0: Optional[float] = Field(default=None)
-    x1: Optional[float] = Field(default=None)
-    y0: Optional[float] = Field(default=None)
-    y1: Optional[float] = Field(default=None)
-
-    # Composite images
     composite_created: bool = False  # Has a composite image been created?
 
+    # -------------
+    # Relationships
+    # -------------
 
-class CLEMImageStack(SQLModel, table=True):  # type: ignore
-    """
-    Database to keep track of the processing status of a single image stack.
-    """
-
-    id: Optional[int] = Field(default=None, primary_key=True)
-    file_path: str = Field(index=True)  # Full path to the file
-    channel_name: Optional[str] = None  # Color associated with stack
-
+    # Session
     session: Optional["Session"] = Relationship(
-        back_populates="image_stacks"
-    )  # Many to one
-    session_id: Optional[int] = Field(foreign_key="session.id")
-
-    # LIF file this stack originated from
-    parent_lif: Optional["CLEMLIFFile"] = Relationship(
-        back_populates="child_stacks",
-    )  # Many to one
-    parent_lif_id: Optional[int] = Field(foreign_key="clemliffile.id", default=None)
-
-    # TIFF files used to build this stack
-    parent_tiffs: List["CLEMTIFFFile"] = Relationship(
-        back_populates="child_stack",
-        sa_relationship_kwargs={"cascade": "delete"},
-    )  # One to many
-
-    # Metadata associated with statck
-    associated_metadata: Optional["CLEMImageMetadata"] = Relationship(
-        back_populates="associated_stacks",
-    )  # Many to one
-    metadata_id: Optional[int] = Field(
-        foreign_key="clemimagemetadata.id",
-        default=None,
+        back_populates="imaging_sites"
+    )  # Many-to-one
+    session_id: Optional[int] = Field(
+        foreign_key="session.id", default=None, unique=False
     )
 
-    # Image series this image stack belongs to
-    parent_series: Optional["CLEMImageSeries"] = Relationship(
-        back_populates="child_stacks",
-    )  # Many to one
-    series_id: Optional[int] = Field(
-        foreign_key="clemimageseries.id",
-        default=None,
+    # DataCollectionGroup
+    data_collection_group: Optional["DataCollectionGroup"] = Relationship(
+        back_populates="imaging_sites"
+    )  # Many-to-one
+    dcg_id: Optional[int] = Field(
+        foreign_key="datacollectiongroup.dataCollectionGroupId", default=None
     )
+    dcg_name: Optional[str] = Field(default=None)
+
+    # GridSquare
+    grid_square: Optional["GridSquare"] = Relationship(
+        back_populates="imaging_sites"
+    )  # Many-to-one
+    grid_square_id: Optional[int] = Field(foreign_key="gridsquare.id", default=None)
 
 
 """
@@ -429,12 +232,13 @@ class DataCollectionGroup(SQLModel, table=True):  # type: ignore
     atlas_pixel_size: Optional[float] = None
     atlas: str = ""
     sample: Optional[int] = None
+    smartem_grid_uuid: Optional[str] = None
     session: Optional["Session"] = Relationship(back_populates="data_collection_groups")
     data_collections: List["DataCollection"] = Relationship(
         back_populates="data_collection_group",
         sa_relationship_kwargs={"cascade": "delete"},
     )
-    clem_image_series: List["CLEMImageSeries"] = Relationship(
+    imaging_sites: List["ImagingSite"] = Relationship(
         back_populates="data_collection_group",
         sa_relationship_kwargs={"cascade": "delete"},
     )
@@ -535,9 +339,6 @@ class ProcessingJob(SQLModel, table=True):  # type: ignore
     auto_proc_programs: List["AutoProcProgram"] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
     )
-    selection_stash: List["SelectionStash"] = Relationship(
-        back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
-    )
     particle_sizes: List["ParticleSizes"] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
     )
@@ -587,15 +388,6 @@ class PreprocessStash(SQLModel, table=True):  # type: ignore
     group_tag: Optional[str]
     session: Optional[Session] = Relationship(back_populates="preprocess_stashes")
     foil_hole: Optional["FoilHole"] = Relationship(back_populates="preprocess_stashes")
-
-
-class SelectionStash(SQLModel, table=True):  # type: ignore
-    id: Optional[int] = Field(default=None, primary_key=True)
-    class_selection_score: float
-    pj_id: int = Field(foreign_key="processingjob.processingJobId")
-    processing_job: Optional[ProcessingJob] = Relationship(
-        back_populates="selection_stash"
-    )
 
 
 class TomographyProcessingParameters(SQLModel, table=True):  # type: ignore
@@ -702,7 +494,7 @@ class GridSquare(SQLModel, table=True):  # type: ignore
     pixel_size: Optional[float] = None
     image: str = ""
     session: Optional[Session] = Relationship(back_populates="grid_squares")
-    clem_image_series: List["CLEMImageSeries"] = Relationship(
+    imaging_sites: List["ImagingSite"] = Relationship(
         back_populates="grid_square", sa_relationship_kwargs={"cascade": "delete"}
     )
     foil_holes: List["FoilHole"] = Relationship(
@@ -718,6 +510,7 @@ class GridSquare(SQLModel, table=True):  # type: ignore
     width: Optional[int] = None
     angle: Optional[float] = None
     quality_indicator: Optional[float] = None
+    smartem_uuid: Optional[str] = None
     data_collection_group: Optional["DataCollectionGroup"] = Relationship(
         back_populates="grid_squares"
     )
@@ -751,6 +544,7 @@ class FoilHole(SQLModel, table=True):  # type: ignore
     pixel_location_y: Optional[int] = None
     diameter: Optional[int] = None
     quality_indicator: Optional[float] = None
+    smartem_uuid: Optional[str] = None
 
 
 class SearchMap(SQLModel, table=True):  # type: ignore
@@ -830,6 +624,7 @@ class Movie(SQLModel, table=True):  # type: ignore
     fluence: Optional[float] = None
     numberOfFrames: Optional[int] = None
     templateLabel: Optional[str] = None
+    smartem_uuid: Optional[str] = None
     murfey_ledger: Optional[MurfeyLedger] = Relationship(back_populates="movies")
     data_collection: Optional["DataCollection"] = Relationship(back_populates="movies")
     foil_hole: Optional[FoilHole] = Relationship(back_populates="movies")
@@ -910,7 +705,6 @@ class ClassificationFeedbackParameters(SQLModel, table=True):  # type: ignore
     initial_model: str
     next_job: int
     picker_murfey_id: Optional[int] = Field(default=None, foreign_key="murfeyledger.id")
-    picker_ispyb_id: Optional[int] = None
     processing_job: Optional[ProcessingJob] = Relationship(
         back_populates="classification_feedback_parameters"
     )

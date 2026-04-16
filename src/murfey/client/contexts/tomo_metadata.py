@@ -6,8 +6,12 @@ from typing import Optional
 
 import xmltodict
 
-from murfey.client.context import Context, ensure_dcg_exists
-from murfey.client.contexts.spa import _file_transferred_to, _get_source
+from murfey.client.context import (
+    Context,
+    _file_transferred_to,
+    _get_source,
+    ensure_dcg_exists,
+)
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.util.client import capture_post
 
@@ -15,9 +19,16 @@ logger = logging.getLogger("murfey.client.contexts.tomo_metadata")
 
 
 class TomographyMetadataContext(Context):
-    def __init__(self, acquisition_software: str, basepath: Path, token: str):
-        super().__init__("Tomography_metadata", acquisition_software, token)
+    def __init__(
+        self,
+        acquisition_software: str,
+        basepath: Path,
+        machine_config: dict,
+        token: str,
+    ):
+        super().__init__("TomographyMetadataContext", acquisition_software, token)
         self._basepath = basepath
+        self._machine_config = machine_config
 
     def post_transfer(
         self,
@@ -46,6 +57,7 @@ class TomographyMetadataContext(Context):
                 collection_type="tomo",
                 metadata_source=metadata_source,
                 environment=environment,
+                machine_config=self._machine_config,
                 token=self._token,
             )
 
@@ -56,6 +68,7 @@ class TomographyMetadataContext(Context):
                 collection_type="tomo",
                 metadata_source=metadata_source,
                 environment=environment,
+                machine_config=self._machine_config,
                 token=self._token,
             )
             with open(transferred_file, "r") as sm_xml:
@@ -131,7 +144,7 @@ class TomographyMetadataContext(Context):
                     environment,
                     source,
                     transferred_file.parent / "SearchMap.jpg",
-                    self._token,
+                    Path(self._machine_config.get("rsync_basepath", "")),
                 )
                 if source
                 else ""
@@ -142,6 +155,7 @@ class TomographyMetadataContext(Context):
                 router_name="session_control.tomo_router",
                 function_name="register_search_map",
                 token=self._token,
+                instrument_name=environment.instrument_name,
                 session_id=environment.murfey_session,
                 sm_name=transferred_file.parent.name,
                 data={
@@ -163,6 +177,7 @@ class TomographyMetadataContext(Context):
                 collection_type="tomo",
                 metadata_source=metadata_source,
                 environment=environment,
+                machine_config=self._machine_config,
                 token=self._token,
             )
             with open(transferred_file, "r") as sm_xml:
@@ -199,6 +214,7 @@ class TomographyMetadataContext(Context):
                 router_name="session_control.tomo_router",
                 function_name="register_search_map",
                 token=self._token,
+                instrument_name=environment.instrument_name,
                 session_id=environment.murfey_session,
                 sm_name=transferred_file.parent.name,
                 data={
@@ -219,6 +235,7 @@ class TomographyMetadataContext(Context):
                 collection_type="tomo",
                 metadata_source=metadata_source,
                 environment=environment,
+                machine_config=self._machine_config,
                 token=self._token,
             )
             with open(transferred_file) as xml:
@@ -251,6 +268,7 @@ class TomographyMetadataContext(Context):
                     router_name="session_control.tomo_router",
                     function_name="register_search_map",
                     token=self._token,
+                    instrument_name=environment.instrument_name,
                     session_id=environment.murfey_session,
                     sm_name=search_map_name,
                     data={
@@ -264,6 +282,7 @@ class TomographyMetadataContext(Context):
                     router_name="session_control.tomo_router",
                     function_name="register_batch_position",
                     token=self._token,
+                    instrument_name=environment.instrument_name,
                     session_id=environment.murfey_session,
                     batch_name=batch_name,
                     data={
@@ -294,6 +313,7 @@ class TomographyMetadataContext(Context):
                             router_name="session_control.tomo_router",
                             function_name="register_batch_position",
                             token=self._token,
+                            instrument_name=environment.instrument_name,
                             session_id=environment.murfey_session,
                             batch_name=beamshift_name,
                             data={

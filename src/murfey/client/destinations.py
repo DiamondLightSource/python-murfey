@@ -78,6 +78,7 @@ def determine_default_destination(
                     router_name="file_io_instrument.router",
                     function_name="suggest_path",
                     token=token,
+                    instrument_name=environment.instrument_name,
                     visit_name=visit,
                     session_id=environment.murfey_session,
                     data={

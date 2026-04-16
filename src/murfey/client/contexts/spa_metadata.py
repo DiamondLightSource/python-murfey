@@ -4,8 +4,12 @@ from typing import Dict, Optional
 
 import xmltodict
 
-from murfey.client.context import Context, ensure_dcg_exists
-from murfey.client.contexts.spa import _file_transferred_to, _get_source
+from murfey.client.context import (
+    Context,
+    _file_transferred_to,
+    _get_source,
+    ensure_dcg_exists,
+)
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.util.client import capture_post
 from murfey.util.spa_metadata import (
@@ -70,9 +74,17 @@ def _foil_hole_positions(xml_path: Path, grid_square: int) -> Dict[str, FoilHole
 
 
 class SPAMetadataContext(Context):
-    def __init__(self, acquisition_software: str, basepath: Path, token: str):
-        super().__init__("SPA_metadata", acquisition_software, token)
+    def __init__(
+        self,
+        acquisition_software: str,
+        basepath: Path,
+        machine_config: dict,
+        token: str,
+    ):
+        super().__init__("SPAMetadataContext", acquisition_software, token)
         self._basepath = basepath
+        self._machine_config = machine_config
+        self._registered_squares: set[int] = set()
 
     def post_transfer(
         self,
@@ -117,6 +129,7 @@ class SPAMetadataContext(Context):
                         collection_type="spa",
                         metadata_source=images_disc,
                         environment=environment,
+                        machine_config=self._machine_config,
                         token=self._token,
                     )
                     for gs, pos_data in gs_pix_positions.items():
@@ -126,6 +139,7 @@ class SPAMetadataContext(Context):
                                 router_name="session_control.spa_router",
                                 function_name="register_grid_square",
                                 token=self._token,
+                                instrument_name=environment.instrument_name,
                                 session_id=environment.murfey_session,
                                 gsid=int(gs),
                                 data={
@@ -139,6 +153,21 @@ class SPAMetadataContext(Context):
                                     "angle": pos_data[6],
                                 },
                             )
+                    if gs_pix_positions:
+                        capture_post(
+                            base_url=str(environment.url.geturl()),
+                            router_name="session_control.spa_router",
+                            function_name="register_atlas",
+                            token=self._token,
+                            instrument_name=environment.instrument_name,
+                            session_id=environment.murfey_session,
+                            data={
+                                "name": f"{environment.visit}-sample-{environment.samples[images_disc].sample}",
+                                "acquisition_uuid": environment.acquisition_uuid,
+                                "register_grid": True,
+                                "tag": dcg_tag,
+                            },
+                        )
 
         elif (
             transferred_file.suffix == ".dm"
@@ -156,6 +185,7 @@ class SPAMetadataContext(Context):
                     collection_type="spa",
                     metadata_source=images_disc,
                     environment=environment,
+                    machine_config=self._machine_config,
                     token=self._token,
                 )
 
@@ -187,7 +217,10 @@ class SPAMetadataContext(Context):
                 )
                 image_path = (
                     _file_transferred_to(
-                        environment, source, Path(gs_info.image), self._token
+                        environment,
+                        source,
+                        Path(gs_info.image),
+                        Path(self._machine_config.get("rsync_basepath", "")),
                     )
                     if gs_info.image
                     else ""
@@ -197,6 +230,7 @@ class SPAMetadataContext(Context):
                     router_name="session_control.spa_router",
                     function_name="register_grid_square",
                     token=self._token,
+                    instrument_name=environment.instrument_name,
                     session_id=environment.murfey_session,
                     gsid=gs_name,
                     data={
@@ -210,27 +244,44 @@ class SPAMetadataContext(Context):
                     },
                 )
 
-            for fh, fh_data in fh_positions.items():
-                capture_post(
-                    base_url=str(environment.url.geturl()),
-                    router_name="session_control.spa_router",
-                    function_name="register_foil_hole",
-                    token=self._token,
-                    session_id=environment.murfey_session,
-                    gs_name=gs_name,
-                    data={
-                        "name": fh,
-                        "x_location": fh_data.x_location,
-                        "y_location": fh_data.y_location,
-                        "x_stage_position": fh_data.x_stage_position,
-                        "y_stage_position": fh_data.y_stage_position,
-                        "readout_area_x": fh_data.readout_area_x,
-                        "readout_area_y": fh_data.readout_area_y,
-                        "thumbnail_size_x": fh_data.thumbnail_size_x,
-                        "thumbnail_size_y": fh_data.thumbnail_size_y,
-                        "pixel_size": fh_data.pixel_size,
-                        "diameter": fh_data.diameter,
-                        "tag": visitless_source,
-                        "image": fh_data.image,
-                    },
-                )
+            if gs_name not in self._registered_squares:
+                for fh, fh_data in fh_positions.items():
+                    capture_post(
+                        base_url=str(environment.url.geturl()),
+                        router_name="session_control.spa_router",
+                        function_name="register_foil_hole",
+                        token=self._token,
+                        instrument_name=environment.instrument_name,
+                        session_id=environment.murfey_session,
+                        gs_name=gs_name,
+                        data={
+                            "name": fh,
+                            "x_location": fh_data.x_location,
+                            "y_location": fh_data.y_location,
+                            "x_stage_position": fh_data.x_stage_position,
+                            "y_stage_position": fh_data.y_stage_position,
+                            "readout_area_x": fh_data.readout_area_x,
+                            "readout_area_y": fh_data.readout_area_y,
+                            "thumbnail_size_x": fh_data.thumbnail_size_x,
+                            "thumbnail_size_y": fh_data.thumbnail_size_y,
+                            "pixel_size": fh_data.pixel_size,
+                            "diameter": fh_data.diameter,
+                            "tag": visitless_source,
+                            "image": fh_data.image,
+                        },
+                    )
+                if fh_positions:
+                    capture_post(
+                        base_url=str(environment.url.geturl()),
+                        router_name="session_control.spa_router",
+                        function_name="register_square",
+                        token=self._token,
+                        instrument_name=environment.instrument_name,
+                        session_id=environment.murfey_session,
+                        gsid=gs_name,
+                        data={
+                            "tag": visitless_source,
+                            "count": len(self._registered_squares) + 1,
+                        },
+                    )
+                    self._registered_squares.add(gs_name)

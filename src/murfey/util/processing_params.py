@@ -3,12 +3,10 @@ import os
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal, Optional
-
-from pydantic import BaseModel
-from werkzeug.utils import secure_filename
 
 from pipeliner.project_graph import ProjectGraph
+from pydantic import BaseModel
+from werkzeug.utils import secure_filename
 
 from murfey.util.config import MachineConfig, get_machine_config
 
@@ -19,9 +17,7 @@ _DEFAULT_MOTIONCORR_FALLBACK = "job002"
 
 
 @lru_cache(maxsize=16)
-def _job_dir_for_alias_cached(
-    visit_name: str, alias: str, mtime_ns: int
-) -> Optional[str]:
+def _job_dir_for_alias_cached(visit_name: str, alias: str, mtime_ns: int) -> str | None:
     """Read default_pipeline.star and return the jobNNN for the given alias.
 
     Returns None on any failure (missing file, graph read error, alias
@@ -122,12 +118,6 @@ class CLEMProcessingParameters(BaseModel):
     # Atlas vs GridSquare registration threshold
     atlas_threshold: float = 0.0015  # in m
 
-    # Image alignment and merging-specific parameters
-    crop_to_n_frames: Optional[int] = 50
-    align_self: Literal["enabled", ""] = "enabled"
-    flatten: Literal["mean", "min", "max", ""] = "mean"
-    align_across: Literal["enabled", ""] = "enabled"
-
 
 default_clem_processing_parameters = CLEMProcessingParameters()
 
@@ -136,13 +126,13 @@ class SPAParameters(BaseModel):
     nr_iter_2d: int = 25
     nr_iter_3d: int = 25
     nr_iter_ini_model: int = 100
-    batch_size_2d: int = 1000 # just for fun
+    batch_size_2d: int = 1000  # just for fun
     nr_classes_2d: int = 10
     nr_classes_3d: int = 4
     downscale: bool = True
     do_icebreaker_jobs: bool = True
     fraction_of_classes_to_remove_2d: float = 0.3
-    nr_picks_before_diameter: int = 2000 # just for fun
+    nr_picks_before_diameter: int = 2000  # just for fun
     bfactor_min_particles: int = 2000
 
 

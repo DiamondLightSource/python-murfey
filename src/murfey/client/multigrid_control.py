@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 
 from murfey.client.analyser import Analyser
 from murfey.client.context import ensure_dcg_exists
-from murfey.client.contexts.spa import SPAModularContext
+from murfey.client.contexts.spa import SPAContext
 from murfey.client.contexts.tomo import TomographyContext
 from murfey.client.destinations import determine_default_destination
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
@@ -48,6 +48,8 @@ class MultigridController:
     analysers: Dict[Path, Analyser] = field(default_factory=lambda: {})
     data_collection_parameters: dict = field(default_factory=lambda: {})
     token: str = ""
+    serialem: bool = False
+    acquisition_uuid: Optional[str] = None
     _machine_config: dict = field(default_factory=lambda: {})
     visit_end_time: Optional[datetime] = None
 
@@ -72,6 +74,7 @@ class MultigridController:
             symmetry=self.data_collection_parameters.get("symmetry"),
             eer_fractionation=self.data_collection_parameters.get("eer_fractionation"),
             instrument_name=self.instrument_name,
+            acquisition_uuid=self.acquisition_uuid,
         )
         self._machine_config = get_machine_config_client(
             str(self._environment.url.geturl()),
@@ -281,6 +284,7 @@ class MultigridController:
                 router_name="session_control.router",
                 function_name="register_stopped_rsyncer",
                 token=self.token,
+                instrument_name=self._environment.instrument_name,
                 session_id=self.session_id,
                 data={"path": str(source)},
             )
@@ -307,6 +311,7 @@ class MultigridController:
             router_name="session_control.router",
             function_name="register_restarted_rsyncer",
             token=self.token,
+            instrument_name=self._environment.instrument_name,
             session_id=self.session_id,
             data={"path": str(source)},
         )
@@ -335,6 +340,7 @@ class MultigridController:
                 router_name="file_io_instrument.router",
                 function_name="make_rsyncer_destination",
                 token=self.token,
+                instrument_name=self._environment.instrument_name,
                 session_id=self.session_id,
                 data={"destination": destination},
             )
@@ -414,6 +420,7 @@ class MultigridController:
                     router_name="session_control.router",
                     function_name="register_restarted_rsyncer",
                     token=self.token,
+                    instrument_name=self._environment.instrument_name,
                     session_id=self.session_id,
                     data={"path": str(source)},
                 )
@@ -430,6 +437,7 @@ class MultigridController:
                     router_name="session_control.router",
                     function_name="register_rsyncer",
                     token=self.token,
+                    instrument_name=self._environment.instrument_name,
                     session_id=self._environment.murfey_session,
                     data=rsyncer_data,
                 )
@@ -449,6 +457,7 @@ class MultigridController:
                 environment=self._environment if not self.dummy_dc else None,
                 force_mdoc_metadata=self.force_mdoc_metadata,
                 limited=limited,
+                serialem=self.serialem,
             )
             self.analysers[source].subscribe(self._start_dc)
             self.analysers[source].start()
@@ -524,6 +533,7 @@ class MultigridController:
                     router_name="file_io_instrument.router",
                     function_name="write_eer_fractionation_file",
                     token=self.token,
+                    instrument_name=self._environment.instrument_name,
                     visit_name=self._environment.visit,
                     session_id=self._environment.murfey_session,
                     data={
@@ -542,6 +552,7 @@ class MultigridController:
                 router_name="workflow.tomo_router",
                 function_name="register_tomo_proc_params",
                 token=self.token,
+                instrument_name=self._environment.instrument_name,
                 session_id=self._environment.murfey_session,
                 data=metadata_json,
             )
@@ -550,13 +561,14 @@ class MultigridController:
                 router_name="workflow.tomo_router",
                 function_name="flush_tomography_processing",
                 token=self.token,
+                instrument_name=self._environment.instrument_name,
                 visit_name=self._environment.visit,
                 session_id=self._environment.murfey_session,
                 data={"rsync_source": str(source)},
             )
             log.info("Tomography processing flushed")
 
-        elif isinstance(context, SPAModularContext):
+        elif isinstance(context, SPAContext):
             if self._environment.visit in source.parts:
                 metadata_source = source
             else:
@@ -571,6 +583,7 @@ class MultigridController:
                     collection_type="spa",
                     metadata_source=metadata_source,
                     environment=self._environment,
+                    machine_config=self._machine_config,
                     token=self.token,
                 )
             except Exception as e:
@@ -598,6 +611,7 @@ class MultigridController:
                 router_name="workflow.router",
                 function_name="start_dc",
                 token=self.token,
+                instrument_name=self._environment.instrument_name,
                 visit_name=self._environment.visit,
                 session_id=self.session_id,
                 data=data,
@@ -614,6 +628,7 @@ class MultigridController:
                     router_name="workflow.router",
                     function_name="register_proc",
                     token=self.token,
+                    instrument_name=self._environment.instrument_name,
                     visit_name=self._environment.visit,
                     session_id=self.session_id,
                     data={
@@ -628,6 +643,7 @@ class MultigridController:
                 router_name="workflow.spa_router",
                 function_name="register_spa_proc_params",
                 token=self.token,
+                instrument_name=self._environment.instrument_name,
                 session_id=self.session_id,
                 data={
                     **{k: None if v == "None" else v for k, v in metadata_json.items()},
@@ -641,6 +657,7 @@ class MultigridController:
                 router_name="workflow.spa_router",
                 function_name="flush_spa_processing",
                 token=self.token,
+                instrument_name=self._environment.instrument_name,
                 visit_name=self._environment.visit,
                 session_id=self.session_id,
                 data={"tag": str(source)},
@@ -669,6 +686,7 @@ class MultigridController:
             router_name="prometheus.router",
             function_name="increment_rsync_file_count",
             token=self.token,
+            instrument_name=self._environment.instrument_name,
             visit_name=self._environment.visit,
             data=data,
         )
@@ -702,6 +720,7 @@ class MultigridController:
                 router_name="prometheus.router",
                 function_name="increment_rsync_transferred_files_prometheus",
                 token=self.token,
+                instrument_name=self._environment.instrument_name,
                 visit_name=self._environment.visit,
                 data=data,
             )
@@ -718,6 +737,7 @@ class MultigridController:
             router_name="prometheus.router",
             function_name="increment_rsync_skipped_files_prometheus",
             token=self.token,
+            instrument_name=self._environment.instrument_name,
             visit_name=self._environment.visit,
             data={
                 "source": source,
@@ -753,6 +773,7 @@ class MultigridController:
             router_name="prometheus.router",
             function_name="increment_rsync_transferred_files",
             token=self.token,
+            instrument_name=self._environment.instrument_name,
             visit_name=self._environment.visit,
             data=data,
         )

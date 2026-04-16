@@ -16,6 +16,8 @@ feedback_callback_params_matrix = (
     ("data_collection_group",),
     ("pato",),
     ("picked_particles",),
+    ("spa.ctf_estimated",),
+    ("spa.motion_corrected",),
     ("picked_tomogram",),
     ("processing_job",),
     ("spa.flush_spa_preprocess",),

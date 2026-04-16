@@ -13,3 +13,5 @@ class MultigridWatcherSpec(BaseModel):
     destination_overrides: Dict[Path, str] = {}
     rsync_restarts: List[str] = []
     visit_end_time: Optional[datetime] = None
+    acquisition_uuid: Optional[str] = None
+    serialem: bool = False

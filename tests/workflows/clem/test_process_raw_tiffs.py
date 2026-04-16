@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from murfey.server.ispyb import TransportManager
-from murfey.workflows.clem.process_raw_tiffs import zocalo_cluster_request
+from murfey.workflows.clem.process_raw_tiffs import run
 
 # Set up variables
 session_id = 0
@@ -49,7 +49,7 @@ def metadata(raw_dir: Path):
     return metadata
 
 
-def test_zocalo_cluster_request(
+def test_run(
     tiff_list: list[Path],
     metadata: Path,
     raw_dir: Path,
@@ -59,7 +59,7 @@ def test_zocalo_cluster_request(
     mock_transport.feedback_queue = feedback_queue
 
     # Run the function with the listed parameters
-    zocalo_cluster_request(
+    run(
         tiff_list=tiff_list,
         root_folder=root_folder,
         session_id=session_id,

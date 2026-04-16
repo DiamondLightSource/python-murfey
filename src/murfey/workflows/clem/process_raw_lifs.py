@@ -15,7 +15,7 @@ except AttributeError:
 logger = getLogger("murfey.workflows.clem.process_raw_lifs")
 
 
-def zocalo_cluster_request(
+def run(
     file: Path,
     root_folder: str,
     session_id: int,  # Provided by the client via the API endpoint

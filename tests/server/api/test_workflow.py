@@ -1,8 +1,19 @@
+from pathlib import Path
 from unittest import mock
+from unittest.mock import MagicMock
 
+import numpy as np
+import PIL.Image
+import pytest
+from pytest_mock import MockerFixture
 from sqlmodel import Session, select
 
-from murfey.server.api.workflow import DCGroupParameters, register_dc_group
+from murfey.server.api.workflow import (
+    DCGroupParameters,
+    MillingParameters,
+    make_gif,
+    register_dc_group,
+)
 from murfey.util.db import DataCollectionGroup, SearchMap
 from tests.conftest import ExampleVisit
 
@@ -427,3 +438,74 @@ def test_register_dc_group_new_atlas_with_searchmaps(
         murfey_db_session,
         close_db=False,
     )
+
+
+@pytest.mark.asyncio
+async def test_make_gif(
+    mocker: MockerFixture,
+    tmp_path: Path,
+):
+    # Set up test variables
+    session_id = 10
+    instrument_name = "test_instrument"
+    rsync_basepath = tmp_path / "data"
+    visit_name = "cm12345-6"
+    year = 2020
+    visit_dir = rsync_basepath / str(year) / visit_name
+    lamella_num = 12
+    lamella_folder = "Lamella"
+    if lamella_num > 1:
+        lamella_folder += f" ({lamella_num})"
+    raw_directory = "autotem"
+
+    # Create a list of test image file paths
+    raw_images = [
+        visit_dir
+        / "autotem"
+        / visit_name
+        / "Sites"
+        / lamella_folder
+        / "DCImages/DCM_asdfjkl/asdfjkl-Polishing-dc_rescan-image-.png"
+    ] * 5
+    # Mock the output of PIL.Image.open to always return a NumPY array
+    mocker.patch(
+        "murfey.server.api.workflow.Image.open",
+        return_value=PIL.Image.fromarray(np.ones((512, 512), dtype=np.uint16)),
+    )
+
+    # Create the Pydantic model
+    params = MillingParameters(
+        lamella_number=lamella_num,
+        images=[str(f) for f in raw_images],
+        raw_directory=raw_directory,
+    )
+
+    # Mock the database query
+    mock_db = MagicMock()
+    mock_db.exec.return_value.one.return_value.instrument_name = instrument_name
+
+    # Mock the machine config and 'get_machine_config'
+    mock_machine_config = MagicMock()
+    mock_machine_config.rsync_basepath = rsync_basepath
+    mocker.patch(
+        "murfey.server.api.workflow.get_machine_config",
+        return_value={
+            instrument_name: mock_machine_config,
+        },
+    )
+
+    # Create the save directory directory
+    save_dir = visit_dir / "processed" / raw_directory
+    save_dir.mkdir(parents=True, exist_ok=True)
+
+    # Run the function and check that the expected outputs are there
+    result = await make_gif(
+        year=year,
+        visit_name=visit_name,
+        session_id=session_id,
+        gif_params=params,
+        db=mock_db,
+    )
+    image_path = save_dir / f"lamella_{lamella_num}_milling.gif"
+    assert image_path.exists()
+    assert result.get("output_gif") == str(image_path)

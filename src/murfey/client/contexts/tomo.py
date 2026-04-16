@@ -5,8 +5,6 @@ from pathlib import Path
 from threading import RLock
 from typing import Callable, Dict, List, OrderedDict
 
-import xmltodict
-
 import murfey.util.eer
 from murfey.client.context import Context, ProcessingParameter, ensure_dcg_exists
 from murfey.client.instance_environment import (
@@ -15,7 +13,7 @@ from murfey.client.instance_environment import (
     MurfeyID,
     MurfeyInstanceEnvironment,
 )
-from murfey.util.client import capture_get, capture_post, get_machine_config_client
+from murfey.util.client import capture_get, capture_post
 from murfey.util.mdoc import get_block, get_global_data, get_num_blocks
 
 logger = logging.getLogger("murfey.client.contexts.tomo")
@@ -77,9 +75,16 @@ class TomographyContext(Context):
         ProcessingParameter("num_eer_frames", "Number of EER Frames"),
     ]
 
-    def __init__(self, acquisition_software: str, basepath: Path, token: str):
-        super().__init__("Tomography", acquisition_software, token)
+    def __init__(
+        self,
+        acquisition_software: str,
+        basepath: Path,
+        machine_config: dict,
+        token: str,
+    ):
+        super().__init__("TomographyContext", acquisition_software, token)
         self._basepath = basepath
+        self._machine_config = machine_config
         self._tilt_series: Dict[str, List[Path]] = {}
         self._tilt_series_with_pjids: List[str] = []
         self._tilt_series_sizes: Dict[str, int] = {}
@@ -108,6 +113,7 @@ class TomographyContext(Context):
                 collection_type="tomo",
                 metadata_source=metadata_source,
                 environment=environment,
+                machine_config=self._machine_config,
                 token=self._token,
             )
 
@@ -149,6 +155,7 @@ class TomographyContext(Context):
                             router_name="workflow.router",
                             function_name="start_dc",
                             token=self._token,
+                            instrument_name=environment.instrument_name,
                             visit_name=environment.visit,
                             session_id=environment.murfey_session,
                             data=dc_data,
@@ -166,6 +173,7 @@ class TomographyContext(Context):
                                 router_name="workflow.router",
                                 function_name="register_proc",
                                 token=self._token,
+                                instrument_name=environment.instrument_name,
                                 visit_name=environment.visit,
                                 session_id=environment.murfey_session,
                                 data={
@@ -185,21 +193,20 @@ class TomographyContext(Context):
             logger.error(f"ERROR {e}, {self.data_collection_parameters}", exc_info=True)
 
     def _file_transferred_to(
-        self, environment: MurfeyInstanceEnvironment, source: Path, file_path: Path
+        self,
+        environment: MurfeyInstanceEnvironment,
+        source: Path,
+        file_path: Path,
+        rsync_basepath: Path,
     ):
-        machine_config = get_machine_config_client(
-            str(environment.url.geturl()),
-            self._token,
-            instrument_name=environment.instrument_name,
-        )
         if environment.visit in environment.default_destinations[source]:
             return (
-                Path(machine_config.get("rsync_basepath", ""))
+                rsync_basepath
                 / Path(environment.default_destinations[source])
                 / file_path.name
             )
         return (
-            Path(machine_config.get("rsync_basepath", ""))
+            rsync_basepath
             / Path(environment.default_destinations[source])
             / environment.visit
             / file_path.name
@@ -249,7 +256,10 @@ class TomographyContext(Context):
 
         if environment:
             file_transferred_to = self._file_transferred_to(
-                environment, source, file_path
+                environment,
+                source,
+                file_path,
+                Path(self._machine_config.get("rsync_basepath", "")),
             )
             environment.movies[file_transferred_to] = MovieTracker(
                 movie_number=next(MovieID),
@@ -280,6 +290,7 @@ class TomographyContext(Context):
                 router_name="workflow.tomo_router",
                 function_name="register_tilt_series_for_rerun",
                 token=self._token,
+                instrument_name=environment.instrument_name,
                 visit_name=environment.visit,
                 data=rerun_data,
             )
@@ -300,6 +311,7 @@ class TomographyContext(Context):
                 router_name="workflow.tomo_router",
                 function_name="register_tilt_series",
                 token=self._token,
+                instrument_name=environment.instrument_name,
                 visit_name=environment.visit,
                 data=ts_data,
             )
@@ -335,6 +347,7 @@ class TomographyContext(Context):
                 router_name="workflow.tomo_router",
                 function_name="register_tilt",
                 token=self._token,
+                instrument_name=environment.instrument_name,
                 visit_name=environment.visit,
                 session_id=environment.murfey_session,
                 data=tilt_data,
@@ -347,6 +360,7 @@ class TomographyContext(Context):
                     router_name="file_io_instrument.router",
                     function_name="write_eer_fractionation_file",
                     token=self._token,
+                    instrument_name=environment.instrument_name,
                     visit_name=environment.visit,
                     session_id=environment.murfey_session,
                     data={
@@ -383,6 +397,7 @@ class TomographyContext(Context):
                 router_name="workflow.tomo_router",
                 function_name="request_tomography_preprocessing",
                 token=self._token,
+                instrument_name=environment.instrument_name,
                 visit_name=environment.visit,
                 session_id=environment.murfey_session,
                 data=preproc_data,
@@ -459,16 +474,8 @@ class TomographyContext(Context):
         if "gain" not in transferred_file.name:
             if transferred_file.suffix in data_suffixes:
                 if self._acquisition_software == "tomo":
-                    if environment:
-                        machine_config = get_machine_config_client(
-                            str(environment.url.geturl()),
-                            self._token,
-                            instrument_name=environment.instrument_name,
-                        )
-                    else:
-                        machine_config = {}
                     required_strings = (
-                        machine_config.get("data_required_substrings", {})
+                        self._machine_config.get("data_required_substrings", {})
                         .get("tomo", {})
                         .get(transferred_file.suffix, ["fractions"])
                     )
@@ -496,6 +503,7 @@ class TomographyContext(Context):
                             router_name="workflow.tomo_router",
                             function_name="register_tilt_series_length",
                             token=self._token,
+                            instrument_name=environment.instrument_name,
                             session_id=environment.murfey_session,
                             data={
                                 "tags": [tilt_series],
@@ -516,6 +524,7 @@ class TomographyContext(Context):
                 router_name="workflow.tomo_router",
                 function_name="register_completed_tilt_series",
                 token=self._token,
+                instrument_name=environment.instrument_name,
                 visit_name=environment.visit,
                 session_id=environment.murfey_session,
                 data={
@@ -539,7 +548,7 @@ class TomographyContext(Context):
     def gather_metadata(
         self, metadata_file: Path, environment: MurfeyInstanceEnvironment | None = None
     ) -> OrderedDict:
-        if metadata_file.suffix not in (".mdoc", ".xml"):
+        if metadata_file.suffix != ".mdoc":
             raise ValueError(
                 f"Tomography gather_metadata method expected xml or mdoc file not {metadata_file.name}"
             )
@@ -547,38 +556,6 @@ class TomographyContext(Context):
             if not metadata_file.is_file():
                 logger.debug(f"Metadata file {metadata_file} not found")
                 return OrderedDict({})
-            if metadata_file.suffix == ".xml":
-                with open(metadata_file, "r") as xml:
-                    try:
-                        for_parsing = xml.read()
-                    except Exception:
-                        logger.warning(
-                            f"Failed to parse file {metadata_file}", exc_info=True
-                        )
-                        return OrderedDict({})
-                    data = xmltodict.parse(for_parsing)
-                try:
-                    metadata: OrderedDict = OrderedDict({})
-                    metadata["experiment_type"] = "tomography"
-                    metadata["voltage"] = 300
-                    metadata["image_size_x"] = data["Acquisition"]["Info"]["ImageSize"][
-                        "Width"
-                    ]
-                    metadata["image_size_y"] = data["Acquisition"]["Info"]["ImageSize"][
-                        "Height"
-                    ]
-                    metadata["pixel_size_on_image"] = float(
-                        data["Acquisition"]["Info"]["SensorPixelSize"]["Height"]
-                    )
-                    metadata["motion_corr_binning"] = 1
-                    metadata["gain_ref"] = None
-                    metadata["dose_per_frame"] = (
-                        environment.dose_per_frame if environment else None
-                    )
-                    metadata["source"] = str(self._basepath)
-                except KeyError:
-                    return OrderedDict({})
-                return metadata
             with open(metadata_file, "r") as md:
                 mdoc_data = get_global_data(md)
                 num_blocks = get_num_blocks(md)

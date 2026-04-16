@@ -6,6 +6,18 @@ from PIL import Image
 from sqlalchemy.exc import NoResultFound
 from sqlmodel import Session, select
 
+try:
+    from smartem_backend.api_client import SmartEMAPIClient
+    from smartem_common.schemas import (
+        FoilHoleData as SmartEMFoilHoleData,
+        GridSquareData as SmartEMGridSquareData,
+        GridSquareMetadata as SmartEMGridSquareMetadata,
+    )
+
+    SMARTEM_ACTIVE = True
+except ImportError:
+    SMARTEM_ACTIVE = False
+
 import murfey.server
 from murfey.server.feedback import _murfey_id
 from murfey.util import sanitise, secure_path
@@ -53,13 +65,15 @@ def register_grid_square(
     if grid_square_params.width is not None:
         grid_square_params.width_scaled = int(grid_square_params.width / 7.8)
 
-    try:
-        grid_square = murfey_db.exec(
-            select(GridSquare)
-            .where(GridSquare.name == gsid)
-            .where(GridSquare.tag == grid_square_params.tag)
-            .where(GridSquare.session_id == session_id)
-        ).one()
+    grid_square_query = murfey_db.exec(
+        select(GridSquare)
+        .where(GridSquare.name == gsid)
+        .where(GridSquare.tag == grid_square_params.tag)
+        .where(GridSquare.session_id == session_id)
+    ).all()
+    if grid_square_query:
+        # Grid square already exists in the murfey database
+        grid_square = grid_square_query[0]
         grid_square.x_location = grid_square_params.x_location or grid_square.x_location
         grid_square.y_location = grid_square_params.y_location or grid_square.y_location
         grid_square.x_stage_position = (
@@ -83,8 +97,11 @@ def register_grid_square(
         grid_square.pixel_size = grid_square_params.pixel_size or grid_square.pixel_size
         grid_square.image = grid_square_params.image or grid_square.image
         if murfey.server._transport_object:
-            murfey.server._transport_object.do_update_grid_square(grid_square.id, grid_square_params)
-    except Exception:
+            murfey.server._transport_object.do_update_grid_square(
+                grid_square.id, grid_square_params
+            )
+    else:
+        # No existing grid square in the murfey database
         if murfey.server._transport_object:
             dcg = murfey_db.exec(
                 select(DataCollectionGroup)
@@ -124,6 +141,84 @@ def register_grid_square(
         )
     murfey_db.add(grid_square)
     murfey_db.commit()
+
+    if SMARTEM_ACTIVE:
+        try:
+            murfey_session = murfey_db.exec(
+                select(MurfeySession).where(MurfeySession.id == session_id)
+            ).one()
+            machine_config = get_machine_config(
+                instrument_name=murfey_session.instrument_name
+            )[murfey_session.instrument_name]
+            if machine_config.smartem_api_url:
+                dcg = murfey_db.exec(
+                    select(DataCollectionGroup)
+                    .where(DataCollectionGroup.session_id == session_id)
+                    .where(DataCollectionGroup.tag == grid_square_params.tag)
+                ).one_or_none()
+                if dcg and dcg.smartem_grid_uuid:
+                    secured_grid_square_image_path_full_res: Path | None = None
+                    if grid_square_params.image:
+                        secured_grid_square_image_path_full_res = secure_path(
+                            Path(grid_square_params.image)
+                        )
+                        if secured_grid_square_image_path_full_res.with_suffix(
+                            ".tiff"
+                        ).is_file():
+                            secured_grid_square_image_path_full_res = (
+                                secured_grid_square_image_path_full_res.with_suffix(
+                                    ".tiff"
+                                )
+                            )
+                        else:
+                            secured_grid_square_image_path_full_res = (
+                                secured_grid_square_image_path_full_res.with_suffix(
+                                    ".mrc"
+                                )
+                            )
+                    smartem_client = SmartEMAPIClient(
+                        base_url=machine_config.smartem_api_url, logger=logger
+                    )
+                    gs_data = SmartEMGridSquareData(
+                        gridsquare_id=str(gsid),
+                        grid_uuid=dcg.smartem_grid_uuid,
+                        center_x=(
+                            int(grid_square_params.x_location)
+                            if grid_square_params.x_location is not None
+                            else None
+                        ),
+                        center_y=(
+                            int(grid_square_params.y_location)
+                            if grid_square_params.y_location is not None
+                            else None
+                        ),
+                        size_width=grid_square_params.width,
+                        size_height=grid_square_params.height,
+                        **(
+                            {"uuid": grid_square.smartem_uuid}
+                            if grid_square.smartem_uuid
+                            else {}
+                        ),
+                        metadata=SmartEMGridSquareMetadata(
+                            atlas_node_id=0,
+                            stage_position=None,
+                            state=None,
+                            rotation=None,
+                            image_path=secured_grid_square_image_path_full_res,
+                            selected=False,
+                            unusable=False,
+                        ),
+                    )
+                    if grid_square.smartem_uuid:
+                        smartem_client.update_gridsquare(gs_data)
+                    else:
+                        response = smartem_client.create_grid_gridsquare(gs_data)
+                        grid_square.smartem_uuid = response.uuid
+                        murfey_db.add(grid_square)
+                        murfey_db.commit()
+        except Exception:
+            logger.warning("Failed to register grid square with smartem", exc_info=True)
+
     murfey_db.close()
 
 
@@ -151,13 +246,15 @@ def register_foil_hole(
         jpeg_size = Image.open(secured_foil_hole_image_path).size
     else:
         jpeg_size = (0, 0)
-    try:
-        foil_hole = murfey_db.exec(
-            select(FoilHole)
-            .where(FoilHole.name == foil_hole_params.name)
-            .where(FoilHole.grid_square_id == gsid)
-            .where(FoilHole.session_id == session_id)
-        ).one()
+    foil_hole_query = murfey_db.exec(
+        select(FoilHole)
+        .where(FoilHole.name == foil_hole_params.name)
+        .where(FoilHole.grid_square_id == gsid)
+        .where(FoilHole.session_id == session_id)
+    ).all()
+    if foil_hole_query:
+        # Foil hole already exists in the murfey database
+        foil_hole = foil_hole_query[0]
         foil_hole.x_location = foil_hole_params.x_location or foil_hole.x_location
         foil_hole.y_location = foil_hole_params.y_location or foil_hole.y_location
         foil_hole.x_stage_position = (
@@ -183,7 +280,8 @@ def register_foil_hole(
             murfey.server._transport_object.do_update_foil_hole(
                 foil_hole.id, gs.thumbnail_size_x / gs.readout_area_x, foil_hole_params
             )
-    except Exception:
+    else:
+        # No existing foil hole in the murfey database
         if murfey.server._transport_object:
             fh_ispyb_response = murfey.server._transport_object.do_insert_foil_hole(
                 gs.id,
@@ -215,6 +313,59 @@ def register_foil_hole(
     fh_id = foil_hole.id
     murfey_db.add(foil_hole)
     murfey_db.commit()
+
+    if SMARTEM_ACTIVE and gs.smartem_uuid:
+        try:
+            murfey_session = murfey_db.exec(
+                select(MurfeySession).where(MurfeySession.id == session_id)
+            ).one()
+            machine_config = get_machine_config(
+                instrument_name=murfey_session.instrument_name
+            )[murfey_session.instrument_name]
+            if machine_config.smartem_api_url:
+                smartem_client = SmartEMAPIClient(
+                    base_url=machine_config.smartem_api_url, logger=logger
+                )
+                fh_data = SmartEMFoilHoleData(
+                    id=str(foil_hole_params.name),
+                    gridsquare_id=str(gs.name),
+                    gridsquare_uuid=gs.smartem_uuid,
+                    x_location=(
+                        int(foil_hole_params.x_location)
+                        if foil_hole_params.x_location is not None
+                        else None
+                    ),
+                    y_location=(
+                        int(foil_hole_params.y_location)
+                        if foil_hole_params.y_location is not None
+                        else None
+                    ),
+                    x_stage_position=foil_hole_params.x_stage_position,
+                    y_stage_position=foil_hole_params.y_stage_position,
+                    diameter=(
+                        int(foil_hole_params.diameter)
+                        if foil_hole_params.diameter is not None
+                        else None
+                    ),
+                    **(
+                        {"uuid": foil_hole.smartem_uuid}
+                        if foil_hole.smartem_uuid
+                        else {}
+                    ),
+                )
+                if foil_hole.smartem_uuid:
+                    smartem_client.update_foilhole(fh_data)
+                else:
+                    responses = smartem_client.create_gridsquare_foilholes(
+                        gs.smartem_uuid, [fh_data]
+                    )
+                    if responses:
+                        foil_hole.smartem_uuid = responses[0].uuid
+                        murfey_db.add(foil_hole)
+                        murfey_db.commit()
+        except Exception:
+            logger.warning("Failed to register foil hole with smartem", exc_info=True)
+
     murfey_db.close()
     return fh_id
 

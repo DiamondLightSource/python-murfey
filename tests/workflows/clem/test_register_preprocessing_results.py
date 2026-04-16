@@ -15,7 +15,7 @@ from murfey.workflows.clem.register_preprocessing_results import (
     COLOR_FLAGS_MURFEY_TO_ISPYB,
     _determine_collection_mode,
     _get_color_flags,
-    _register_clem_image_series,
+    _register_clem_imaging_site,
     _register_dcg_and_atlas,
     _register_grid_square,
     _snake_to_camel_case,
@@ -47,7 +47,7 @@ def generate_preprocessing_messages(
     # Construct all the datasets to be tested
     datasets: list[tuple[Path, bool, bool, tuple[int, int], float, list[float]]] = [
         (
-            grid_dir / "Overview_1" / "Image_1",
+            grid_dir / "Overview 1" / "Image 1",
             False,
             True,
             (2400, 2400),
@@ -59,22 +59,38 @@ def generate_preprocessing_messages(
     datasets.extend(
         [
             (
-                grid_dir / "TileScan_1" / f"Position_{n}",
+                grid_dir / "TileScan 1" / f"Position {n + 1}",
                 True,
                 False,
                 (2048, 2048),
                 1.6e-7,
                 [0.003, 0.00332768, 0.003, 0.00332768],
             )
-            for n in range(5)
+            for n in range(3)
+        ]
+    )
+    datasets.extend(
+        [
+            (
+                grid_dir / "TileScan 1" / f"Position {n + 1}_Lng_LVCC",
+                True,
+                False,
+                (2048, 2048),
+                1.6e-7,
+                [0.003, 0.00332768, 0.003, 0.00332768],
+            )
+            for n in range(3)
         ]
     )
 
     messages: list[dict[str, Any]] = []
-    for dataset in datasets:
+    for series_path, is_stack, is_montage, shape, pixel_size, extent in datasets:
         # Unpack items from list of dataset parameters
-        series_path = dataset[0]
-        series_name = str(series_path.relative_to(processed_dir)).replace("/", "--")
+        series_name = (
+            str(series_path.relative_to(processed_dir))
+            .replace("/", "--")
+            .replace(" ", "_")
+        )
         metadata = series_path / "metadata" / f"{series_path.stem}.xml"
         metadata.parent.mkdir(parents=True, exist_ok=True)
         metadata.touch(exist_ok=True)
@@ -89,11 +105,6 @@ def generate_preprocessing_messages(
                 thumbnail.parent.mkdir(parents=True)
             thumbnail.touch(exist_ok=True)
         thumbnail_size = (512, 512)
-        is_stack = dataset[1]
-        is_montage = dataset[2]
-        shape = dataset[3]
-        pixel_size = dataset[4]
-        extent = dataset[5]
 
         message = {
             "session_id": session_id,
@@ -173,8 +184,8 @@ def test_get_color_flags(test_params: tuple[list[str], dict[str, bool]]):
     assert _get_color_flags(colors) == expected_result
 
 
-def test_register_clem_image_series():
-    _register_clem_image_series
+def test_register_clem_imaging_site():
+    _register_clem_imaging_site
 
 
 @pytest.mark.parametrize(
@@ -243,7 +254,7 @@ def test_run(
 
     # Mock the registration helper functions
     mock_register_clem_series = mocker.patch(
-        "murfey.workflows.clem.register_preprocessing_results._register_clem_image_series"
+        "murfey.workflows.clem.register_preprocessing_results._register_clem_imaging_site"
     )
     mock_register_dcg_and_atlas = mocker.patch(
         "murfey.workflows.clem.register_preprocessing_results._register_dcg_and_atlas"
@@ -254,7 +265,7 @@ def test_run(
 
     # Mock the align and merge workflow call
     mock_align_and_merge_call = mocker.patch(
-        "murfey.workflows.clem.register_preprocessing_results.submit_cluster_request"
+        "murfey.workflows.clem.register_preprocessing_results.run_align_and_merge"
     )
 
     preprocessing_messages = generate_preprocessing_messages(
@@ -330,17 +341,9 @@ def test_run_with_db(
         return_value=ispyb_db_session,
     )
 
-    # Mock out the machine config used in the helper sanitisation function
-    mock_get_machine_config = mocker.patch("murfey.workflows.clem.get_machine_config")
-    mock_machine_config = MagicMock()
-    mock_machine_config.rsync_basepath = rsync_basepath
-    mock_get_machine_config.return_value = {
-        ExampleVisit.instrument_name: mock_machine_config,
-    }
-
     # Mock the align and merge workflow call
     mock_align_and_merge_call = mocker.patch(
-        "murfey.workflows.clem.register_preprocessing_results.submit_cluster_request"
+        "murfey.workflows.clem.register_preprocessing_results.run_align_and_merge"
     )
 
     # Patch the TransportManager object in the workflows called
@@ -381,21 +384,23 @@ def test_run_with_db(
     else:
         assert mock_align_and_merge_call.call_count == len(preprocessing_messages) * 3
 
-    # Both databases should have entries for data collection group, and grid squares
-    # ISPyB database should additionally have an atlas entry
+    # Murfey's DataCollectionGroup should have an entry
     murfey_dcg_search = murfey_db_session.exec(
         sm_select(MurfeyDB.DataCollectionGroup).where(
             MurfeyDB.DataCollectionGroup.session_id == murfey_session.id
         )
     ).all()
     assert len(murfey_dcg_search) == 1
+
+    # GridSquare entries should be half the initial number of entries due to overwrites
     murfey_gs_search = murfey_db_session.exec(
         sm_select(MurfeyDB.GridSquare).where(
             MurfeyDB.GridSquare.session_id == murfey_session.id
         )
     ).all()
-    assert len(murfey_gs_search) == len(preprocessing_messages) - 1
+    assert len(murfey_gs_search) == (len(preprocessing_messages) - 1) // 2
 
+    # ISPyB's DataCollectionGroup should have an entry
     murfey_dcg = murfey_dcg_search[0]
     ispyb_dcg_search = (
         ispyb_db_session.execute(
@@ -408,6 +413,7 @@ def test_run_with_db(
     )
     assert len(ispyb_dcg_search) == 1
 
+    # Atlas should have an entry
     ispyb_dcg = ispyb_dcg_search[0]
     ispyb_atlas_search = (
         ispyb_db_session.execute(
@@ -427,12 +433,13 @@ def test_run_with_db(
     }
     collection_mode = _determine_collection_mode(colors)
 
+    # Atlas color flags and collection mode should be set correctly
     ispyb_atlas = ispyb_atlas_search[0]
-    # Check that the Atlas color flags and collection mode are set correctly
     for flag, value in color_flags.items():
         assert getattr(ispyb_atlas, flag) == value
     assert ispyb_atlas.mode == collection_mode
 
+    # ISPyB's GrridSquare should have half the number of initial entries
     ispyb_gs_search = (
         ispyb_db_session.execute(
             sa_select(ISPyBDB.GridSquare).where(
@@ -442,9 +449,12 @@ def test_run_with_db(
         .scalars()
         .all()
     )
-    assert len(ispyb_gs_search) == len(preprocessing_messages) - 1
+    assert len(ispyb_gs_search) == (len(preprocessing_messages) - 1) // 2
     for gs in ispyb_gs_search:
-        # Check that the Atlas color flags and collection mode are set correctly
+        # Check that all entries point to the denoised images ("_Lng_LVCC")
+        assert gs.gridSquareImage is not None and "_Lng_LVCC" in gs.gridSquareImage
+
+        # Check that the GridSquare color flags and collection mode are set correctly
         for flag, value in color_flags.items():
             assert getattr(gs, flag) == value
         assert gs.mode == collection_mode

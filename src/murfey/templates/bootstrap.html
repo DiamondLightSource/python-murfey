@@ -20,6 +20,21 @@
     C:\msys64 </span
   >.
 </p>
+<p>
+  Some versions of Windows are too old to support the default MSYS2 installer.
+  In such cases, download this alternative
+  <a href="{{ proxy_path }}/msys2/repo/distrib/msys2-x86_64-latest.sfx.exe"
+    >executable</a
+  >
+  and run it. It will unpack the
+  <span
+    style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+    >msys64</span
+  >
+  folder into your Downloads folder. Copy this folder to the default MSYS2
+  location, and run the UCRT64 executable within it to proceed with the
+  installation as normal.
+</p>
 <h3>B. Setting Up MSYS2</h3>
 <h4>i. Setting Up the MSYS2 Package Manager (If Network-Restricted)</h4>
 <p>
@@ -39,7 +54,7 @@
 <pre
   style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
 >
-    C:\msys64\etc\pacman.d
+  C:\msys64\etc\pacman.d
 </pre>
 <h4>ii. Installing Dependencies</h4>
 <p>
@@ -51,11 +66,11 @@
 <pre
   style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
 >
-    $ pacman -Syu
-    $ pacman -S msys2-runtime
-    $ pacman -S rsync
-    $ pacman -S mingw-w64-ucrt-x86_64-python-pip
-    $ pacman -S mingw-w64-ucrt-x86_64-rust
+  $ pacman -Syu
+  $ pacman -S msys2-runtime
+  $ pacman -S rsync
+  $ pacman -S mingw-w64-ucrt-x86_64-python-pip
+  $ pacman -S mingw-w64-ucrt-x86_64-rust
 </pre>
 <p>
   Other utility packages such as
@@ -74,6 +89,60 @@
     >pacman -Ss &lt;package-name&gt;</span
   >
 </p>
+<h4>Downgrading Python packages</h4>
+<p>
+  MSYS2 current installs Python 3.14 by default, which we have not rigorously
+  tested Murfey with. For now, we downgrade to Python 3.12.12, which is known to
+  work with Murfey. To do so, download the following packages:
+</p>
+<ul>
+  <li>
+    <a
+      href="{{ proxy_path }}/msys2/repo/mingw/ucrt64/mingw-w64-ucrt-x86_64-python-3.12.12-1-any.pkg.tar.zst"
+      style="
+        font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace;
+      "
+      >mingw-w64-ucrt-x86_64-python-3.12.12-1-any.pkg.tar.zst</a
+    >
+  </li>
+  <li>
+    <a
+      href="{{ proxy_path }}/msys2/repo/mingw/ucrt64/mingw-w64-ucrt-x86_64-python-distlib-0.4.0-2-any.pkg.tar.zst"
+      style="
+        font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace;
+      "
+      >mingw-w64-ucrt-x86_64-python-distlib-0.4.0-2-any.pkg.tar.zst</a
+    >
+  </li>
+  <li>
+    <a
+      href="{{ proxy_path }}/msys2/repo/mingw/ucrt64/mingw-w64-ucrt-x86_64-python-pip-25.3-2-any.pkg.tar.zst"
+      style="
+        font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace;
+      "
+      >mingw-w64-ucrt-x86_64-python-pip-25.3-2-any.pkg.tar.zst</a
+    >
+  </li>
+  <li>
+    <a
+      href="{{ proxy_path }}/msys2/repo/mingw/ucrt64/mingw-w64-ucrt-x86_64-python-setuptools-80.9.0-2-any.pkg.tar.zst"
+      style="
+        font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace;
+      "
+      >mingw-w64-ucrt-x86_64-python-setuptools-80.9.0-2-any.pkg.tar.zst</a
+    >
+  </li>
+</ul>
+<p>
+  These files will be placed in your account's Downloads folder by default, and
+  can then be installed using the following command:
+</p>
+<pre
+  style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+>
+  $ pacman -U /c/Users/&lt;username&gt;/Downloads/&lt;package-name&gt;</pre
+>
+
 <h4>iii. Configuring the Rust Package Manager (If Network-Restricted)</h4>
 <p>
   Many newer Python packages now have dependencies written in Rust that allow
@@ -119,13 +188,13 @@
 <pre
   style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
 >
-    %USERPROFILE%\.cargo
+  %USERPROFILE%\.cargo
 </pre>
 <p>For a user named Murfey, for example, this would take the form:</p>
 <pre
   style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
 >
-    C:\Users\Murfey\.cargo
+  C:\Users\Murfey\.cargo
 </pre>
 <p>
   With this file configured,
@@ -154,9 +223,9 @@
 <pre
   style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
 >
-    $ pip install virtualenv --index-url {{ request.url.scheme }}://{{ netloc }}{{ proxy_path }}/pypi --trusted-host {{ netloc }}
-    $ virtualenv your-env-name  # Create the virtual environment
-    $ source your-env-name/bin/activate  # Activate the virtual environment
+  $ pip install virtualenv --index-url {{ request.url.scheme }}://{{ netloc }}{{ proxy_path }}/pypi --trusted-host {{ netloc }}
+  $ virtualenv your-env-name  # Create the virtual environment
+  $ source your-env-name/bin/activate  # Activate the virtual environment
 </pre>
 <h3>B. Installing Murfey</h3>
 <p>
@@ -166,6 +235,40 @@
 <pre
   style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
 >
-    $ pip install murfey --index-url {{ request.url.scheme }}://{{ netloc }}{{ proxy_path }}/pypi/index --trusted-host {{ netloc }}
+  $ pip install murfey --index-url {{ request.url.scheme }}://{{ netloc }}{{ proxy_path }}/pypi/index --trusted-host {{ netloc }}
 </pre>
+
+<h4>Installing Pillow</h4>
+<p>
+  Python's Pillow package will be needed for certain instruments. This will
+  require the installation of additional image libraries in
+  <span
+    style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+    >pacman</span
+  >:
+</p>
+<pre
+  style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+>
+  $ pacman -S \
+    mingw-w64-ucrt-x86_64-freetype \
+    mingw-w64-ucrt-x86_64-giflib \
+    mingw-w64-ucrt-x86_64-lcms2 \
+    mingw-w64-ucrt-x86_64-libjpeg-turbo \
+    mingw-w64-ucrt-x86_64-libpng \
+    mingw-w64-ucrt-x86_64-libtiff \
+    mingw-w64-ucrt-x86_64-libwebp \
+    mingw-w64-ucrt-x86_64-openjpeg2 \
+    mingw-w64-ucrt-x86_64-zlib
+</pre>
+<p>
+  Once the necessary libraries have been installed, Pillow can be installed by
+  running the following command:
+</p>
+<pre
+  style="font-family: Consolas, Monaco, &quot;Lucida Console&quot;, monospace"
+>
+  $ ZLIB_ROOT="/ucrt64" pip install pillow --index-url {{ request.url.scheme }}://{{ netloc }}{{ proxy_path }}/pypi/index --trusted-host {{ netloc }}
+</pre>
+
 {% endblock %}

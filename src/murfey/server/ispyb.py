@@ -47,6 +47,7 @@ if security_config.ispyb_credentials:
             bind=create_engine(
                 url(credentials=security_config.ispyb_credentials),
                 connect_args={"use_pure": True},
+                pool_recycle=250,
             )
         )
         log.info("Loaded ISPyB database session")

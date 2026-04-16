@@ -10,6 +10,14 @@ from pydantic import BaseModel
 from sqlalchemy import func
 from sqlmodel import select
 
+try:
+    from smartem_backend.api_client import SmartEMAPIClient
+    from smartem_common.schemas import AtlasData
+
+    SMARTEM_ACTIVE = True
+except ImportError:
+    SMARTEM_ACTIVE = False
+
 import murfey.server.prometheus as prom
 from murfey.server import _transport_object
 from murfey.server.api.auth import (
@@ -347,6 +355,99 @@ def get_foil_hole(
     session_id: MurfeySessionID, fh_name: int, db=murfey_db
 ) -> Dict[str, int]:
     return _get_foil_hole(session_id, fh_name, db)
+
+
+class AtlasRegistration(BaseModel):
+    name: str
+    acquisition_uuid: str | None
+    storage_folder: str = ""
+    register_grid: bool = False
+    tag: str = ""
+
+
+@spa_router.post("/sessions/{session_id}/register_atlas")
+def register_atlas(
+    session_id: MurfeySessionID,
+    atlas_registration_data: AtlasRegistration,
+    db=murfey_db,
+):
+    if SMARTEM_ACTIVE and atlas_registration_data.acquisition_uuid is not None:
+        session = db.exec(select(Session).where(Session.id == session_id)).one()
+        machine_config = get_machine_config(session.instrument_name)[
+            session.instrument_name
+        ]
+        if machine_config.smartem_api_url:
+            smartem_client = SmartEMAPIClient(
+                base_url=machine_config.smartem_api_url, logger=logger
+            )
+            grid_uuid = None
+            if atlas_registration_data.tag:
+                dcg = db.exec(
+                    select(DataCollectionGroup)
+                    .where(DataCollectionGroup.session_id == session_id)
+                    .where(DataCollectionGroup.tag == atlas_registration_data.tag)
+                ).one_or_none()
+                grid_uuid = dcg.smartem_grid_uuid
+            else:
+                possible_grids = smartem_client.get_acquisition_grids(
+                    atlas_registration_data.acquisition_uuid
+                )
+                for grid in possible_grids:
+                    if grid.name == atlas_registration_data.name.replace("_atlas", ""):
+                        grid_uuid = grid.uuid
+                        break
+            if grid_uuid is not None:
+                atlas_data = AtlasData(
+                    id=atlas_registration_data.name,
+                    acquisition_date=datetime.now(),
+                    storage_folder=atlas_registration_data.storage_folder,
+                    name=atlas_registration_data.name,
+                    tiles=[],
+                    gridsquare_positions=None,
+                    grid_uuid=grid_uuid,
+                )
+                smartem_client.create_grid_atlas(atlas_data)
+                if atlas_registration_data.register_grid:
+                    smartem_client.grid_registered(grid_uuid)
+    else:
+        logger.info(
+            f"smartem deactivated so did not register atlas for {sanitise(str(atlas_registration_data.acquisition_uuid))}"
+        )
+
+
+class SquareRegistration(BaseModel):
+    tag: str
+    count: int | None = None
+
+
+@spa_router.post("/sessions/{session_id}/register_square/{gsid}")
+def register_square(
+    session_id: MurfeySessionID,
+    gsid: int,
+    square_registration_data: SquareRegistration,
+    db=murfey_db,
+):
+    if SMARTEM_ACTIVE:
+        gs = db.exec(
+            select(GridSquare)
+            .where(GridSquare.name == gsid)
+            .where(GridSquare.tag == square_registration_data.tag)
+            .where(GridSquare.session_id == session_id)
+        ).one_or_none()
+        if gs and gs.smartem_uuid:
+            session = db.exec(select(Session).where(Session.id == session_id)).one()
+            machine_config = get_machine_config(session.instrument_name)[
+                session.instrument_name
+            ]
+            if machine_config.smartem_api_url:
+                smartem_client = SmartEMAPIClient(
+                    base_url=machine_config.smartem_api_url, logger=logger
+                )
+                smartem_client.gridsquare_registered(
+                    gs.smartem_uuid, count=square_registration_data.count
+                )
+    else:
+        logger.info("smartem deactivated so did not register square")
 
 
 @spa_router.post("/sessions/{session_id}/make_atlas_jpg")
