@@ -9,7 +9,7 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, TypeVar
+from typing import Callable, Type, TypeVar
 
 from murfey.client.context import Context
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
@@ -25,84 +25,6 @@ from murfey.util.models import (
 logger = logging.getLogger("murfey.client.contexts.fib")
 
 lock = threading.Lock()
-
-
-MILLING_STEP_NAMES = {
-    # Map unique activity name to class attribute
-    # Preparation stage
-    "Preparation - Eucentric Tilt": "eucentric_tilt",
-    "Preparation - Artificial Features": "artificial_features",
-    "Preparation - Milling Angle": "milling_angle",
-    "Preparation - Image Acquisition": "image_acquisition",
-    "Preparation - Lamella Placement": "lamella_placement",
-    # Milling stage
-    "Milling - Delay": "delay_1",
-    "Milling - Reference Definition": "reference_definition_1",
-    "Milling - Electron Reference Definition": "reference_definition_1_electron",
-    "Milling - Stress Relief Cuts": "stress_relief_cuts",
-    "Milling - Reference Redefinition 1": "reference_definition_2",
-    "Milling - Rough Milling": "rough_milling",
-    "Milling - Rough Milling - Electron Image": "rough_milling_electron",
-    "Milling - Reference Redefinition 2": "reference_definition_3",
-    "Milling - Medium Milling": "medium_milling",
-    "Milling - Medium Milling - Electron Image": "medium_milling_electron",
-    "Milling - Fine Milling": "fine_milling",
-    "Milling - Fine Milling - Electron Image": "fine_milling_electron",
-    "Milling - Finer Milling": "finer_milling",
-    "Milling - Finer Milling - Electron Image": "finer_milling_electron",
-    # Thinning stage
-    "Thinning - Delay": "delay_2",
-    "Thinning - Polishing 1": "polishing_1",
-    "Thinning - Polishing 1 - Electron Image": "polishing_1_electron",
-    "Thinning - Polishing 2": "polishing_2",
-    "Thinning - Polishing 2 - Ion Image": "polishing_2_ion",
-    "Thinning - Polishing 2 - Electron Image": "polishing_2_electron",
-}
-
-
-STAGE_POSITION_VALUES = {
-    # Map class attribute to element name
-    # Paths are relative to the "StagePosition" node
-    "x": "X",
-    "y": "Y",
-    "z": "Z",
-    "rotation": "R",
-    "tilt_alpha": "AT",
-}
-
-
-STAGE_POSITION_NAMES = {
-    # Map class attribute to element name
-    # Paths are relative to the "Site" node
-    "preparation": "PreparationSiteLocation/StagePosition/StagePosition",
-    "chunk_coincidence": "Parameters/ChunkCoincidenceStagePosition/StagePosition",
-    "chunk": "ChunkSiteLocation/StagePosition/StagePosition",
-    "thinning_1": "Parameters/ThinningStagePosition/StagePosition",
-    "thinning_2": "ThinningSiteLocation/StagePosition/StagePosition",
-}
-
-
-BEAM_VALUES = {
-    # Map class attribute to element name
-    # These are relative to the "MillingPreset" or "BeamPreset" node
-    "beam_type": "BeamType",
-    "voltage": "HighVoltage",
-    "current": "BeamCurrent",
-}
-
-
-LAMELLA_MILLING_VALUES = {
-    # Map class atrribute to element name
-    # These are relative to the "Activity" node
-    "milling_angle": "MillingAngle",
-    "lamella_offset": "OffsetFromLamella",
-    "trench_height_front": "FrontTrenchHeight",
-    "trench_height_rear": "RearTrenchHeight",
-    "width_overlap_front_left": "LamellaFrontLeftWidthOverlap",
-    "width_overlap_front_right": "LamellaFrontRightWidthOverlap",
-    "width_overlap_rear_left": "LamellaRearLeftWidthOverlap",
-    "width_overlap_rear_right": "LamellaRearRightWidthOverlap",
-}
 
 
 @dataclass
@@ -133,7 +55,7 @@ T = TypeVar("T")
 def _parse_xml_text(
     node: ET.Element,
     path: str,
-    func: Callable[[str], T],
+    func: Callable[[str], T] | Type,
 ) -> T | None:
     """
     Searches the XML Element using the provided path. If a matching node is found,
@@ -200,6 +122,89 @@ def _parse_boolean(text: str):
     else:
         logger.warning(f"Could not parse {text} as a boolean")
         return None
+
+
+MILLING_STEP_NAMES = {
+    # Map unique activity name to class attribute
+    # Preparation stage
+    "Preparation - Eucentric Tilt": "eucentric_tilt",
+    "Preparation - Artificial Features": "artificial_features",
+    "Preparation - Milling Angle": "milling_angle",
+    "Preparation - Image Acquisition": "image_acquisition",
+    "Preparation - Lamella Placement": "lamella_placement",
+    # Milling stage
+    "Milling - Delay": "delay_1",
+    "Milling - Reference Definition": "reference_definition",
+    "Milling - Electron Reference Definition": "reference_definition_electron",
+    "Milling - Stress Relief Cuts": "stress_relief_cuts",
+    "Milling - Reference Redefinition 1": "reference_redefinition_1",
+    "Milling - Rough Milling": "rough_milling",
+    "Milling - Rough Milling - Electron Image": "rough_milling_electron",
+    "Milling - Reference Redefinition 2": "reference_redefinition_2",
+    "Milling - Medium Milling": "medium_milling",
+    "Milling - Medium Milling - Electron Image": "medium_milling_electron",
+    "Milling - Fine Milling": "fine_milling",
+    "Milling - Fine Milling - Electron Image": "fine_milling_electron",
+    "Milling - Finer Milling": "finer_milling",
+    "Milling - Finer Milling - Electron Image": "finer_milling_electron",
+    # Thinning stage
+    "Thinning - Delay": "delay_2",
+    "Thinning - Polishing 1": "polishing_1",
+    "Thinning - Polishing 1 - Electron Image": "polishing_1_electron",
+    "Thinning - Polishing 2": "polishing_2",
+    "Thinning - Polishing 2 - Ion Image": "polishing_2_ion",
+    "Thinning - Polishing 2 - Electron Image": "polishing_2_electron",
+}
+
+
+STAGE_POSITION_VALUES = {
+    # Map class attribute to element name
+    # Paths are relative to the "StagePosition" node
+    "x": "X",
+    "y": "Y",
+    "z": "Z",
+    "rotation": "R",
+    "tilt_alpha": "AT",
+}
+
+
+STAGE_POSITION_NAMES = {
+    # Map class attribute to element name
+    # Paths are relative to the "Site" node
+    "preparation": "PreparationSiteLocation/StagePosition/StagePosition",
+    "chunk_coincidence": "Parameters/ChunkCoincidenceStagePosition/StagePosition",
+    "chunk": "ChunkSiteLocation/StagePosition/StagePosition",
+    "thinning_1": "Parameters/ThinningStagePosition/StagePosition",
+    "thinning_2": "ThinningSiteLocation/StagePosition/StagePosition",
+}
+
+
+ACTIVITY_FIELD_MAP = (
+    # Model field name | Path relative to "Activity" | Function to apply
+    # These are relative to the "Activity" node
+    # Common parameters
+    ("is_enabled", "IsEnabled", _parse_boolean),
+    ("status", "ActivityMetadata/ExecutionResult", str),
+    ("execution_time", "ExecutionTime", _parse_measurement),
+    # Milling/Imaging beam parameters
+    ("site_location_type", "SiteLocationType", str),
+    ("beam_type", "MillingPreset/BeamType", str),
+    ("beam_type", "BeamPreset/BeamType", str),
+    ("voltage", "MillingPreset/HighVoltage", _parse_measurement),
+    ("voltage", "BeamPreset/HighVoltage", _parse_measurement),
+    ("current", "MillingPreset/BeamCurrent", _parse_measurement),
+    ("current", "BeamPreset/BeamCurrent", _parse_measurement),
+    # Milling parameters
+    ("depth_correction", "DepthCorrection", float),
+    ("milling_angle", "MillingAngle", _parse_measurement),
+    ("lamella_offset", "OffsetFromLamella", _parse_measurement),
+    ("trench_height_front", "FrontTrenchHeight", _parse_measurement),
+    ("trench_height_rear", "RearTrenchHeight", _parse_measurement),
+    ("width_overlap_front_left", "LamellaFrontLeftWidthOverlap", _parse_measurement),
+    ("width_overlap_front_right", "LamellaFrontRightWidthOverlap", _parse_measurement),
+    ("width_overlap_rear_left", "LamellaRearLeftWidthOverlap", _parse_measurement),
+    ("width_overlap_rear_right", "LamellaRearRightWidthOverlap", _parse_measurement),
+)
 
 
 def _get_source(file_path: Path, environment: MurfeyInstanceEnvironment) -> Path | None:
@@ -503,67 +508,11 @@ class FIBContext(Context):
                         step_name=activity_name, recipe_name=recipe_name
                     )
 
-                    # Update the corresponding milling activity field
-                    step_info.is_enabled = _parse_xml_text(
-                        activity, "IsEnabled", _parse_boolean
-                    )
-                    step_info.status = _parse_xml_text(
-                        activity, "ActivityMetadata/ExecutionResult", str
-                    )
-                    step_info.execution_time = _parse_xml_text(
-                        activity, "ExecutionTime", _parse_measurement
-                    )
+                    # Iteratively update fields in the MillingSteps model it's not None
+                    for field, path, func in ACTIVITY_FIELD_MAP:
+                        if (value := _parse_xml_text(activity, path, func)) is not None:
+                            step_info.__setattr__(field, value)
 
-                    # Additional metadata extraction if elements are present
-                    step_info.site_location_type = _parse_xml_text(
-                        activity, "SiteLocationType", str
-                    )
-                    step_info.depth_correction = _parse_xml_text(
-                        activity, "DepthCorrection", float
-                    )
-                    # Lamella milling geometries
-                    for value_name, value_path in LAMELLA_MILLING_VALUES.items():
-                        step_info.__setattr__(
-                            value_name,
-                            _parse_xml_text(
-                                activity,
-                                value_path,
-                                _parse_measurement,
-                            ),
-                        )
-                    # Beam information stored in either "BeamPreset" or "MillingPreset"
-                    if activity.find("BeamPreset") is not None:
-                        for value_name, value_path in BEAM_VALUES.items():
-                            match value_name:
-                                case "beam_type":
-                                    step_info.beam_type = _parse_xml_text(
-                                        activity, f"BeamPreset/{value_path}", str
-                                    )
-                                case _:
-                                    step_info.__setattr__(
-                                        value_name,
-                                        _parse_xml_text(
-                                            activity,
-                                            f"BeamPreset/{value_path}",
-                                            _parse_measurement,
-                                        ),
-                                    )
-                    elif activity.find("MillingPreset") is not None:
-                        for value_name, value_path in BEAM_VALUES.items():
-                            match value_name:
-                                case "beam_type":
-                                    step_info.beam_type = _parse_xml_text(
-                                        activity, f"MillingPreset/{value_path}", str
-                                    )
-                                case _:
-                                    step_info.__setattr__(
-                                        value_name,
-                                        _parse_xml_text(
-                                            activity,
-                                            f"MillingPreset/{value_path}",
-                                            _parse_measurement,
-                                        ),
-                                    )
                     # Add info for current step to the site info model
                     site_info.steps.__setattr__(
                         MILLING_STEP_NAMES[unique_name], step_info
