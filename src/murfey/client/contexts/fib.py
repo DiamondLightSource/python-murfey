@@ -452,25 +452,18 @@ class FIBContext(Context):
             )
 
             # Extract stage position information for all known stages in current site
-            stage_info = StagePositionInfo(
-                **{
-                    stage_name: StagePositionValues(
-                        **{
-                            value_name: value
-                            for value_name, value_path in STAGE_POSITION_VALUES.items()
-                            if (
-                                value := _parse_xml_text(
-                                    stage, value_path, _parse_measurement
-                                )
+            site_info.stage_info = StagePositionInfo()
+            for stage_name, stage_path in STAGE_POSITION_NAMES.items():
+                if (stage := site.find(stage_path)) is not None:
+                    stage_values = StagePositionValues()
+                    for value_name, value_path in STAGE_POSITION_VALUES.items():
+                        if (
+                            value := _parse_xml_text(
+                                stage, value_path, _parse_measurement
                             )
-                            is not None
-                        }
-                    )
-                    for stage_name, stage_path in STAGE_POSITION_NAMES.items()
-                    if (stage := site.find(stage_path)) is not None
-                }
-            )
-            site_info.stage_info = stage_info
+                        ) is not None:
+                            stage_values.__setattr__(value_name, value)
+                    site_info.stage_info.__setattr__(stage_name, stage_values)
 
             # Find all Recipe nodes for the Site
             if not (recipes := site.findall("Workflow/Recipe")):
