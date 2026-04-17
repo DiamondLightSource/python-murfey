@@ -1,3 +1,4 @@
+import json
 import logging
 from importlib.metadata import entry_points
 from pathlib import Path
@@ -8,6 +9,7 @@ from sqlmodel import Session
 
 from murfey.server.api.auth import validate_instrument_token
 from murfey.server.murfey_db import murfey_db
+from murfey.util.models import LamellaSiteInfo
 
 logger = logging.getLogger("murfey.server.api.workflow_fib")
 
@@ -42,4 +44,16 @@ def register_fib_atlas(
         session_id=session_id,
         file=fib_atlas_info.file,
         murfey_db=db,
+    )
+
+
+@router.post("/sessions/{session_id}/register_milling_progress")
+def register_fib_milling_progress(
+    session_id: int,
+    site_info: LamellaSiteInfo,
+    db: Session = murfey_db,
+):
+    logger.debug(
+        "Received the following FIB metadata for registration:\n"
+        f"{json.dumps(site_info.model_dump(exclude_none=True), indent=2, default=str)}"
     )
