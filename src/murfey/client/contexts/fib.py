@@ -17,6 +17,7 @@ from murfey.util.client import capture_post
 from murfey.util.models import (
     LamellaSiteInfo,
     MillingStepInfo,
+    MillingSteps,
     StagePositionInfo,
     StagePositionValues,
 )
@@ -420,6 +421,11 @@ class FIBContext(Context):
             logger.warning(f"Error parsing file {str(file)}", exc_info=True)
             return None
 
+        # Get the project name
+        if (project_name := _parse_xml_text(root, ".//Project/Name", str)) is None:
+            logger.warning("Metadata file has no project name")
+            return None
+
         # Find all the Site nodes
         if not (sites := root.findall(".//Sites/Site")):
             logger.warning(f"No site information found in {str(file)}")
@@ -433,7 +439,12 @@ class FIBContext(Context):
                 logger.warning("Current site doesn't have a name")
                 continue
             site_num = _number_from_name(site_name)
-            site_info = LamellaSiteInfo(site_name=site_name)
+            site_info = LamellaSiteInfo(
+                project_name=project_name,
+                site_name=site_name,
+                site_number=site_num,
+                steps=MillingSteps(),
+            )
 
             # Extract stage position information for all known stages in current site
             stage_info = StagePositionInfo(
@@ -554,7 +565,10 @@ class FIBContext(Context):
                                         ),
                                     )
                     # Add info for current step to the site info model
-                    site_info.__setattr__(MILLING_STEP_NAMES[unique_name], step_info)
+                    site_info.steps.__setattr__(
+                        MILLING_STEP_NAMES[unique_name], step_info
+                    )
+
             # Add info for current site to the dict
             all_site_info[site_num] = site_info
 
