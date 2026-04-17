@@ -264,14 +264,22 @@ class FIBContext(Context):
                 all_site_info_new = self._parse_autotem_metadata(transferred_file)
                 for site_num, site_info_new in all_site_info_new.items():
                     # Post the data to the backend if it's been changed
-                    if site_info_new.model_dump(
-                        exclude_none=True
+                    if (
+                        data := site_info_new.model_dump(exclude_none=True)
                     ) != self._site_info.get(site_num, LamellaSiteInfo()).model_dump(
                         exclude_none=True
                     ):
-                        ##############
-                        # Do POST here
-                        ##############
+                        # Post to the backend
+                        capture_post(
+                            base_url=str(environment.url.geturl()),
+                            router_name="workflow_fib.router",
+                            function_name="register_fib_milling_progress",
+                            token=self._token,
+                            instrument_name=environment.instrument_name,
+                            data=data,
+                            # Endpoint kwargs
+                            session_id=environment.murfey_session,
+                        )
 
                         # Update existing dict
                         self._site_info[site_num] = site_info_new
@@ -339,14 +347,15 @@ class FIBContext(Context):
                     function_name="make_gif",
                     token=self._token,
                     instrument_name=environment.instrument_name,
-                    year=datetime.now().year,
-                    visit_name=environment.visit,
-                    session_id=environment.murfey_session,
                     data={
                         "lamella_number": lamella_number,
                         "images": [str(file) for file in gif_list],
                         "raw_directory": raw_directory,
                     },
+                    # Endpoint kwargs
+                    year=datetime.now().year,
+                    visit_name=environment.visit,
+                    session_id=environment.murfey_session,
                 )
 
         # -----------------------------------------------------------------------------
@@ -550,6 +559,7 @@ class FIBContext(Context):
                 token=self._token,
                 instrument_name=environment.instrument_name,
                 data={"file": str(file)},
+                # Endpoint kwargs
                 session_id=environment.murfey_session,
             )
             logger.info(f"Registering atlas image {file.name!r}")
