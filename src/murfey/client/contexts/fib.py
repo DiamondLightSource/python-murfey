@@ -73,13 +73,11 @@ STAGE_POSITION_VALUES = {
 STAGE_POSITION_NAMES = {
     # Map class attribute to element name
     # Paths are relative to the "Site" node
-    "thinning": "ThinningSiteLocation/StagePosition/StagePosition",
-    # These stage position fields are also present
-    # but it's unclear which milling steps they correspond to
-    "chunk_coincidence": "Parameters/ChunkCoincidenceStagePosition/StagePosition",
-    "thinning_stage": "Parameters/ThinningStagePosition/StagePosition",
     "preparation": "PreparationSiteLocation/StagePosition/StagePosition",
-    "chunk_site": "ChunkSiteLocation/StagePosition/StagePosition",
+    "chunk_coincidence": "Parameters/ChunkCoincidenceStagePosition/StagePosition",
+    "chunk": "ChunkSiteLocation/StagePosition/StagePosition",
+    "thinning_1": "Parameters/ThinningStagePosition/StagePosition",
+    "thinning_2": "ThinningSiteLocation/StagePosition/StagePosition",
 }
 
 
@@ -490,7 +488,9 @@ class FIBContext(Context):
 
                     # Create a unique name based on recipe and activity names
                     unique_name = f"{recipe_name} - {activity_name}"
-                    step_info = MillingStepInfo()
+                    step_info = MillingStepInfo(
+                        step_name=activity_name, recipe_name=recipe_name
+                    )
 
                     # Update the corresponding milling activity field
                     step_info.is_enabled = _parse_xml_text(
@@ -504,10 +504,12 @@ class FIBContext(Context):
                     )
 
                     # Additional metadata extraction if elements are present
-                    if activity.find("DepthCorrection") is not None:
-                        step_info.depth_correction = _parse_xml_text(
-                            activity, "DepthCorrection", float
-                        )
+                    step_info.site_location_type = _parse_xml_text(
+                        activity, "SiteLocationType", str
+                    )
+                    step_info.depth_correction = _parse_xml_text(
+                        activity, "DepthCorrection", float
+                    )
                     # Lamella milling geometries
                     for value_name, value_path in LAMELLA_MILLING_VALUES.items():
                         step_info.__setattr__(
