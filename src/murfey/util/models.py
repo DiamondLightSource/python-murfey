@@ -116,11 +116,33 @@ class StagePositionValues(BaseModel):
 
 
 class StagePositionInfo(BaseModel):
-    thinning: StagePositionValues | None = None
-    chunk_coincidence: StagePositionValues | None = None
-    thinning_stage: StagePositionValues | None = None
-    preparation: StagePositionValues | None = None
-    chunk_site: StagePositionValues | None = None
+    """
+    Stage position values associated with the different stages of the milling
+    process. The XML paths they're associated with (with "Site" as the parent
+    node) are indicated in the comments.
+
+    The image acquisition steps have a "SiteLocationType" field that appear to
+    be associated with either "ChunkSiteLocation" or "ThinningSiteLocation".
+    "ThinningStagePosition" appears to be a duplicate of "ThinningSiteLocation"
+    so far, and it is unclearf for now what stages "PreparationSiteLocation"
+    and "ChunkCoincidenceStagePosition" currently correspond to.
+    """
+
+    preparation: StagePositionValues | None = (
+        None  # PreparationSiteLocation/StagePosition/StagePosition
+    )
+    chunk_coincidence: StagePositionValues | None = (
+        None  # Parameters/ChunkCoincidenceStagePosition/StagePosition
+    )
+    chunk: StagePositionValues | None = (
+        None  # ChunkSiteLocation/StagePosition/StagePosition
+    )
+    thinning_1: StagePositionValues | None = (
+        None  # Parameters/ThinningStagePosition/StagePosition
+    )
+    thinning_2: StagePositionValues | None = (
+        None  # ThinningSiteLocation/StagePosition/StagePosition
+    )
 
 
 class MillingStepInfo(BaseModel):
@@ -130,9 +152,14 @@ class MillingStepInfo(BaseModel):
     """
 
     # Step setup
+    step_name: str | None = None
+    recipe_name: str | None = None
     is_enabled: bool | None = None
     status: str | None = None
     execution_time: float | None = None
+
+    # Associated stage position information
+    site_location_type: str | None = None
 
     # Beam info
     beam_type: str | None = None
