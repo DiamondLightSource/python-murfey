@@ -178,16 +178,7 @@ class MillingStepInfo(BaseModel):
     width_overlap_rear_right: float | None = None
 
 
-class LamellaSiteInfo(BaseModel):
-    """
-    Pydantic model that stores all the metadata of interest for a single lamella
-    site.
-    """
-
-    # Values not associated with a single step
-    site_name: str | None = None
-    stage_info: StagePositionInfo | None = None
-
+class MillingSteps(BaseModel):
     # Processing steps supported by AutoTEM
     # Preparation stage
     eucentric_tilt: MillingStepInfo | None = None
@@ -217,6 +208,20 @@ class LamellaSiteInfo(BaseModel):
     polishing_2: MillingStepInfo | None = None
     polishing_2_ion: MillingStepInfo | None = None
     polishing_2_electron: MillingStepInfo | None = None
+
+
+class LamellaSiteInfo(BaseModel):
+    """
+    Pydantic model that stores all the metadata of interest for a single lamella
+    site.
+    """
+
+    # Values not associated with a single step
+    project_name: str | None = None
+    site_name: str | None = None
+    site_number: int | None = None
+    stage_info: StagePositionInfo | None = None
+    steps: MillingSteps | None = None
 
 
 """
