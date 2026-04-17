@@ -188,13 +188,13 @@ class MillingSteps(BaseModel):
     lamella_placement: MillingStepInfo | None = None
     # Milling stage
     delay_1: MillingStepInfo | None = None
-    reference_definition_1: MillingStepInfo | None = None
-    reference_definition_1_electron: MillingStepInfo | None = None
+    reference_definition: MillingStepInfo | None = None
+    reference_definition_electron: MillingStepInfo | None = None
     stress_relief_cuts: MillingStepInfo | None = None
-    reference_definition_2: MillingStepInfo | None = None
+    reference_redefinition_1: MillingStepInfo | None = None
     rough_milling: MillingStepInfo | None = None
     rough_milling_electron: MillingStepInfo | None = None
-    reference_definition_3: MillingStepInfo | None = None
+    reference_redefinition_2: MillingStepInfo | None = None
     medium_milling: MillingStepInfo | None = None
     medium_milling_electron: MillingStepInfo | None = None
     fine_milling: MillingStepInfo | None = None
