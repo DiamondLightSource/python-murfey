@@ -129,14 +129,32 @@ def test_file_transferred_to(
         ) == destination_dir / file.relative_to(visit_dir)
 
 
+@pytest.mark.parametrize(
+    "test_params",
+    (  # File type to test | Use environment? | Find source? | Find destination?
+        ("drift_correction", True, True, True),
+        ("drift_correction", False, True, True),
+        ("drift_correction", True, False, True),
+        ("drift_correction", True, True, False),
+    ),
+)
 def test_fib_autotem_context(
     mocker: MockerFixture,
+    test_params: tuple[str, bool, bool, bool],
     tmp_path: Path,
     visit_dir: Path,
     fib_autotem_dc_images: list[Path],
 ):
+    # Unpack test params
+    file_type, use_env, find_source, find_dst = test_params
+
     # Mock the environment
-    mock_environment = MagicMock()
+    mock_environment = None
+    if use_env:
+        mock_environment = MagicMock()
+
+    # Mock the logger to check if specific logs are triggered
+    mock_logger = mocker.patch("murfey.client.contexts.fib.logger")
 
     # Create a list of destinations
     destination_dir = tmp_path / "fib" / "data" / "current_year" / "visit"
@@ -145,11 +163,9 @@ def test_fib_autotem_context(
     ]
 
     # Mock the functions used in 'post_transfer'
-    mock_get_source = mocker.patch(
-        "murfey.client.contexts.fib._get_source", return_value=tmp_path
-    )
+    mock_get_source = mocker.patch("murfey.client.contexts.fib._get_source")
     mock_file_transferred_to = mocker.patch(
-        "murfey.client.contexts.fib._file_transferred_to", side_effect=destination_files
+        "murfey.client.contexts.fib._file_transferred_to"
     )
     mock_capture_post = mocker.patch("murfey.client.contexts.fib.capture_post")
 
@@ -162,18 +178,38 @@ def test_fib_autotem_context(
         token="",
     )
 
-    # Parse images one-by-one and check that expected calls were made
-    for file in fib_autotem_dc_images:
-        context.post_transfer(file, environment=mock_environment)
-        mock_get_source.assert_called_with(file, mock_environment)
-        mock_file_transferred_to.assert_called_with(
-            environment=mock_environment,
-            source=basepath,
-            file_path=file,
-            rsync_basepath=Path(""),
-        )
-    assert mock_capture_post.call_count == len(fib_autotem_dc_images)
-    assert len(context._drift_correction_images) == num_lamellae
+    match file_type:
+        case "drift_correction":
+            # Add case-specific return values and side-effects to the mocks
+            mock_get_source.return_value = tmp_path if find_source else None
+            if find_dst:
+                mock_file_transferred_to.side_effect = destination_files
+            else:
+                mock_file_transferred_to.return_value = None
+
+            # Parse images one-by-one and check that expected calls were made
+            for file in fib_autotem_dc_images:
+                context.post_transfer(file, environment=mock_environment)
+            if not use_env:
+                mock_logger.warning.assert_called_with("No environment passed in")
+            elif not find_source:
+                mock_logger.warning.assert_called_with(
+                    f"No source found for file {file}"
+                )
+            elif not find_dst:
+                mock_logger.warning.assert_called_with(
+                    f"File {file.name!r} not found on storage system"
+                )
+            else:
+                mock_get_source.assert_called_with(file, mock_environment)
+                mock_file_transferred_to.assert_called_with(
+                    environment=mock_environment,
+                    source=basepath,
+                    file_path=file,
+                    rsync_basepath=Path(""),
+                )
+                assert mock_capture_post.call_count == len(fib_autotem_dc_images)
+                assert len(context._drift_correction_images) == num_lamellae
 
 
 def test_fib_maps_context(
