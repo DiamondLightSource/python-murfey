@@ -9,119 +9,19 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable, TypeVar
 
-from pydantic import BaseModel, computed_field
-
 from murfey.client.context import Context
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.util.client import capture_post
+from murfey.util.models import (
+    LamellaSiteInfo,
+    MillingStepInfo,
+    StagePositionInfo,
+    StagePositionValues,
+)
 
 logger = logging.getLogger("murfey.client.contexts.fib")
 
 lock = threading.Lock()
-
-
-class StagePositionValues(BaseModel):
-    # Coordinates are in metres
-    x: float | None = None
-    y: float | None = None
-    z: float | None = None
-    # Angles are in degrees
-    rotation: float | None = None
-    tilt_alpha: float | None = None
-
-    @computed_field
-    def slot_number(self) -> int | None:
-        if self.x is None:
-            return None
-        return 1 if self.x < 0 else 2
-
-
-class StagePositionInfo(BaseModel):
-    thinning: StagePositionValues | None = None
-    chunk_coincidence: StagePositionValues | None = None
-    thinning_stage: StagePositionValues | None = None
-    preparation: StagePositionValues | None = None
-    chunk_site: StagePositionValues | None = None
-
-
-class WidthOverlap(BaseModel):
-    front_left: float | None = None
-    front_right: float | None = None
-    rear_left: float | None = None
-    rear_right: float | None = None
-
-
-class MillingStepInfo(BaseModel):
-    """
-    These are the parameters configured per milling step that we are interested
-    in tracking. Some attributes are present only for certain steps.
-    """
-
-    # Step setup
-    enabled: bool | None = None
-    status: str | None = None
-    execution_time: float | None = None
-
-    # Beam info
-    beam_type: str | None = None
-    voltage: float | None = None
-    current: float | None = None
-
-    # Lamella dimensions
-
-    # Milling info
-    milling_angle: float | None = None
-    depth_correction: float | None = None
-    lamella_offset: float | None = None
-    trench_height_front: float | None = None
-    trench_height_rear: float | None = None
-    width_overlap_front_left: float | None = None
-    width_overlap_front_right: float | None = None
-    width_overlap_rear_left: float | None = None
-    width_overlap_rear_right: float | None = None
-
-
-class LamellaSiteInfo(BaseModel):
-    """
-    These parameters are not associated with a single milling step
-    """
-
-    site_name: str | None = None
-    stage_info: StagePositionInfo | None = None
-
-    """
-    These are all the possible processing steps found in the ProjectData.dat file.
-    It contains information on whether the step has been enabled as well as its
-    current staate.
-    """
-    # Preparation stage
-    eucentric_tilt: MillingStepInfo | None = None
-    artificial_features: MillingStepInfo | None = None
-    milling_angle: MillingStepInfo | None = None
-    image_acquisition: MillingStepInfo | None = None
-    lamella_placement: MillingStepInfo | None = None
-    # Milling stage
-    delay_1: MillingStepInfo | None = None
-    reference_definition_1: MillingStepInfo | None = None
-    reference_definition_1_electron: MillingStepInfo | None = None
-    stress_relief_cuts: MillingStepInfo | None = None
-    reference_definition_2: MillingStepInfo | None = None
-    rough_milling: MillingStepInfo | None = None
-    rough_milling_electron: MillingStepInfo | None = None
-    reference_definition_3: MillingStepInfo | None = None
-    medium_milling: MillingStepInfo | None = None
-    medium_milling_electron: MillingStepInfo | None = None
-    fine_milling: MillingStepInfo | None = None
-    fine_milling_electron: MillingStepInfo | None = None
-    finer_milling: MillingStepInfo | None = None
-    finer_milling_electron: MillingStepInfo | None = None
-    # Thinning stage
-    delay_2: MillingStepInfo | None = None
-    polishing_1: MillingStepInfo | None = None
-    polishing_1_electron: MillingStepInfo | None = None
-    polishing_2: MillingStepInfo | None = None
-    polishing_2_ion: MillingStepInfo | None = None
-    polishing_2_electron: MillingStepInfo | None = None
 
 
 MILLING_STEP_NAMES = {
@@ -570,7 +470,7 @@ class FIBContext(Context):
                     step_info = MillingStepInfo()
 
                     # Update the corresponding milling activity field
-                    step_info.enabled = _parse_xml_text(
+                    step_info.is_enabled = _parse_xml_text(
                         activity, "IsEnabled", _parse_boolean
                     )
                     step_info.status = _parse_xml_text(
