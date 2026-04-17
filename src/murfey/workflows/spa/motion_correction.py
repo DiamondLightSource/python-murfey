@@ -1,5 +1,6 @@
 from logging import getLogger
 
+import requests
 from sqlmodel import Session, select
 
 from murfey.util.config import get_machine_config
@@ -47,6 +48,13 @@ def motion_corrected(message: dict, murfey_db: Session) -> dict[str, bool]:
                     f"micrographs/{movie.smartem_uuid}",
                     update,
                     MicrographResponse,
+                )
+                requests.post(
+                    f"{machine_config.smartem_api_url}/micrographs/{movie.smartem_uuid}/motion_correction/completed",
+                    json={
+                        "total_motion": message["total_motion"],
+                        "average_motion": message["average_motion"],
+                    },
                 )
         except Exception:
             logger.warning(
