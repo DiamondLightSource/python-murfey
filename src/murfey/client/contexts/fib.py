@@ -258,7 +258,7 @@ class FIBContext(Context):
         super().post_transfer(transferred_file, environment=environment, **kwargs)
         if environment is None:
             logger.warning("No environment passed in")
-            return
+            return None
 
         # -----------------------------------------------------------------------------
         # AutoTEM
@@ -302,6 +302,7 @@ class FIBContext(Context):
                         # Update existing dict
                         self._site_info[site_num] = site_info_new
                         logger.info(f"Updating metadata for site {site_num}")
+                return None
 
             elif "DCImages" in parts and transferred_file.suffix == ".png":
                 lamella_name = parts[parts.index("Sites") + 1]
@@ -375,6 +376,7 @@ class FIBContext(Context):
                     visit_name=environment.visit,
                     session_id=environment.murfey_session,
                 )
+                return None
 
         # -----------------------------------------------------------------------------
         # Maps
@@ -387,7 +389,7 @@ class FIBContext(Context):
             ):
                 if not (source := _get_source(transferred_file, environment)):
                     logger.warning(f"No source found for file {transferred_file}")
-                    return
+                    return None
                 if not (
                     destination_file := _file_transferred_to(
                         environment=environment,
@@ -401,11 +403,11 @@ class FIBContext(Context):
                     logger.warning(
                         f"File {transferred_file.name!r} not found on storage system"
                     )
-                    return
+                    return None
 
                 # Register image in database
                 self._register_atlas(destination_file, environment)
-                return
+                return None
 
         # -----------------------------------------------------------------------------
         # Meteor
