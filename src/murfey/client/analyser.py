@@ -408,7 +408,7 @@ class Analyser(Observer):
                     )
                     self.post_transfer(transferred_file)
                 case "SPAContext":
-                    logger.debug(f"File {transferred_file.name!r} is part of the atlas")
+                    logger.debug(f"File {transferred_file.name!r} is part of the SPA workflow")
                     self.post_transfer(transferred_file)
 
                     # Find extension
@@ -444,7 +444,7 @@ class Analyser(Observer):
                             self.notify(dc_metadata)
 
                 case "TomographyContext":
-                    logger.debug(f"File {transferred_file.name!r} is part of the atlas")
+                    logger.debug(f"File {transferred_file.name!r} is part of the tomography workflow")
                     self.post_transfer(transferred_file)
 
                     # Find extension
