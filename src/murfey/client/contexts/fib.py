@@ -422,24 +422,24 @@ class FIBContext(Context):
         along with the configured milling steps and their completion status.
         """
 
+        all_site_info: dict[int, LamellaSiteInfo] = {}
         try:
             root = ET.parse(file).getroot()
         except Exception:
             logger.warning(f"Error parsing file {str(file)}", exc_info=True)
-            return None
+            return all_site_info
 
         # Get the project name
         if (project_name := _parse_xml_text(root, ".//Project/Name", str)) is None:
             logger.warning("Metadata file has no project name")
-            return None
+            return all_site_info
 
         # Find all the Site nodes
         if not (sites := root.findall(".//Sites/Site")):
             logger.warning(f"No site information found in {str(file)}")
-            return None
+            return all_site_info
 
         # Iterate through Site nodes
-        all_site_info: dict[int, LamellaSiteInfo] = {}
         for site in sites:
             # Extract site name and number
             if (site_name := _parse_xml_text(site, "Name", str)) is None:
