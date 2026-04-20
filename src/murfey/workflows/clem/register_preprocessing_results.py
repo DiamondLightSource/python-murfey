@@ -364,17 +364,20 @@ def _register_grid_square(
 
     # Check if an atlas has been registered
     if not (
-        atlas_entry := murfey_db.exec(
+        # Sort by ascending insertion order
+        atlas_results := murfey_db.exec(
             select(MurfeyDB.ImagingSite)
             .where(MurfeyDB.ImagingSite.session_id == session_id)
             .where(MurfeyDB.ImagingSite.dcg_name == dcg_name)
             .where(MurfeyDB.ImagingSite.data_type == "atlas")
-        ).one_or_none()
+            .order_by(MurfeyDB.ImagingSite.id)
+        ).all()
     ):
         logger.info(
             f"No atlas has been registered for data collection group {dcg_name!r} yet"
         )
         return
+    atlas_entry = atlas_results[-1]  # Use the latest registered atlas
 
     # Check if there are CLEM entries to register
     if clem_img_site_to_register := murfey_db.exec(
