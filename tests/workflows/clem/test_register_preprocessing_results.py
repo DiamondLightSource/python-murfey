@@ -69,6 +69,20 @@ def generate_preprocessing_messages(
             for n in range(3)
         ]
     )
+    # Add a second atlas dataset
+    datasets.extend(
+        [
+            (
+                grid_dir / "Overview 2" / "Image 1",
+                False,
+                True,
+                (2400, 2400),
+                1e-6,
+                [0.002, 0.0044, 0.002, 0.0044],
+            )
+        ]
+    )
+    # Add on metadata for denoised datasets
     datasets.extend(
         [
             (
@@ -398,7 +412,7 @@ def test_run_with_db(
             MurfeyDB.GridSquare.session_id == murfey_session.id
         )
     ).all()
-    assert len(murfey_gs_search) == (len(preprocessing_messages) - 1) // 2
+    assert len(murfey_gs_search) == (len(preprocessing_messages) - 2) // 2
 
     # ISPyB's DataCollectionGroup should have an entry
     murfey_dcg = murfey_dcg_search[0]
@@ -449,7 +463,7 @@ def test_run_with_db(
         .scalars()
         .all()
     )
-    assert len(ispyb_gs_search) == (len(preprocessing_messages) - 1) // 2
+    assert len(ispyb_gs_search) == (len(preprocessing_messages) - 2) // 2
     for gs in ispyb_gs_search:
         # Check that all entries point to the denoised images ("_Lng_LVCC")
         assert gs.gridSquareImage is not None and "_Lng_LVCC" in gs.gridSquareImage
