@@ -14,6 +14,7 @@ from murfey.client.contexts.fib import (
     _file_transferred_to,
     _get_source,
     _number_from_name,
+    _parse_boolean,
 )
 
 # Mock session values
@@ -405,6 +406,26 @@ def fib_maps_images(visit_dir: Path):
 def test_number_from_name(test_params: tuple[str, int]):
     name, number = test_params
     assert _number_from_name(name) == number
+
+
+@pytest.mark.parametrize(
+    "test_params",
+    (  # Input | Expected output
+        ("True", True),
+        ("true", True),
+        ("T", True),
+        ("t", True),
+        ("1", True),
+        ("False", False),
+        ("false", False),
+        ("F", False),
+        ("f", False),
+        ("0", False),
+    ),
+)
+def test_parse_boolean(test_params: tuple[str, bool]):
+    text, expected_result = test_params
+    assert _parse_boolean(text) == expected_result
 
 
 def test_get_source(
