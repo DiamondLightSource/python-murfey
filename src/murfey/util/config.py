@@ -153,6 +153,15 @@ class MachineConfig(BaseModel):  # type: ignore
         # Let it validate and fail as-is
         return v
 
+    @field_validator("mkdir_chmod", mode="before")
+    @classmethod
+    def parse_octal_int(cls, value):
+        # Attempt to parse the string as an octal int
+        if isinstance(value, str):
+            return int(value, 8)
+        # Return value as-is otherwise
+        return value
+
 
 @lru_cache(maxsize=1)
 def machine_config_from_file(
