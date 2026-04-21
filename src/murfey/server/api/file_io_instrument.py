@@ -86,9 +86,11 @@ def suggest_path(
         count = count + 1 if count else 2
         check_path = check_path.parent / f"{check_path_name}{count}"
     if params.touch:
-        check_path.mkdir(mode=0o750)
+        check_path.mkdir(mode=machine_config.mkdir_chmod)
         if params.extra_directory:
-            (check_path / secure_filename(params.extra_directory)).mkdir(mode=0o750)
+            (check_path / secure_filename(params.extra_directory)).mkdir(
+                mode=machine_config.mkdir_chmod
+            )
     return {"suggested_path": check_path.relative_to(rsync_basepath)}
 
 
@@ -112,7 +114,7 @@ def make_rsyncer_destination(session_id: int, destination: Dest, db=murfey_db):
         machine_config.rsync_basepath or Path("")
     ).resolve() / destination_path
     for parent_path in full_destination_path.parents:
-        parent_path.mkdir(mode=0o750, exist_ok=True)
+        parent_path.mkdir(mode=machine_config.mkdir_chmod, exist_ok=True)
     return destination
 
 
