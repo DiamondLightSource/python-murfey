@@ -58,11 +58,13 @@ class MachineConfig(BaseModel):  # type: ignore
         "directories": [],
         "files": [],
     }
+    mkdir_chmod: int = 0o750
 
     # Rsync setup
     rsync_url: str = ""
     rsync_module: str = ""
     rsync_basepath: Optional[Path] = None
+    rsync_chmod: str = "D0750,F0750"
     allow_removal: bool = False
 
     # Upstream data download setup
