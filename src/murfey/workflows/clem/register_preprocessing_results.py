@@ -330,16 +330,11 @@ def _register_dcg_and_atlas(
         .where(MurfeyDB.DataCollectionGroup.tag == dcg_name)
     ).one()
 
-    if not (
-        clem_img_site := murfey_db.exec(
-            select(MurfeyDB.ImagingSite)
-            .where(MurfeyDB.ImagingSite.session_id == session_id)
-            .where(MurfeyDB.ImagingSite.site_name == result.site_name)
-        ).one_or_none()
-    ):
-        clem_img_site = MurfeyDB.ImagingSite(
-            session_id=session_id, site_name=result.site_name
-        )
+    clem_img_site = murfey_db.exec(
+        select(MurfeyDB.ImagingSite)
+        .where(MurfeyDB.ImagingSite.session_id == session_id)
+        .where(MurfeyDB.ImagingSite.site_name == result.site_name)
+    ).one()
 
     clem_img_site.dcg_id = dcg_entry.id
     clem_img_site.dcg_name = dcg_entry.tag
@@ -534,12 +529,13 @@ def _register_grid_square(
                     image=grid_square_params.image,
                 )
             murfey_db.add(grid_square_entry)
-            murfey_db.commit()
 
             # Add grid square ID to existing CLEM image series entry
             clem_img_site.grid_square_id = grid_square_entry.id
             murfey_db.add(clem_img_site)
-            murfey_db.commit()
+
+        # Do one commit at the end
+        murfey_db.commit()
     else:
         logger.info(
             f"No grid squares to register for data collection group {dcg_name!r} yet"
