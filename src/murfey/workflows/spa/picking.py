@@ -376,7 +376,6 @@ def _check_notifications(message: dict, murfey_db: Session) -> None:
 
 
 def particles_picked(message: dict, murfey_db: Session) -> dict[str, bool]:
-    logger.debug("New picked particle!")
     movie = murfey_db.exec(
         select(Movie).where(Movie.murfey_id == message["motion_correction_id"])
     ).one()
@@ -415,15 +414,9 @@ def particles_picked(message: dict, murfey_db: Session) -> dict[str, bool]:
             == _pj_id(message["program_id"], murfey_db)
         )
     ).one()
-    logger.debug(f"{feedback_params}")
-    print(feedback_params)
     if feedback_params.estimate_particle_diameter:
-        logger.debug("use diameter")
-        print("use diameter")
         _register_picked_particles_use_diameter(message, murfey_db)
     else:
-        logger.debug("use box size")
-        print("use box size")
         _register_picked_particles_use_boxsize(message, murfey_db)
     prom.preprocessed_movies.labels(
         processing_job=_pj_id(message["program_id"], murfey_db)
