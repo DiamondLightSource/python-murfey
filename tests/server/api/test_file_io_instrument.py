@@ -10,6 +10,7 @@ from murfey.server.api.file_io_instrument import (
     make_rsyncer_destination,
     suggest_path,
 )
+from murfey.util.config import MachineConfig
 
 
 @pytest.mark.parametrize(
@@ -58,13 +59,16 @@ def test_suggest_path(
     mock_db.exec.return_value.one.return_value = mock_session
 
     # Mock 'get_machine_config'
-    mock_machine_config = MagicMock()
-    mock_machine_config.rsync_basepath = rsync_basepath
-    mock_machine_config.mkdir_chmod = 0o775
+    machine_config = MachineConfig(
+        **{
+            "rsync_basepath": str(rsync_basepath),
+            "mkdir_chmod": "0o775",
+        }
+    )
     mocker.patch(
         "murfey.server.api.file_io_instrument.get_machine_config",
         return_value={
-            instrument_name: mock_machine_config,
+            instrument_name: machine_config,
         },
     )
 
@@ -133,13 +137,16 @@ def test_make_rsyncer_destination(
     mock_db.exec.return_value.one.return_value = mock_session
 
     # Mock 'get_machine_config'
-    mock_machine_config = MagicMock()
-    mock_machine_config.rsync_basepath = rsync_basepath
-    mock_machine_config.mkdir_chmod = 0o775
+    machine_config = MachineConfig(
+        **{
+            "rsync_basepath": str(rsync_basepath),
+            "mkdir_chmod": "0o775",
+        }
+    )
     mocker.patch(
         "murfey.server.api.file_io_instrument.get_machine_config",
         return_value={
-            instrument_name: mock_machine_config,
+            instrument_name: machine_config,
         },
     )
 
