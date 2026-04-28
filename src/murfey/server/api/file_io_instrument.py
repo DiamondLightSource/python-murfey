@@ -34,7 +34,9 @@ router = APIRouter(
 
 
 class SuggestedPathParameters(BaseModel):
-    base_path: Path
+    base_path: (
+        Path  # Partial Path starting from immediately after the rsync destination
+    )
     touch: bool = False
     extra_directory: str = ""
 
