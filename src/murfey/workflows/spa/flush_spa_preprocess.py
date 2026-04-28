@@ -24,7 +24,6 @@ from murfey.util import sanitise, secure_path
 from murfey.util.config import get_machine_config, get_microscope
 from murfey.util.db import (
     AutoProcProgram,
-    ClassificationFeedbackParameters,
     DataCollection,
     DataCollectionGroup,
     FoilHole,
@@ -497,18 +496,11 @@ def flush_spa_preprocess(message: dict, murfey_db: Session) -> dict[str, bool]:
         .where(AutoProcProgram.pj_id == ProcessingJob.id)
         .where(ProcessingJob.recipe == recipe_name)
     ).one()
-    params = murfey_db.exec(
-        select(SPARelionParameters, ClassificationFeedbackParameters)
-        .where(SPARelionParameters.pj_id == collected_ids[2].id)
-        .where(ClassificationFeedbackParameters.pj_id == SPARelionParameters.pj_id)
-    ).one()
-    proc_params = params[0]
-    feedback_params = params[1]
-    if not proc_params:
-        logger.warning(
-            f"No SPA processing parameters found for client processing job ID {collected_ids[2].id}"
+    proc_params = murfey_db.exec(
+        select(SPARelionParameters).where(
+            SPARelionParameters.pj_id == collected_ids[2].id
         )
-        return {"success": False, "requeue": False}
+    ).one()
 
     murfey_ids = _murfey_id(
         collected_ids[3].id,
@@ -516,10 +508,6 @@ def flush_spa_preprocess(message: dict, murfey_db: Session) -> dict[str, bool]:
         number=2 * len(stashed_files),
         close=False,
     )
-    if feedback_params.picker_murfey_id is None:
-        feedback_params.picker_murfey_id = murfey_ids[1]
-        murfey_db.add(feedback_params)
-
     for i, f in enumerate(stashed_files):
         try:
             foil_hole_id = None

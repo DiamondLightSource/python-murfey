@@ -59,7 +59,6 @@ from murfey.util import sanitise
 from murfey.util.config import get_machine_config
 from murfey.util.db import (
     AutoProcProgram,
-    ClassificationFeedbackParameters,
     DataCollection,
     DataCollectionGroup,
     FoilHole,
@@ -523,13 +522,11 @@ async def request_spa_preprocessing(
             .where(AutoProcProgram.pj_id == ProcessingJob.id)
             .where(ProcessingJob.recipe == "em-spa-preprocess")
         ).one()
-        params = db.exec(
-            select(SPARelionParameters, ClassificationFeedbackParameters)
-            .where(SPARelionParameters.pj_id == collected_ids[2].id)
-            .where(ClassificationFeedbackParameters.pj_id == SPARelionParameters.pj_id)
+        proc_params = db.exec(
+            select(SPARelionParameters).where(
+                SPARelionParameters.pj_id == collected_ids[2].id
+            )
         ).one()
-        proc_params: Optional[dict] = dict(params[0])
-        feedback_params = params[1]
     except sqlalchemy.exc.NoResultFound:
         proc_params = None
     try:
@@ -557,10 +554,6 @@ async def request_spa_preprocessing(
         detached_ids = [c.id for c in collected_ids]
 
         murfey_ids = _murfey_id(detached_ids[3], db, number=2, close=False)
-
-        if feedback_params.picker_murfey_id is None:
-            feedback_params.picker_murfey_id = murfey_ids[1]
-            db.add(feedback_params)
         movie = Movie(
             murfey_id=murfey_ids[0],
             data_collection_id=detached_ids[1],

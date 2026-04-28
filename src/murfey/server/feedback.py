@@ -907,6 +907,7 @@ def _register_complete_2d_batch(message: dict, _db):
             murfey.server._transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
+        feedback_params.hold_class2d = False
         _db.add(feedback_params)
         _db.commit()
         _db.close()
