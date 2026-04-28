@@ -79,11 +79,8 @@ def test_suggest_path(
         if touch
         else not (visit_dir / dir_name).exists()
     )
-    assert (
-        (visit_dir / dir_name / extra_dir).exists()
-        if touch and extra_dir
-        else not (visit_dir / dir_name / extra_dir).exists()
-    )
+    if touch and extra_dir:
+        assert (visit_dir / dir_name / extra_dir).exists()
 
 
 def test_make_rsyncer_destination():
