@@ -2,8 +2,9 @@ from datetime import datetime
 from logging import getLogger
 from pathlib import Path
 from typing import Dict, List, Optional
+import requests
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlmodel import select
@@ -58,6 +59,47 @@ router = APIRouter(
     tags=["Session Info: General"],
 )
 
+alertmanager_url = "https://murfey-alertmanager.diamond.ac.uk"
+
+@router.get("/silences/{microscope}")
+def get_silences(microscope: str):
+    try:
+        silences = requests.get(f"{alertmanager_url}/api/v2/silences?filter=microscope={microscope}")
+        return str(silences.json())
+    except:
+        HTTPException(status_code=silences.status_code, detail=silences.json())
+
+@router.post("/silences/{microscope}")
+def get_silences(microscope: str, end_time: datetime ):
+    #for testing
+    # microscope = 'm00'
+
+    start_time = datetime.now().astimezone().isoformat()
+    end_time = end_time.astimezone().isoformat()
+    silence_json = {
+    "matchers":[
+        {
+            "name": "microscope",
+            "value": microscope,
+            "isRegex": False
+        }],
+    "createdBy": "dvu71330",
+    "annotations":{"description": "Test"},
+    "comment": "test",
+    "status": {"state": "active"},
+    "startsAt": str(start_time),
+    "endsAt": str(end_time)
+    }
+    print(silence_json)
+    try:
+        alertmanager_response = requests.post(f"{alertmanager_url}/api/v2/silences", json=silence_json)
+        print(alertmanager_response)
+    except:
+        raise HTTPException(status_code=500, detail= "Error creating silence")
+    if alertmanager_response.status_code == 200:
+        return str(alertmanager_response.json())
+    else:
+        raise HTTPException(status_code=alertmanager_response.status_code, detail=alertmanager_response.json())
 
 @router.get("/health/")
 def health_check(db=ispyb_db):
