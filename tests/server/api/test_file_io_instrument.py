@@ -4,7 +4,12 @@ from unittest.mock import MagicMock
 import pytest
 from pytest_mock import MockerFixture
 
-from murfey.server.api.file_io_instrument import SuggestedPathParameters, suggest_path
+from murfey.server.api.file_io_instrument import (
+    Dest,
+    SuggestedPathParameters,
+    make_rsyncer_destination,
+    suggest_path,
+)
 
 
 @pytest.mark.parametrize(
@@ -27,6 +32,8 @@ def test_suggest_path(
 ):
     # Unpack test params
     touch, extra_dir, has_raw = test_params
+
+    # Set other parameters
     instrument_name = "test"
     year = "2026"
     visit_name = "visit"
@@ -83,5 +90,64 @@ def test_suggest_path(
         assert (visit_dir / dir_name / extra_dir).exists()
 
 
-def test_make_rsyncer_destination():
-    pass
+@pytest.mark.parametrize(
+    "dir_name",
+    (
+        # General
+        "images",
+        "screenshots",
+        # SPA/Tomo-specific
+        "raw",
+        "raw2",
+        "raw3",
+        "atlas",
+        # FIB-specific
+        "autotem",
+        "maps",
+        "meteor",
+        "extras",
+    ),
+)
+def test_make_rsyncer_destination(
+    mocker: MockerFixture,
+    dir_name: str,
+    tmp_path: Path,
+):
+    # Set other parameters
+    instrument_name = "test"
+    year = "2026"
+    visit_name = "visit"
+    session_id = 1
+
+    rsync_basepath = tmp_path / "data"
+    visit_dir = rsync_basepath / year / visit_name
+    destination = visit_dir / dir_name
+
+    dest = Dest(destination=destination.relative_to(rsync_basepath))
+
+    # Mock the database call
+    mock_session = MagicMock()
+    mock_session.instrument_name = instrument_name
+    mock_session.visit = visit_name
+    mock_db = MagicMock()
+    mock_db.exec.return_value.one.return_value = mock_session
+
+    # Mock 'get_machine_config'
+    mock_machine_config = MagicMock()
+    mock_machine_config.rsync_basepath = rsync_basepath
+    mock_machine_config.mkdir_chmod = 0o775
+    mocker.patch(
+        "murfey.server.api.file_io_instrument.get_machine_config",
+        return_value={
+            instrument_name: mock_machine_config,
+        },
+    )
+
+    # Run the function and check expected outputs
+    result = make_rsyncer_destination(
+        session_id=session_id,
+        destination=dest,
+        db=mock_db,
+    )
+    assert result == dest
+    assert destination.exists()
