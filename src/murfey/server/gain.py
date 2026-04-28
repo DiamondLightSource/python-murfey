@@ -35,7 +35,7 @@ async def prepare_gain(
     env: Dict[str, str],
     rescale: bool = True,
     tag: str = "",
-    chmod: int = 0o775,
+    chmod: int = 0o750,
 ) -> Tuple[Path | None, Path | None]:
     if not all(executables.get(s) for s in ("dm2mrc", "clip", "newstack")):
         logger.error("No executables were provided to prepare the gain reference with")
