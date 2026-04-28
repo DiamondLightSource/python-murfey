@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from logging import getLogger
 from pathlib import Path
@@ -86,11 +87,12 @@ def suggest_path(
         count = count + 1 if count else 2
         check_path = check_path.parent / f"{check_path_name}{count}"
     if params.touch:
-        check_path.mkdir(mode=machine_config.mkdir_chmod)
+        check_path.mkdir()
+        os.chmod(check_path, mode=machine_config.mkdir_chmod)
         if params.extra_directory:
-            (check_path / secure_filename(params.extra_directory)).mkdir(
-                mode=machine_config.mkdir_chmod
-            )
+            extra_dir = check_path / secure_filename(params.extra_directory)
+            extra_dir.mkdir()
+            os.chmod(extra_dir, mode=machine_config.mkdir_chmod)
     return {"suggested_path": check_path.relative_to(rsync_basepath)}
 
 
@@ -102,9 +104,9 @@ class Dest(BaseModel):
 def make_rsyncer_destination(session_id: int, destination: Dest, db=murfey_db):
     secure_path_parts = [secure_filename(p) for p in destination.destination.parts]
     destination_path = "/".join(secure_path_parts)
-    instrument_name = (
-        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
-    )
+    session_entry = db.exec(select(Session).where(Session.id == session_id)).one()
+    instrument_name = session_entry.instrument_name
+    visit = session_entry.visit
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
@@ -113,8 +115,14 @@ def make_rsyncer_destination(session_id: int, destination: Dest, db=murfey_db):
     full_destination_path = (
         machine_config.rsync_basepath or Path("")
     ).resolve() / destination_path
-    for parent_path in full_destination_path.parents:
-        parent_path.mkdir(mode=machine_config.mkdir_chmod, exist_ok=True)
+    # Create every folder up to and including the folder being rsync'ed
+    current_path: Path | None = None
+    for part in full_destination_path.parts:
+        current_path = Path(part) if current_path is None else current_path / part
+        current_path.mkdir(exist_ok=True)
+        # Change permissions after the visit directory
+        if visit in current_path.parts:
+            os.chmod(current_path, mode=machine_config.mkdir_chmod)
     return destination
 
 
