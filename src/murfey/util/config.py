@@ -157,7 +157,7 @@ class MachineConfig(BaseModel):  # type: ignore
     @classmethod
     def parse_octal_int(cls, value):
         # Attempt to parse the string as an octal int
-        if isinstance(value, str):
+        if isinstance(value, str) and value.startswith("0o") and value[2:].isdigit():
             return int(value, 8)
         # Return value as-is otherwise
         return value
