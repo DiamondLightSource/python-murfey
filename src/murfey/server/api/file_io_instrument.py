@@ -124,7 +124,13 @@ def make_rsyncer_destination(session_id: int, destination: Dest, db=murfey_db):
         current_path.mkdir(exist_ok=True)
         # Change permissions after the visit directory
         if visit in current_path.parts:
-            os.chmod(current_path, mode=machine_config.mkdir_chmod)
+            try:
+                os.chmod(current_path, mode=machine_config.mkdir_chmod)
+            except PermissionError:
+                logger.warning(
+                    f"Insufficient permissions to change permissions for {current_path}"
+                )
+                continue
     return destination
 
 
