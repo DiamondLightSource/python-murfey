@@ -1,4 +1,5 @@
 import asyncio
+import os
 from datetime import datetime
 from logging import getLogger
 from pathlib import Path
@@ -607,9 +608,9 @@ async def request_spa_preprocessing(
         db.close()
 
         if not mrc_out.parent.exists():
-            Path(secure_filename(str(mrc_out))).parent.mkdir(
-                parents=True, exist_ok=True
-            )
+            mrc_out_dir = Path(secure_filename(str(mrc_out))).parent
+            mrc_out_dir.mkdir(parents=True, exist_ok=True)
+            os.chmod(mrc_out_dir, mode=machine_config.mkdir_chmod)
         recipe_name = machine_config.recipes.get(
             "em-spa-preprocess", "em-spa-preprocess"
         )
@@ -836,6 +837,7 @@ async def request_tomography_preprocessing(
         murfey_ids = _murfey_id(appid, db, number=1, close=False)
         if not mrc_out.parent.exists():
             mrc_out.parent.mkdir(parents=True, exist_ok=True)
+            os.chmod(mrc_out.parent, mode=machine_config.mkdir_chmod)
 
         session_processing_parameters = db.exec(
             select(SessionProcessingParameters).where(
@@ -988,6 +990,7 @@ def register_completed_tilt_series(
             )
             if not stack_file.parent.exists():
                 stack_file.parent.mkdir(parents=True)
+                os.chmod(stack_file.parent, mode=machine_config.mkdir_chmod)
             tilt_offset = midpoint([float(get_angle(t)) for t in tilts])
             zocalo_message = {
                 "recipes": ["em-tomo-align"],
@@ -1222,8 +1225,10 @@ async def make_gif(
         / "processed"
     )
     output_dir.mkdir(exist_ok=True)
+    os.chmod(output_dir, mode=machine_config.mkdir_chmod)
     output_dir = output_dir / secure_filename(gif_params.raw_directory)
     output_dir.mkdir(exist_ok=True)
+    os.chmod(output_dir, mode=machine_config.mkdir_chmod)
     output_path = output_dir / f"lamella_{gif_params.lamella_number}_milling.gif"
 
     if Image is not None:

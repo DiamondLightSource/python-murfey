@@ -487,6 +487,7 @@ async def test_make_gif(
     # Mock the machine config and 'get_machine_config'
     mock_machine_config = MagicMock()
     mock_machine_config.rsync_basepath = rsync_basepath
+    mock_machine_config.mkdir_chmod = 0o775
     mocker.patch(
         "murfey.server.api.workflow.get_machine_config",
         return_value={
