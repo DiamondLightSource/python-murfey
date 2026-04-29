@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
-import shutil
 import threading
-import time
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from datetime import datetime
@@ -267,17 +265,6 @@ class FIBContext(Context):
             parts = transferred_file.parts
             if transferred_file.name == "ProjectData.dat":
                 logger.info(f"Found metadata file {transferred_file} for parsing")
-
-                # Create a backup copy of the file
-                backup_file = (
-                    transferred_file.parent
-                    / f"{transferred_file.stem}-{time.time_ns()}{transferred_file.suffix}"
-                )
-                shutil.copyfile(
-                    transferred_file,
-                    backup_file,
-                )
-                logger.info(f"Saved snapshot of the metadata file as {backup_file}")
 
                 # Parse the metadata file
                 all_site_info_new = self._parse_autotem_metadata(transferred_file)
