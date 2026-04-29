@@ -114,23 +114,27 @@ def make_rsyncer_destination(session_id: int, destination: Dest, db=murfey_db):
     ]
     if not machine_config:
         raise ValueError("No machine configuration set when making rsyncer destination")
+
+    # Make the destination directory and all parents
     full_destination_path = (
         machine_config.rsync_basepath or Path("")
     ).resolve() / destination_path
-    # Create every folder up to and including the folder being rsync'ed
-    current_path: Path | None = None
-    for part in full_destination_path.parts:
-        current_path = Path(part) if current_path is None else current_path / part
-        current_path.mkdir(exist_ok=True)
-        # Change permissions after the visit directory
-        if visit in current_path.parts:
-            try:
-                os.chmod(current_path, mode=machine_config.mkdir_chmod)
-            except PermissionError:
-                logger.warning(
-                    f"Insufficient permissions to change permissions for {current_path}"
-                )
-                continue
+    full_destination_path.mkdir(parents=True, exist_ok=True)
+
+    # Change permissions for every folder after the visit directory
+    try:
+        visit_index = full_destination_path.parts.index(visit)
+    except ValueError:
+        logger.error(f"Could not find directory level {visit!r} in destination path")
+        raise
+    current_path = full_destination_path.parents[-(visit_index + 1)]
+    for part in full_destination_path.parts[visit_index + 1 :]:
+        current_path = current_path / part
+        try:
+            os.chmod(current_path, mode=machine_config.mkdir_chmod)
+        except PermissionError:
+            logger.warning(f"Unable to change permissions for {current_path}")
+            continue
     return destination
 
 
