@@ -509,7 +509,6 @@ def test_fib_autotem_context_projectdata(
     mock_logger = mocker.patch("murfey.client.contexts.fib.logger")
 
     # Mock the functions used in 'post_transfer'
-    mock_copy = mocker.patch("murfey.client.contexts.fib.shutil.copyfile")
     mock_capture_post = mocker.patch("murfey.client.contexts.fib.capture_post")
 
     # Create the mock metadata file to parse
@@ -547,7 +546,6 @@ def test_fib_autotem_context_projectdata(
             has_activity_name,
         )
     ):
-        mock_copy.assert_called_once()
         assert mock_capture_post.call_count == num_lamellae
         assert len(context._site_info) == num_lamellae
         for i in range(num_lamellae):
