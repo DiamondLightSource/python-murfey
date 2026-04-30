@@ -1440,3 +1440,10 @@ murfey.server.api.workflow_fib.router:
         type: int
     methods:
       - POST
+  - path: /workflow/fib/sessions/{session_id}/register_milling_progress
+    function: register_fib_milling_progress
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
