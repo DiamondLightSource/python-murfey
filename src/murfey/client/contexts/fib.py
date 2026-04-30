@@ -4,7 +4,7 @@ import logging
 import re
 import threading
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Type, TypeVar
 
@@ -228,7 +228,7 @@ def _file_transferred_to(
 
 @dataclass
 class FIBImage:
-    images: list[Path] = []
+    images: list[Path] = field(default_factory=list)
     output_file: Path | None = None
     is_submitted: bool = False
 
@@ -440,9 +440,9 @@ class FIBContext(Context):
                     )
 
                     # Iteratively update fields in the MillingSteps model it's not None
-                    for field, path, func in ACTIVITY_FIELD_MAP:
+                    for field_name, path, func in ACTIVITY_FIELD_MAP:
                         if (value := _parse_xml_text(activity, path, func)) is not None:
-                            step_info.__setattr__(field, value)
+                            step_info.__setattr__(field_name, value)
 
                     # Add info for current step to the site info model
                     site_info.steps.__setattr__(
