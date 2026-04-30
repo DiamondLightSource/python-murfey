@@ -124,8 +124,8 @@ class StagePositionInfo(BaseModel):
     The image acquisition steps have a "SiteLocationType" field that appear to
     be associated with either "ChunkSiteLocation" or "ThinningSiteLocation".
     "ThinningStagePosition" appears to be a duplicate of "ThinningSiteLocation"
-    so far, and it is unclearf for now what stages "PreparationSiteLocation"
-    and "ChunkCoincidenceStagePosition" currently correspond to.
+    so far, and it is unclear for now what stages "PreparationSiteLocation" and
+    "ChunkCoincidenceStagePosition" currently correspond to.
     """
 
     preparation: StagePositionValues | None = (
