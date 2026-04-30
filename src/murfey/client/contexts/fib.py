@@ -299,7 +299,7 @@ class FIBContext(Context):
                         if self._make_gif(
                             environment=environment,
                             lamella_number=site_num,
-                            images=fib_image.images,
+                            images=sorted(fib_image.images),
                             output_file=fib_image.output_file,
                         ):
                             with lock:
