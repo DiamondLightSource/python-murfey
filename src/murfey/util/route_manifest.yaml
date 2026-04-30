@@ -382,28 +382,6 @@ murfey.server.api.bootstrap.version:
     path_params: []
     methods:
       - GET
-murfey.server.api.clem.router:
-  - path: /workflow/clem/sessions/{session_id}/process_raw_lifs
-    function: process_raw_lifs
-    path_params:
-      - name: session_id
-        type: int
-    methods:
-      - POST
-  - path: /workflow/clem/sessions/{session_id}/process_raw_tiffs
-    function: process_raw_tiffs
-    path_params:
-      - name: session_id
-        type: int
-    methods:
-      - POST
-  - path: /workflow/clem/sessions/{session_id}/align_and_merge_stacks
-    function: align_and_merge_stacks
-    path_params:
-      - name: session_id
-        type: int
-    methods:
-      - POST
 murfey.server.api.display.router:
   - path: /display/instruments/{instrument_name}/instrument_name
     function: get_instrument_display_name
@@ -1417,6 +1395,28 @@ murfey.server.api.workflow.tomo_router:
     path_params:
       - name: visit_name
         type: str
+      - name: session_id
+        type: int
+    methods:
+      - POST
+murfey.server.api.workflow_clem.router:
+  - path: /workflow/clem/sessions/{session_id}/process_raw_lifs
+    function: process_raw_lifs
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
+  - path: /workflow/clem/sessions/{session_id}/process_raw_tiffs
+    function: process_raw_tiffs
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
+  - path: /workflow/clem/sessions/{session_id}/align_and_merge_stacks
+    function: align_and_merge_stacks
+    path_params:
       - name: session_id
         type: int
     methods:
