@@ -107,7 +107,7 @@ def test_sxt_context_txrm(
         json={
             "tag": "example",
             "source": str(tmp_path),
-            "recipe": "sxt-tomo-align",
+            "recipe": "sxt-aretomo",
             "experiment_type": "sxt",
         },
         headers={"Authorization": "Bearer "},
