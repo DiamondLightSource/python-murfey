@@ -1292,17 +1292,6 @@ murfey.server.api.workflow.correlative_router:
         type: str
     methods:
       - POST
-  - path: /workflow/correlative/year/{year}/visits/{visit_name}/sessions/{session_id}/make_milling_gif
-    function: make_gif
-    path_params:
-      - name: year
-        type: int
-      - name: visit_name
-        type: str
-      - name: session_id
-        type: int
-    methods:
-      - POST
 murfey.server.api.workflow.router:
   - path: /workflow/visits/{visit_name}/sessions/{session_id}/register_data_collection_group
     function: register_dc_group
@@ -1442,6 +1431,13 @@ murfey.server.api.workflow_fib.router:
       - POST
   - path: /workflow/fib/sessions/{session_id}/register_milling_progress
     function: register_fib_milling_progress
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
+  - path: /workflow/fib/sessions/{session_id}/make_gif
+    function: make_gif
     path_params:
       - name: session_id
         type: int
