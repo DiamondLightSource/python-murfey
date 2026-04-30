@@ -540,10 +540,9 @@ class FIBContext(Context):
                 )
                 return None
             # Determine the path to save the GIF to
-            raw_dir = Path(environment.default_destinations[self._basepath])
             try:
-                visit_index = raw_dir.parts.index(environment.visit)
-                visit_dir = list(reversed(raw_dir.parents))[visit_index]
+                visit_index = destination_file.parts.index(environment.visit)
+                visit_dir = list(reversed(destination_file.parents))[visit_index]
                 output_file = (
                     visit_dir
                     / "processed"
