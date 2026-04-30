@@ -124,5 +124,5 @@ async def make_gif(
         duration=30,
         loop=0,
     )
-
+    logger.info(f"Created GIF file {gif_params.output_file}")
     return {"output_gif": str(gif_params.output_file)}
