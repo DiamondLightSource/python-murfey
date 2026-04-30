@@ -93,7 +93,13 @@ async def make_gif(
         visit_index = output_dir.parts.index(visit_name)
         # Change permissions for folders in the visit directory and onwards
         for current_path in list(reversed(output_dir.parents))[visit_index + 1 :]:
-            os.chmod(current_path, mode=machine_config.mkdir_chmod)
+            try:
+                os.chmod(current_path, mode=machine_config.mkdir_chmod)
+            except PermissionError:
+                logger.warning(
+                    f"Insufficient permissions to modify directory {current_path}"
+                )
+                continue
 
     if PIL.Image is not None:
         images = [PIL.Image.open(f) for f in gif_params.images]
