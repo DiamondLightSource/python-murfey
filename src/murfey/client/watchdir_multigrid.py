@@ -110,7 +110,8 @@ class MultigridDirWatcher(Observer):
                     sample_dirs = list(d.glob("Sample*"))
                     if d.is_dir() and len(sample_dirs):
                         for sample in sample_dirs:
-                            if len(list(sample.glob("*.mdoc"))):
+                            if (sample / "Session.dm").is_file():
+                                # Transfer only folders where a tomo session exists
                                 if sample not in self._seen_dirs:
                                     self._handle_metadata(
                                         sample,
