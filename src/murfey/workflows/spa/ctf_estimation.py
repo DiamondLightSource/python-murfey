@@ -1,5 +1,6 @@
 from logging import getLogger
 
+import requests
 from sqlmodel import Session, select
 
 from murfey.util.config import get_machine_config
@@ -45,6 +46,10 @@ def ctf_estimated(message: dict, murfey_db: Session) -> dict[str, bool]:
                     f"micrographs/{movie.smartem_uuid}",
                     update,
                     MicrographResponse,
+                )
+                requests.post(
+                    f"{machine_config.smartem_api_url}/micrographs/{movie.smartem_uuid}/ctf_estimation/completed",
+                    json={"ctf_max_res": message["ctf_max_resolution"]},
                 )
         except Exception:
             logger.warning(
