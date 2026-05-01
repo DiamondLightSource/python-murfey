@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 from logging import getLogger
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -65,14 +66,14 @@ alertmanager_url = "https://murfey-alertmanager.diamond.ac.uk"
 def get_silences(microscope: str):
     try:
         silences = requests.get(f"{alertmanager_url}/api/v2/silences?filter=microscope={microscope}")
-        return str(silences.json())
+        return (silences.json())
     except:
         HTTPException(status_code=silences.status_code, detail=silences.json())
 
 @router.post("/silences/{microscope}")
-def get_silences(microscope: str, end_time: datetime ):
+def create_silence(microscope: str, end_time: datetime ):
     #for testing
-    # microscope = 'm00'
+    microscope = 'm00'
 
     start_time = datetime.now().astimezone().isoformat()
     end_time = end_time.astimezone().isoformat()
@@ -90,16 +91,33 @@ def get_silences(microscope: str, end_time: datetime ):
     "startsAt": str(start_time),
     "endsAt": str(end_time)
     }
-    print(silence_json)
     try:
         alertmanager_response = requests.post(f"{alertmanager_url}/api/v2/silences", json=silence_json)
-        print(alertmanager_response)
     except:
         raise HTTPException(status_code=500, detail= "Error creating silence")
     if alertmanager_response.status_code == 200:
         return str(alertmanager_response.json())
     else:
         raise HTTPException(status_code=alertmanager_response.status_code, detail=alertmanager_response.json())
+
+@router.delete("/silences/{microscope}")
+def delete_silences(microscope: str):
+    #for testing
+    microscope='m00'
+
+    silences = get_silences(microscope)
+
+    ids = [] #for testing
+    for silence in silences:
+        if silence['status']['state'] == 'active':
+            id = silence['id']
+            print(id)
+            try:
+                response = requests.delete(f"{alertmanager_url}/api/v2/silence/{id}")
+                print(response)
+            except:
+                raise HTTPException(status_code=400, detail="error deleting silence")
+    return "Silences Deleted"
 
 @router.get("/health/")
 def health_check(db=ispyb_db):
