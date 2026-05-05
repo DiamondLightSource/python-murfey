@@ -13,6 +13,7 @@ from sqlmodel import Session, select
 import murfey.util.db as MurfeyDB
 from murfey.server.api.auth import validate_instrument_token
 from murfey.server.murfey_db import murfey_db
+from murfey.util import sanitise_path
 from murfey.util.config import get_machine_config
 from murfey.util.models import LamellaSiteInfo
 
@@ -85,6 +86,12 @@ async def make_gif(
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
+    rsync_basepath = machine_config.rsync_basepath or Path(".").resolve()
+
+    # Sanitise and verify that the output directory is relative to rsync basepath
+    output_dir = sanitise_path(gif_params.output_file.parent)
+    if not output_dir.is_relative_to(rsync_basepath):
+        logger.error("Output directory path is not permitted")
 
     # Create the directory structure
     if not (output_dir := gif_params.output_file.parent).exists():
