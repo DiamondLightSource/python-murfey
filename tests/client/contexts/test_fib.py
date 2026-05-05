@@ -11,6 +11,7 @@ from murfey.client.contexts.fib import (
     STAGE_POSITION_NAMES,
     STAGE_POSITION_VALUES,
     FIBContext,
+    FIBImage,
     _file_transferred_to,
     _get_source,
     _number_from_name,
@@ -469,23 +470,24 @@ def test_file_transferred_to(
 
 @pytest.mark.parametrize(
     "test_params",
-    (  # Has environment | Has Project name | Has Site | Has Site name | Has Recipe | Has Recipe name | Has Activity | Has Activity name
-        # Pass case
-        (True, True, True, True, True, True, True, True),
-        # Only one of these should be False at a given time
-        (True, True, True, True, True, True, True, False),
-        (True, True, True, True, True, True, False, True),
-        (True, True, True, True, True, False, True, True),
-        (True, True, True, True, False, True, True, True),
-        (True, True, True, False, True, True, True, True),
-        (True, True, False, True, True, True, True, True),
-        (True, False, True, True, True, True, True, True),
-        (False, True, True, True, True, True, True, True),
+    (
+        # Pass cases
+        (True, True, True, True, True, True, True, True, True),  # DC images
+        (True, True, True, True, True, True, True, True, False),  # No DC images
+        # Only one of these, and the last one, should be False at a given time
+        (True, True, True, True, True, True, True, False, False),  # No activity name
+        (True, True, True, True, True, True, False, True, False),  # No activity
+        (True, True, True, True, True, False, True, True, False),  # No recipe name
+        (True, True, True, True, False, True, True, True, False),  # No recipe
+        (True, True, True, False, True, True, True, True, False),  # No site name
+        (True, True, False, True, True, True, True, True, False),  # No sites
+        (True, False, True, True, True, True, True, True, False),  # No project name
+        (False, True, True, True, True, True, True, True, False),  # No environment
     ),
 )
 def test_fib_autotem_context_projectdata(
     mocker: MockerFixture,
-    test_params: tuple[bool, bool, bool, bool, bool, bool, bool, bool],
+    test_params: tuple[bool, bool, bool, bool, bool, bool, bool, bool, bool],
     tmp_path: Path,
     visit_dir: Path,
 ):
@@ -499,6 +501,7 @@ def test_fib_autotem_context_projectdata(
         has_recipe_name,
         has_activities,
         has_activity_name,
+        has_drift_correction_images,
     ) = test_params
 
     # Mock the environment
@@ -532,6 +535,14 @@ def test_fib_autotem_context_projectdata(
         machine_config={},
         token="",
     )
+    if has_drift_correction_images:
+        for i in range(num_lamellae):
+            context._drift_correction_images[i + 1] = FIBImage(
+                images=[tmp_path / "dummy.png"],
+                output_file=tmp_path / "dc_image.gif",
+                is_submitted=False,
+            )
+
     context.post_transfer(mock_projectdata, environment=mock_environment)
 
     # Check the success case
@@ -547,10 +558,35 @@ def test_fib_autotem_context_projectdata(
             has_activity_name,
         )
     ):
-        assert mock_capture_post.call_count == num_lamellae
+        assert mock_capture_post.call_count == num_lamellae * (
+            2 if has_drift_correction_images else 1
+        )
         assert len(context._site_info) == num_lamellae
         for i in range(num_lamellae):
+            mock_capture_post.assert_any_call(
+                base_url=mock.ANY,
+                router_name="workflow_fib.router",
+                function_name="register_fib_milling_progress",
+                token=mock.ANY,
+                instrument_name=mock.ANY,
+                data=mock.ANY,
+                session_id=mock.ANY,
+            )
             mock_logger.info.assert_any_call(f"Updating metadata for site {i + 1}")
+            if has_drift_correction_images:
+                mock_capture_post.assert_any_call(
+                    base_url=mock.ANY,
+                    router_name="workflow_fib.router",
+                    function_name="make_gif",
+                    token=mock.ANY,
+                    instrument_name=mock.ANY,
+                    data={
+                        "lamella_number": i + 1,
+                        "images": [str(tmp_path / "dummy.png")],
+                        "output_file": str(tmp_path / "dc_image.gif"),
+                    },
+                    session_id=mock.ANY,
+                )
     # These fail cases will return an empty dict and not call "post_transfer"
     if not has_environment:
         mock_logger.warning.assert_called_with("No environment passed in")
