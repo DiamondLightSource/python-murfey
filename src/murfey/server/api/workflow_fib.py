@@ -89,12 +89,12 @@ async def make_gif(
     rsync_basepath = machine_config.rsync_basepath or Path(".").resolve()
 
     # Sanitise and verify that the output directory is relative to rsync basepath
-    output_dir = sanitise_path(gif_params.output_file.parent)
-    if not output_dir.is_relative_to(rsync_basepath):
-        logger.error("Output directory path is not permitted")
+    output_file = sanitise_path(gif_params.output_file)
+    if not output_file.is_relative_to(rsync_basepath):
+        logger.error("Output file path is not permitted")
 
     # Create the directory structure
-    if not (output_dir := gif_params.output_file.parent).exists():
+    if not (output_dir := output_file.parent).exists():
         output_dir.mkdir(parents=True)
         logger.debug(f"Created output directory {output_dir}")
         visit_index = output_dir.parts.index(visit_name)
@@ -130,12 +130,12 @@ async def make_gif(
     # Convert back to PIL.Image objects and save as GIF
     converted = [PIL.Image.fromarray(arr[f], mode="L") for f in range(len(images))]
     converted[0].save(
-        gif_params.output_file,
+        output_file,
         format="GIF",
         append_images=converted[1:],
         save_all=True,
         duration=30,
         loop=0,
     )
-    logger.info(f"Created GIF file {gif_params.output_file}")
-    return {"output_gif": str(gif_params.output_file)}
+    logger.info(f"Created GIF file {output_file}")
+    return {"output_gif": str(output_file)}
