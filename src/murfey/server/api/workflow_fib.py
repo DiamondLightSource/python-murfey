@@ -108,10 +108,8 @@ async def make_gif(
                 )
                 continue
 
-    if PIL.Image is not None:
-        images = [PIL.Image.open(f) for f in gif_params.images]
-    else:
-        images = []
+    # Load the images as PIL Image objects
+    images = [PIL.Image.open(f) for f in gif_params.images]
     for im in images:
         im.thumbnail((512, 512))
 
