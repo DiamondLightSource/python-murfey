@@ -99,7 +99,7 @@ async def make_gif(
         logger.debug(f"Created output directory {output_dir}")
         visit_index = output_dir.parts.index(visit_name)
         # Change permissions for folders in the visit directory and onwards
-        for current_path in list(reversed(output_dir.parents))[visit_index + 1 :]:
+        for current_path in list(reversed(output_file.parents))[visit_index + 1 :]:
             try:
                 os.chmod(current_path, mode=machine_config.mkdir_chmod)
             except PermissionError:
