@@ -334,7 +334,7 @@ def create_fib_autotem_project_data(
     autotem_node.append(project_node)
 
     # Save the mock XML file
-    file = visit_dir / "autotem/visit/ProjectData.dat"
+    file = visit_dir / f"autotem/{project_name}/ProjectData.dat"
     file.parent.mkdir(parents=True, exist_ok=True)
     tree = ET.ElementTree(autotem_node)
     ET.indent(tree, space="  ")
@@ -379,7 +379,7 @@ def fib_maps_images(visit_dir: Path):
         name = "Electron Snapshot"
         if i > 0:
             name += f" ({i + 1})"
-        file = visit_dir / "maps/visit/LayersData/Layer" / f"{name}.tiff"
+        file = visit_dir / f"maps/{project_name}/LayersData/Layer" / f"{name}.tiff"
         if not file.exists():
             file.parent.mkdir(parents=True, exist_ok=True)
             file.touch()
@@ -508,9 +508,40 @@ def test_fib_autotem_context_projectdata(
     mock_environment = None
     if has_environment:
         mock_environment = MagicMock()
+        mock_environment.visit = visit_name
 
     # Mock the logger to check that specific logs are called
     mock_logger = mocker.patch("murfey.client.contexts.fib.logger")
+
+    # Mock '_get_source'
+    mock_get_source = mocker.patch("murfey.client.contexts.fib._get_source")
+    mock_get_source.return_value = tmp_path
+
+    # Mock '_file_transferred_to'
+    mock_file_transferred_to = mocker.patch(
+        "murfey.client.contexts.fib._file_transferred_to"
+    )
+    mock_file_transferred_to.return_value = (
+        tmp_path
+        / "fib"
+        / "data"
+        / "current_year"
+        / visit_name
+        / "autotem"
+        / project_name
+        / "ProjectData.dat"
+    )
+    # Set the expected output directory to be derived from metadata
+    output_dir = (
+        tmp_path
+        / "fib"
+        / "data"
+        / "current_year"
+        / visit_name
+        / "processed"
+        / project_name
+        / "grid_2"
+    )
 
     # Mock the functions used in 'post_transfer'
     mock_capture_post = mocker.patch("murfey.client.contexts.fib.capture_post")
@@ -536,13 +567,15 @@ def test_fib_autotem_context_projectdata(
         token="",
     )
     if has_drift_correction_images:
+        # Add drift correction images
         for i in range(num_lamellae):
             context._drift_correction_images[i + 1] = FIBImage(
                 images=[tmp_path / "dummy.png"],
-                output_file=tmp_path / "dc_image.gif",
+                output_file=None,
                 is_submitted=False,
             )
 
+    # Run 'post_transfer' and check for expected calls and outputs
     context.post_transfer(mock_projectdata, environment=mock_environment)
 
     # Check the success case
@@ -558,11 +591,15 @@ def test_fib_autotem_context_projectdata(
             has_activity_name,
         )
     ):
+        # 'capture_post' should be called once when registering the site
+        # and again if registering a drift correction image
         assert mock_capture_post.call_count == num_lamellae * (
             2 if has_drift_correction_images else 1
         )
+        # There should be one dictionary entry for each lamella now
         assert len(context._site_info) == num_lamellae
         for i in range(num_lamellae):
+            lamella_number = i + 1
             mock_capture_post.assert_any_call(
                 base_url=mock.ANY,
                 router_name="workflow_fib.router",
@@ -572,7 +609,10 @@ def test_fib_autotem_context_projectdata(
                 data=mock.ANY,
                 session_id=mock.ANY,
             )
-            mock_logger.info.assert_any_call(f"Updating metadata for site {i + 1}")
+            mock_logger.info.assert_any_call(
+                f"Updating metadata for site {lamella_number}"
+            )
+
             if has_drift_correction_images:
                 mock_capture_post.assert_any_call(
                     base_url=mock.ANY,
@@ -581,9 +621,13 @@ def test_fib_autotem_context_projectdata(
                     token=mock.ANY,
                     instrument_name=mock.ANY,
                     data={
-                        "lamella_number": i + 1,
+                        "lamella_number": lamella_number,
                         "images": [str(tmp_path / "dummy.png")],
-                        "output_file": str(tmp_path / "dc_image.gif"),
+                        "output_file": str(
+                            output_dir
+                            / "drift_correction"
+                            / f"lamella_{lamella_number}.gif"
+                        ),
                     },
                     session_id=mock.ANY,
                 )
@@ -612,7 +656,7 @@ def test_fib_autotem_context_projectdata(
             )
         mock_capture_post.assert_not_called()
     # These fail cases will produce LamellaSiteInfo dicts with default values
-    # "post_transfer" will still be called
+    # "capture_post" will still be called
     elif not has_recipe_name:
         mock_logger.warning.assert_any_call("Recipe doesn't have a name, skipping")
         assert mock_capture_post.call_count == num_lamellae
@@ -734,22 +778,22 @@ def test_fib_autotem_context_drift_correction_images(
         mock_logger.warning.assert_called_with(f"No source found for file {file}")
     elif not find_dst:
         mock_logger.warning.assert_called_with(
-            f"File {file.name!r} not found on storage system"
+            f"Could not find destination file path for {file.name!r}"
         )
     elif not has_site_info:
         mock_logger.debug.assert_called_with(
             f"No metadata found for site {lamella_num} yet"
         )
     elif not has_project_name:
-        mock_logger.warning.assert_called_with(
+        mock_logger.warning.assert_any_call(
             f"No project name associated with site {lamella_num}"
         )
     elif not has_stage_position:
-        mock_logger.warning.assert_called_with(
+        mock_logger.warning.assert_any_call(
             f"No stage position information associated with site {lamella_num}"
         )
     elif not has_stage_values:
-        mock_logger.warning.assert_called_with(
+        mock_logger.warning.assert_any_call(
             f"Could not determine slot number of site {lamella_num}"
         )
     else:
