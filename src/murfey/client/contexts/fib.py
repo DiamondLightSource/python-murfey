@@ -291,16 +291,59 @@ class FIBContext(Context):
 
                     # Post drift correction GIF request if it hasn't already been done
                     if (
-                        (fib_image := self._drift_correction_images.get(site_num, None))
-                        is not None
-                        and not fib_image.is_submitted
-                        and fib_image.output_file is not None
-                    ):
+                        fib_image := self._drift_correction_images.get(site_num, None)
+                    ) is not None and not fib_image.is_submitted:
+                        # Construct the output file name if it doesn't already exist
+                        if (output_file := fib_image.output_file) is None:
+                            if not (
+                                source := _get_source(transferred_file, environment)
+                            ):
+                                logger.warning(
+                                    f"No source found for file {transferred_file}"
+                                )
+                                continue
+                            if not (
+                                destination_file := _file_transferred_to(
+                                    environment=environment,
+                                    source=source,
+                                    file_path=transferred_file,
+                                    rsync_basepath=Path(
+                                        self._machine_config.get("rsync_basepath", "")
+                                    ),
+                                )
+                            ):
+                                logger.warning(
+                                    f"Could not find destination file path for {transferred_file.name!r}"
+                                )
+                                continue
+                            if (
+                                output_dir := self._determine_output_dir(
+                                    site_num,
+                                    destination_file,
+                                    environment,
+                                )
+                            ) is None:
+                                logger.warning(
+                                    f"Could not determine output directory for lamella {site_num}"
+                                )
+                                continue
+                            with lock:
+                                output_file = (
+                                    output_dir
+                                    / "drift_correction"
+                                    / f"lamella_{site_num}.gif"
+                                )
+                                self._drift_correction_images[
+                                    site_num
+                                ].output_file = output_file
+                            # Reload the new object
+                            fib_image = self._drift_correction_images[site_num]
+
                         if self._make_gif(
                             environment=environment,
                             lamella_number=site_num,
                             images=sorted(fib_image.images),
-                            output_file=fib_image.output_file,
+                            output_file=output_file,
                         ):
                             with lock:
                                 self._drift_correction_images[
@@ -337,7 +380,7 @@ class FIBContext(Context):
                     )
                 ):
                     logger.warning(
-                        f"File {transferred_file.name!r} not found on storage system"
+                        f"Could not find destination file path for {transferred_file.name!r}"
                     )
                     return None
 
@@ -455,6 +498,59 @@ class FIBContext(Context):
         logger.info(f"Successfully extracted AutoTEM metadata from file {file}")
         return all_site_info
 
+    def _determine_output_dir(
+        self,
+        lamella_number: int,
+        destination_file: Path,
+        environment: MurfeyInstanceEnvironment,
+    ):
+        """
+        Helper function to determine the output directory for the current lamella site
+        on the server side.
+        """
+        # Early exits if data for creating output path is absent
+        # No site info
+        if (site_info := self._site_info.get(lamella_number)) is None:
+            logger.debug(f"No metadata found for site {lamella_number} yet")
+            return None
+        # No project name
+        if (project_name := site_info.project_name) is None:
+            logger.warning(f"No project name associated with site {lamella_number}")
+            return None
+        # No stage position information
+        if all(
+            getattr(site_info.stage_info, stage_name, None) is None
+            for stage_name in STAGE_POSITION_NAMES.keys()
+        ):
+            logger.warning(
+                f"No stage position information associated with site {lamella_number}"
+            )
+            return None
+        # Determine the slot number
+        slot_number: int | None = None
+        for stage_name in reversed(STAGE_POSITION_NAMES.keys()):
+            if (stage_info := getattr(site_info.stage_info, stage_name, None)) is None:
+                continue
+            if stage_info.slot_number is None:
+                continue
+            else:
+                slot_number = stage_info.slot_number
+                break
+        # Early exit if no slot number
+        if slot_number is None:
+            logger.warning(f"Could not determine slot number of site {lamella_number}")
+            return None
+        # Determine the path to save the GIF to
+        try:
+            visit_index = destination_file.parts.index(environment.visit)
+            visit_dir = list(reversed(destination_file.parents))[visit_index]
+            return visit_dir / "processed" / project_name / f"grid_{slot_number}"
+        except Exception:
+            logger.error(
+                f"Could not construct output directory path for site {lamella_number}"
+            )
+            return None
+
     def _make_drift_correction_gif(
         self,
         file: Path,
@@ -484,7 +580,7 @@ class FIBContext(Context):
                 rsync_basepath=Path(self._machine_config.get("rsync_basepath", "")),
             )
         ):
-            logger.warning(f"File {file.name!r} not found on storage system")
+            logger.warning(f"Could not find destination file path for {file.name!r}")
             return
 
         # Create FIBImage instance for this lamella site, or update existing one
@@ -499,67 +595,20 @@ class FIBContext(Context):
                     destination_file
                 )
                 self._drift_correction_images[lamella_number].is_submitted = False
-
-        # Determine the output directory to save the milling image to
-        output_file = self._drift_correction_images[lamella_number].output_file
-        if output_file is None:
-            # Early exits if data for creating output image path is absent
-            # No site info
-            if (site_info := self._site_info.get(lamella_number)) is None:
-                logger.debug(f"No metadata found for site {lamella_number} yet")
-                return None
-            # No project name
-            if (project_name := site_info.project_name) is None:
-                logger.warning(f"No project name associated with site {lamella_number}")
-                return None
-            # No stage position information
-            if all(
-                getattr(site_info.stage_info, stage_name, None) is None
-                for stage_name in STAGE_POSITION_NAMES.keys()
-            ):
-                logger.warning(
-                    f"No stage position information associated with site {lamella_number}"
-                )
-                return None
-            # Determine the slot number
-            slot_number: int | None = None
-            for stage_name in reversed(STAGE_POSITION_NAMES.keys()):
-                if (
-                    stage_info := getattr(site_info.stage_info, stage_name, None)
-                ) is None:
-                    continue
-                if stage_info.slot_number is None:
-                    continue
-                else:
-                    slot_number = stage_info.slot_number
-                    break
-            # Early exit if no slot number
-            if slot_number is None:
-                logger.warning(
-                    f"Could not determine slot number of site {lamella_number}"
-                )
-                return None
-            # Determine the path to save the GIF to
-            try:
-                visit_index = destination_file.parts.index(environment.visit)
-                visit_dir = list(reversed(destination_file.parents))[visit_index]
-                output_file = (
-                    visit_dir
-                    / "processed"
-                    / project_name
-                    / f"grid_{slot_number}"
-                    / "drift_correction"
-                    / f"lamella_{lamella_number}.gif"
-                )
-                with lock:
-                    self._drift_correction_images[
-                        lamella_number
-                    ].output_file = output_file
-            except Exception:
-                logger.error(
-                    f"Could not construct drift correction GIF output path for site {lamella_number}"
-                )
-                return None
+        if (
+            output_dir := self._determine_output_dir(
+                lamella_number,
+                destination_file,
+                environment,
+            )
+        ) is None:
+            logger.warning(
+                f"Could not determine output directory for lamella {lamella_number}"
+            )
+            return None
+        output_file = output_dir / "drift_correction" / f"lamella_{lamella_number}.gif"
+        with lock:
+            self._drift_correction_images[lamella_number].output_file = output_file
 
         # Submit job to backend to construct a GIF
         if self._make_gif(
