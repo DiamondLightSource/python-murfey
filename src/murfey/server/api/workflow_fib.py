@@ -92,14 +92,14 @@ async def make_gif(
     output_file = sanitise_path(gif_params.output_file)
     if not output_file.is_relative_to(rsync_basepath):
         logger.error("Output file path is not permitted")
+        raise ValueError
 
-    # Create the directory structure
-    if not (output_dir := output_file.parent).exists():
-        output_dir.mkdir(parents=True)
-        logger.debug(f"Created output directory {output_dir}")
-        visit_index = output_dir.parts.index(visit_name)
-        # Change permissions for folders in the visit directory and onwards
-        for current_path in list(reversed(output_file.parents))[visit_index + 1 :]:
+    # Create folders in the visit directory and onwards and change permissions
+    visit_index = output_file.parts.index(visit_name)
+    for current_path in list(reversed(output_file.parents))[visit_index + 1 :]:
+        if not current_path.exists():
+            current_path.mkdir(parents=True)
+            logger.debug(f"Created output directory {current_path}")
             try:
                 os.chmod(current_path, mode=machine_config.mkdir_chmod)
             except PermissionError:
