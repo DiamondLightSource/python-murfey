@@ -66,7 +66,12 @@ alertmanager_url = "https://murfey-alertmanager.diamond.ac.uk"
 def get_silences(microscope: str):
     try:
         silences = requests.get(f"{alertmanager_url}/api/v2/silences?filter=microscope={microscope}")
-        return (silences.json())
+        active_silences = []
+        for silence in silences.json():
+            if silence['status']['state'] == 'active':
+                active_silences.append(silence)
+        print(active_silences)
+        return (active_silences)
     except:
         HTTPException(status_code=silences.status_code, detail=silences.json())
 
@@ -96,7 +101,7 @@ def create_silence(microscope: str, end_time: datetime ):
     except:
         raise HTTPException(status_code=500, detail= "Error creating silence")
     if alertmanager_response.status_code == 200:
-        return str(alertmanager_response.json())
+        return alertmanager_response.json()
     else:
         raise HTTPException(status_code=alertmanager_response.status_code, detail=alertmanager_response.json())
 
@@ -109,14 +114,12 @@ def delete_silences(microscope: str):
 
     ids = [] #for testing
     for silence in silences:
-        if silence['status']['state'] == 'active':
-            id = silence['id']
-            print(id)
-            try:
-                response = requests.delete(f"{alertmanager_url}/api/v2/silence/{id}")
-                print(response)
-            except:
-                raise HTTPException(status_code=400, detail="error deleting silence")
+        id = silence['id']
+        try:
+            response = requests.delete(f"{alertmanager_url}/api/v2/silence/{id}")
+            print(response)
+        except:
+            raise HTTPException(status_code=400, detail="error deleting silence")
     return "Silences Deleted"
 
 @router.get("/health/")
