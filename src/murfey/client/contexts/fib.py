@@ -290,49 +290,43 @@ class FIBContext(Context):
                         logger.info(f"Updating metadata for site {site_num}")
 
                     # Post drift correction GIF request if it hasn't already been done
-                    if (
-                        fib_image := self._drift_correction_images.get(site_num, None)
-                    ) is not None and not fib_image.is_submitted:
+                    fib_image = self._drift_correction_images.get(site_num, None)
+                    if fib_image is not None and not fib_image.is_submitted:
                         # Construct the output file name if it doesn't already exist
                         if (output_file := fib_image.output_file) is None:
-                            if not (
-                                source := _get_source(transferred_file, environment)
-                            ):
+                            source = _get_source(transferred_file, environment)
+                            if source is None:
                                 logger.warning(
                                     f"No source found for file {transferred_file}"
                                 )
                                 continue
-                            if not (
-                                destination_file := _file_transferred_to(
-                                    environment=environment,
-                                    source=source,
-                                    file_path=transferred_file,
-                                    rsync_basepath=Path(
-                                        self._machine_config.get("rsync_basepath", "")
-                                    ),
-                                )
-                            ):
+                            destination_file = _file_transferred_to(
+                                environment=environment,
+                                source=source,
+                                file_path=transferred_file,
+                                rsync_basepath=Path(
+                                    self._machine_config.get("rsync_basepath", "")
+                                ),
+                            )
+                            if destination_file is None:
                                 logger.warning(
                                     f"Could not find destination file path for {transferred_file.name!r}"
                                 )
                                 continue
-                            if (
-                                output_dir := self._determine_output_dir(
-                                    site_num,
-                                    destination_file,
-                                    environment,
-                                )
-                            ) is None:
+                            output_dir = self._determine_output_dir(
+                                site_num, destination_file, environment
+                            )
+                            if output_dir is None:
                                 logger.warning(
                                     f"Could not determine output directory for lamella {site_num}"
                                 )
                                 continue
+                            output_file = (
+                                output_dir
+                                / "drift_correction"
+                                / f"lamella_{site_num}.gif"
+                            )
                             with lock:
-                                output_file = (
-                                    output_dir
-                                    / "drift_correction"
-                                    / f"lamella_{site_num}.gif"
-                                )
                                 self._drift_correction_images[
                                     site_num
                                 ].output_file = output_file
@@ -366,19 +360,17 @@ class FIBContext(Context):
                 "Electron Snapshot" in transferred_file.name
                 and transferred_file.suffix in (".tif", ".tiff")
             ):
-                if not (source := _get_source(transferred_file, environment)):
+                source = _get_source(transferred_file, environment)
+                if source is None:
                     logger.warning(f"No source found for file {transferred_file}")
                     return None
-                if not (
-                    destination_file := _file_transferred_to(
-                        environment=environment,
-                        source=source,
-                        file_path=transferred_file,
-                        rsync_basepath=Path(
-                            self._machine_config.get("rsync_basepath", "")
-                        ),
-                    )
-                ):
+                destination_file = _file_transferred_to(
+                    environment=environment,
+                    source=source,
+                    file_path=transferred_file,
+                    rsync_basepath=Path(self._machine_config.get("rsync_basepath", "")),
+                )
+                if destination_file is None:
                     logger.warning(
                         f"Could not find destination file path for {transferred_file.name!r}"
                     )
@@ -569,17 +561,17 @@ class FIBContext(Context):
                 f"Could not extract metadata from file {file}", exc_info=True
             )
             return None
-        if not (source := _get_source(file, environment)):
+        source = _get_source(file, environment)
+        if source is None:
             logger.warning(f"No source found for file {file}")
             return
-        if not (
-            destination_file := _file_transferred_to(
-                environment=environment,
-                source=source,
-                file_path=file,
-                rsync_basepath=Path(self._machine_config.get("rsync_basepath", "")),
-            )
-        ):
+        destination_file = _file_transferred_to(
+            environment=environment,
+            source=source,
+            file_path=file,
+            rsync_basepath=Path(self._machine_config.get("rsync_basepath", "")),
+        )
+        if destination_file is None:
             logger.warning(f"Could not find destination file path for {file.name!r}")
             return
 
