@@ -401,6 +401,7 @@ class Analyser(Observer):
                     "AtlasContext"
                     | "CLEMContext"
                     | "FIBContext"
+                    | "SIMContext"
                     | "SPAMetadataContext"
                     | "SXTContext"
                     | "TomographyMetadataContext"
