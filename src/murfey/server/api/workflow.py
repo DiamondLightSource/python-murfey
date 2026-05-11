@@ -5,7 +5,6 @@ from logging import getLogger
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import numpy as np
 import sqlalchemy
 from fastapi import APIRouter, Depends
 from ispyb.sqlalchemy import (
@@ -20,11 +19,6 @@ from pydantic import BaseModel
 from sqlalchemy.exc import OperationalError
 from sqlmodel import col, select
 from werkzeug.utils import secure_filename
-
-try:
-    from PIL import Image
-except ImportError:
-    Image = None
 
 try:
     from smartem_backend.api_client import SmartEMAPIClient
@@ -1194,71 +1188,3 @@ def register_sample_image(
     if _transport_object:
         return _transport_object.do_insert_sample_image(record)
     return {"success": False}
-
-
-class MillingParameters(BaseModel):
-    lamella_number: int
-    images: List[str]
-    raw_directory: str
-
-
-@correlative_router.post(
-    "/year/{year}/visits/{visit_name}/sessions/{session_id}/make_milling_gif"
-)
-async def make_gif(
-    year: int,
-    visit_name: str,
-    session_id: int,
-    gif_params: MillingParameters,
-    db=murfey_db,
-):
-    instrument_name = (
-        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
-    )
-    machine_config = get_machine_config(instrument_name=instrument_name)[
-        instrument_name
-    ]
-    output_dir = (
-        (machine_config.rsync_basepath or Path("")).resolve()
-        / secure_filename(str(year))
-        / secure_filename(visit_name)
-        / "processed"
-    )
-    output_dir.mkdir(exist_ok=True)
-    os.chmod(output_dir, mode=machine_config.mkdir_chmod)
-    output_dir = output_dir / secure_filename(gif_params.raw_directory)
-    output_dir.mkdir(exist_ok=True)
-    os.chmod(output_dir, mode=machine_config.mkdir_chmod)
-    output_path = output_dir / f"lamella_{gif_params.lamella_number}_milling.gif"
-
-    if Image is not None:
-        images = [Image.open(f) for f in gif_params.images]
-    else:
-        images = []
-    for im in images:
-        im.thumbnail((512, 512))
-
-    # Normalize and convert individual frames to 8-bit
-    arr: list[np.ndarray] = []
-    for im in images:
-        frame = np.array(im).astype(np.float32)
-        vmin, vmax = np.percentile(frame, (0.5, 99.5))
-        scale = 255 / ((vmax - vmin) or 1)
-        np.clip(frame, a_min=vmin, a_max=vmax, out=frame)
-        np.subtract(frame, vmin, out=frame)
-        np.multiply(frame, scale, out=frame)
-        arr.append(frame.astype(np.uint8))
-    arr = np.array(arr).astype(np.uint8)
-
-    # Convert back to Image objects and save as GIF
-    converted = [Image.fromarray(arr[f], mode="L") for f in range(len(images))]
-    converted[0].save(
-        output_path,
-        format="GIF",
-        append_images=converted[1:],
-        save_all=True,
-        duration=30,
-        loop=0,
-    )
-
-    return {"output_gif": str(output_path)}

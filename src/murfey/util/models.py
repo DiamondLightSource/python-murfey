@@ -128,20 +128,22 @@ class StagePositionInfo(BaseModel):
     "ChunkCoincidenceStagePosition" currently correspond to.
     """
 
-    preparation: StagePositionValues | None = (
+    # Top-level values
+    preparation_site: StagePositionValues | None = (
         None  # PreparationSiteLocation/StagePosition/StagePosition
     )
-    chunk_coincidence: StagePositionValues | None = (
-        None  # Parameters/ChunkCoincidenceStagePosition/StagePosition
-    )
-    chunk: StagePositionValues | None = (
+    chunk_site: StagePositionValues | None = (
         None  # ChunkSiteLocation/StagePosition/StagePosition
     )
-    thinning_1: StagePositionValues | None = (
-        None  # Parameters/ThinningStagePosition/StagePosition
-    )
-    thinning_2: StagePositionValues | None = (
+    thinning_site: StagePositionValues | None = (
         None  # ThinningSiteLocation/StagePosition/StagePosition
+    )
+    # Stored under Parameters
+    chunk_coincidence_params: StagePositionValues | None = (
+        None  # Parameters/ChunkCoincidenceStagePosition/StagePosition
+    )
+    thinning_params: StagePositionValues | None = (
+        None  # Parameters/ThinningStagePosition/StagePosition
     )
 
 
