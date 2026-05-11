@@ -129,20 +129,20 @@ class StagePositionInfo(BaseModel):
     """
 
     # Top-level values
-    preparation: StagePositionValues | None = (
+    preparation_site: StagePositionValues | None = (
         None  # PreparationSiteLocation/StagePosition/StagePosition
     )
-    chunk: StagePositionValues | None = (
+    chunk_site: StagePositionValues | None = (
         None  # ChunkSiteLocation/StagePosition/StagePosition
     )
-    thinning_1: StagePositionValues | None = (
+    thinning_site: StagePositionValues | None = (
         None  # ThinningSiteLocation/StagePosition/StagePosition
     )
     # Stored under Parameters
-    chunk_coincidence: StagePositionValues | None = (
+    chunk_coincidence_params: StagePositionValues | None = (
         None  # Parameters/ChunkCoincidenceStagePosition/StagePosition
     )
-    thinning_2: StagePositionValues | None = (
+    thinning_params: StagePositionValues | None = (
         None  # Parameters/ThinningStagePosition/StagePosition
     )
 

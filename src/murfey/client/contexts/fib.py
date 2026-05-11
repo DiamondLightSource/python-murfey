@@ -162,11 +162,11 @@ STAGE_POSITION_VALUES = {
 STAGE_POSITION_NAMES = {
     # Map class attribute to element name
     # Paths are relative to the "Site" node
-    "preparation": "PreparationSiteLocation/StagePosition/StagePosition",
-    "chunk": "ChunkSiteLocation/StagePosition/StagePosition",
-    "thinning_1": "ThinningSiteLocation/StagePosition/StagePosition",
-    "chunk_coincidence": "Parameters/ChunkCoincidenceStagePosition/StagePosition",
-    "thinning_2": "Parameters/ThinningStagePosition/StagePosition",
+    "preparation_site": "PreparationSiteLocation/StagePosition/StagePosition",
+    "chunk_site": "ChunkSiteLocation/StagePosition/StagePosition",
+    "thinning_site": "ThinningSiteLocation/StagePosition/StagePosition",
+    "chunk_coincidence_params": "Parameters/ChunkCoincidenceStagePosition/StagePosition",
+    "thinning_params": "Parameters/ThinningStagePosition/StagePosition",
 }
 
 
