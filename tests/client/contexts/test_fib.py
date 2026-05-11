@@ -762,9 +762,9 @@ def test_fib_autotem_context_drift_correction_images(
         if has_project_name:
             metadata_dict["project_name"] = project_name
         if has_stage_position:
-            stage_dict: dict[str, dict] = {"preparation": {}}
+            stage_dict: dict[str, dict] = {"preparation_site": {}}
             if has_stage_values:
-                stage_dict["preparation"] = {"x": 0.003}
+                stage_dict["preparation_site"] = {"x": 0.003}
             metadata_dict["stage_info"] = stage_dict
         if has_site_info:
             context._site_info[lamella_num] = LamellaSiteInfo(**metadata_dict)
@@ -810,7 +810,8 @@ def test_fib_autotem_context_drift_correction_images(
             lamella_num = i + 1
             # The '_site_info' attribute should now be populated
             assert (
-                context._site_info[lamella_num].stage_info.preparation.slot_number == 2
+                context._site_info[lamella_num].stage_info.preparation_site.slot_number
+                == 2
             )
 
             # The output file should point to 'grid_2' for a positive x stage position
