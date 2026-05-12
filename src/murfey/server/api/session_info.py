@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import Dict, List, Optional
 import requests
 
-from fastapi import APIRouter, Depends, Request, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 from sqlmodel import select
 
@@ -64,22 +64,15 @@ alertmanager_url = "https://murfey-alertmanager.diamond.ac.uk"
 
 @router.get("/silences/{microscope}")
 def get_silences(microscope: str):
-    try:
-        silences = requests.get(f"{alertmanager_url}/api/v2/silences?filter=microscope={microscope}")
-        active_silences = []
-        for silence in silences.json():
-            if silence['status']['state'] == 'active':
-                active_silences.append(silence)
-        print(active_silences)
-        return (active_silences)
-    except:
-        HTTPException(status_code=silences.status_code, detail=silences.json())
+    silences = requests.get(f"{alertmanager_url}/api/v2/silences?filter=microscope={microscope}")
+    active_silences = []
+    for silence in silences.json():
+        if silence['status']['state'] == 'active':
+            active_silences.append(silence)
+    return (active_silences)
 
 @router.post("/silences/{microscope}")
 def create_silence(microscope: str, end_time: datetime ):
-    #for testing
-    microscope = 'm00'
-
     start_time = datetime.now().astimezone().isoformat()
     end_time = end_time.astimezone().isoformat()
     silence_json = {
@@ -89,38 +82,25 @@ def create_silence(microscope: str, end_time: datetime ):
             "value": microscope,
             "isRegex": False
         }],
-    "createdBy": "dvu71330",
+    "createdBy": "murfey",
     "annotations":{"description": "Test"},
-    "comment": "test",
+    "comment": "silence created from murfey",
     "status": {"state": "active"},
     "startsAt": str(start_time),
     "endsAt": str(end_time)
     }
-    try:
-        alertmanager_response = requests.post(f"{alertmanager_url}/api/v2/silences", json=silence_json)
-    except:
-        raise HTTPException(status_code=500, detail= "Error creating silence")
-    if alertmanager_response.status_code == 200:
-        return alertmanager_response.json()
-    else:
-        raise HTTPException(status_code=alertmanager_response.status_code, detail=alertmanager_response.json())
+    response = requests.post(f"{alertmanager_url}/api/v2/silences", json=silence_json)
+    return JSONResponse(status_code=response.status_code, content=response.json())
 
 @router.delete("/silences/{microscope}")
 def delete_silences(microscope: str):
-    #for testing
-    microscope='m00'
-
     silences = get_silences(microscope)
-
-    ids = [] #for testing
+    if len(silences) == 0:
+        return None
     for silence in silences:
         id = silence['id']
-        try:
-            response = requests.delete(f"{alertmanager_url}/api/v2/silence/{id}")
-            print(response)
-        except:
-            raise HTTPException(status_code=400, detail="error deleting silence")
-    return "Silences Deleted"
+        response = requests.delete(f"{alertmanager_url}/api/v2/silence/{id}")
+    return response  #returns final response in loop
 
 @router.get("/health/")
 def health_check(db=ispyb_db):
