@@ -1,5 +1,4 @@
 from datetime import datetime
-import json
 from logging import getLogger
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -59,7 +58,6 @@ router = APIRouter(
     dependencies=[Depends(validate_token)],
     tags=["Session Info: General"],
 )
-
 
 
 @router.get("/health/")
@@ -476,9 +474,11 @@ async def get_tiff_file(visit_name: str, session_id: int, tiff_path: str, db=mur
 
 #Methods for turning alerts on and off
 alertmanager_url = "https://murfey-alertmanager.diamond.ac.uk"
+alertmanager_url = sanitise(alertmanager_url)
 
 @router.get("/silences/{microscope}")
 def get_silences(microscope: str):
+    microscope = sanitise(microscope)
     silences = requests.get(f"{alertmanager_url}/api/v2/silences?filter=microscope={microscope}")
     active_silences = []
     for silence in silences.json():
@@ -488,6 +488,7 @@ def get_silences(microscope: str):
 
 @router.post("/silences/{microscope}")
 def create_silence(microscope: str, end_time: datetime ):
+    microscope = sanitise(microscope)
     start_time = datetime.now().astimezone().isoformat()
     end_time = end_time.astimezone().isoformat()
     silence_json = {
@@ -509,6 +510,7 @@ def create_silence(microscope: str, end_time: datetime ):
 
 @router.delete("/silences/{microscope}") #delete all silences for given microscope
 def delete_silences(microscope: str):
+    microscope = sanitise(microscope)
     silences = get_silences(microscope)
     if len(silences) == 0:
         return None
