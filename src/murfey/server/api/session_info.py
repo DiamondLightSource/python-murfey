@@ -473,29 +473,29 @@ async def get_tiff_file(visit_name: str, session_id: int, tiff_path: str, db=mur
     return FileResponse(path=tiff_file) if isinstance(tiff_file, Path) else tiff_file
 
 #Methods for turning alerts on and off
-alertmanager_url = "https://murfey-alertmanager.diamond.ac.uk"
-alertmanager_url = sanitise(alertmanager_url)
 
-@router.get("/silences/{microscope}")
-def get_silences(microscope: str):
-    microscope_sanitised = sanitise(microscope)
-    silences = requests.get(f"{alertmanager_url}/api/v2/silences?filter=microscope={microscope_sanitised}")
+@router.get("/silences/{instrument_name}")
+def get_silences(instrument_name: MurfeyInstrumentName):
+    machine_config = machine_info_by_instrument(instrument_name)
+    alertmanager_url = machine_config.alertmanager_url
+    silences = requests.get(f"{alertmanager_url}/api/v2/silences?filter=microscope={instrument_name}")
     active_silences = []
     for silence in silences.json():
         if silence['status']['state'] == 'active':
             active_silences.append(silence)
     return (active_silences)
 
-@router.post("/silences/{microscope}")
-def create_silence(microscope: str, end_time: datetime ):
-    microscope = sanitise(microscope)
+@router.post("/silences/{instrument_name}")
+def create_silence(instrument_name: MurfeyInstrumentName, end_time: datetime ):
+    machine_config = machine_info_by_instrument(instrument_name)
+    alertmanager_url = machine_config.alertmanager_url
     start_time = datetime.now().astimezone().isoformat()
     end_time = end_time.astimezone().isoformat()
     silence_json = {
     "matchers":[
         {
             "name": "microscope",
-            "value": microscope,
+            "value": instrument_name,
             "isRegex": False
         }],
     "createdBy": "murfey",
@@ -508,10 +508,11 @@ def create_silence(microscope: str, end_time: datetime ):
     response = requests.post(f"{alertmanager_url}/api/v2/silences", json=silence_json)
     return JSONResponse(status_code=response.status_code, content=response.json()) #return a response with same data and code as from alertmanager
 
-@router.delete("/silences/{microscope}") #delete all silences for given microscope
-def delete_silences(microscope: str):
-    microscope_sanitised = sanitise(microscope)
-    silences = get_silences(microscope_sanitised)
+@router.delete("/silences/{instrument_name}") #delete all silences for given microscope
+def delete_silences(instrument_name: MurfeyInstrumentName):
+    machine_config = machine_info_by_instrument(instrument_name)
+    alertmanager_url = machine_config.alertmanager_url
+    silences = get_silences(instrument_name)
     if len(silences) == 0:
         return None
     for silence in silences:

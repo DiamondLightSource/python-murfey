@@ -118,6 +118,9 @@ class MachineConfig(BaseModel):  # type: ignore
     # Pydantic BaseModel settings
     model_config = ConfigDict(extra="allow")
 
+    # Alertmanager URL
+    alertmanager_url: str = "https://murfey-alertmanager.diamond.ac.uk"
+
     @field_validator("calibrations", mode="before")
     @classmethod
     def validate_calibration_data(
