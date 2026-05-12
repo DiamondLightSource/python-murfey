@@ -478,8 +478,8 @@ alertmanager_url = sanitise(alertmanager_url)
 
 @router.get("/silences/{microscope}")
 def get_silences(microscope: str):
-    microscope = sanitise(microscope)
-    silences = requests.get(f"{alertmanager_url}/api/v2/silences?filter=microscope={microscope}")
+    microscope_sanitised = sanitise(microscope)
+    silences = requests.get(f"{alertmanager_url}/api/v2/silences?filter=microscope={microscope_sanitised}")
     active_silences = []
     for silence in silences.json():
         if silence['status']['state'] == 'active':
@@ -510,8 +510,8 @@ def create_silence(microscope: str, end_time: datetime ):
 
 @router.delete("/silences/{microscope}") #delete all silences for given microscope
 def delete_silences(microscope: str):
-    microscope = sanitise(microscope)
-    silences = get_silences(microscope)
+    microscope_sanitised = sanitise(microscope)
+    silences = get_silences(microscope_sanitised)
     if len(silences) == 0:
         return None
     for silence in silences:
