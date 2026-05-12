@@ -1,4 +1,5 @@
 import logging
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -164,11 +165,15 @@ def register_grid_square(
                             ".tiff"
                         ).is_file():
                             secured_grid_square_image_path_full_res = (
-                                secured_grid_square_image_path_full_res.with_suffix(".tiff")
+                                secured_grid_square_image_path_full_res.with_suffix(
+                                    ".tiff"
+                                )
                             )
                         else:
                             secured_grid_square_image_path_full_res = (
-                                secured_grid_square_image_path_full_res.with_suffix(".mrc")
+                                secured_grid_square_image_path_full_res.with_suffix(
+                                    ".mrc"
+                                )
                             )
                     smartem_client = SmartEMAPIClient(
                         base_url=machine_config.smartem_api_url, logger=logger
@@ -543,6 +548,7 @@ def flush_spa_preprocess(message: dict, murfey_db: Session) -> dict[str, bool]:
         ppath = Path(f.file_path)
         if not mrcp.parent.exists():
             mrcp.parent.mkdir(parents=True)
+            os.chmod(mrcp.parent, mode=machine_config.mkdir_chmod)
         movie = Movie(
             murfey_id=murfey_ids[2 * i],
             data_collection_id=collected_ids[1].id,

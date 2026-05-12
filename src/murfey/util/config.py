@@ -58,11 +58,13 @@ class MachineConfig(BaseModel):  # type: ignore
         "directories": [],
         "files": [],
     }
+    mkdir_chmod: int = 0o750
 
     # Rsync setup
     rsync_url: str = ""
     rsync_module: str = ""
     rsync_basepath: Optional[Path] = None
+    rsync_chmod: str = "D0750,F0750"
     allow_removal: bool = False
 
     # Upstream data download setup
@@ -150,6 +152,15 @@ class MachineConfig(BaseModel):  # type: ignore
             return validated
         # Let it validate and fail as-is
         return v
+
+    @field_validator("mkdir_chmod", mode="before")
+    @classmethod
+    def parse_octal_int(cls, value):
+        # Attempt to parse the string as an octal int
+        if isinstance(value, str) and value.startswith("0o") and value[2:].isdigit():
+            return int(value, 8)
+        # Return value as-is otherwise
+        return value
 
 
 @lru_cache(maxsize=1)

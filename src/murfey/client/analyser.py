@@ -63,7 +63,9 @@ class Analyser(Observer):
         self._acquisition_software = ""
         self._context: Context | None = None
         self.queue: queue.Queue = queue.Queue()
-        self.thread = threading.Thread(name="Analyser", target=self._analyse_in_thread)
+        self.thread = threading.Thread(
+            name=f"Analyser {basepath_local}", target=self._analyse_in_thread
+        )
         self._stopping = False
         self._halt_thread = False
         self._murfey_config = (

@@ -382,28 +382,6 @@ murfey.server.api.bootstrap.version:
     path_params: []
     methods:
       - GET
-murfey.server.api.clem.router:
-  - path: /workflow/clem/sessions/{session_id}/process_raw_lifs
-    function: process_raw_lifs
-    path_params:
-      - name: session_id
-        type: int
-    methods:
-      - POST
-  - path: /workflow/clem/sessions/{session_id}/process_raw_tiffs
-    function: process_raw_tiffs
-    path_params:
-      - name: session_id
-        type: int
-    methods:
-      - POST
-  - path: /workflow/clem/sessions/{session_id}/align_and_merge_stacks
-    function: align_and_merge_stacks
-    path_params:
-      - name: session_id
-        type: int
-    methods:
-      - POST
 murfey.server.api.display.router:
   - path: /display/instruments/{instrument_name}/instrument_name
     function: get_instrument_display_name
@@ -1292,17 +1270,6 @@ murfey.server.api.workflow.correlative_router:
         type: str
     methods:
       - POST
-  - path: /workflow/correlative/year/{year}/visits/{visit_name}/sessions/{session_id}/make_milling_gif
-    function: make_gif
-    path_params:
-      - name: year
-        type: int
-      - name: visit_name
-        type: str
-      - name: session_id
-        type: int
-    methods:
-      - POST
 murfey.server.api.workflow.router:
   - path: /workflow/visits/{visit_name}/sessions/{session_id}/register_data_collection_group
     function: register_dc_group
@@ -1432,9 +1399,45 @@ murfey.server.api.workflow.tomo_router:
         type: int
     methods:
       - POST
+murfey.server.api.workflow_clem.router:
+  - path: /workflow/clem/sessions/{session_id}/process_raw_lifs
+    function: process_raw_lifs
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
+  - path: /workflow/clem/sessions/{session_id}/process_raw_tiffs
+    function: process_raw_tiffs
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
+  - path: /workflow/clem/sessions/{session_id}/align_and_merge_stacks
+    function: align_and_merge_stacks
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
 murfey.server.api.workflow_fib.router:
   - path: /workflow/fib/sessions/{session_id}/register_atlas
     function: register_fib_atlas
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
+  - path: /workflow/fib/sessions/{session_id}/register_milling_progress
+    function: register_fib_milling_progress
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
+  - path: /workflow/fib/sessions/{session_id}/make_gif
+    function: make_gif
     path_params:
       - name: session_id
         type: int

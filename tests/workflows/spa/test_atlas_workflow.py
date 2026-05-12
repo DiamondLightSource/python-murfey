@@ -39,6 +39,7 @@ def test_atlas_jpg_from_mrc(
     # Mock the return result of 'get_machine_config()'
     mock_machine_config = MagicMock()
     mock_machine_config.processed_directory_name = processed_dir_name
+    mock_machine_config.mkdir_chmod = 0o775
     mocker.patch(
         "murfey.workflows.spa.atlas.get_machine_config",
         return_value={"test": mock_machine_config},

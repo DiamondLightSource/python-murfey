@@ -64,7 +64,7 @@ def process_sxt_tilt_series_workflow(
         .where(DataCollection.dcg_id == DataCollectionGroup.id)
         .where(ProcessingJob.dc_id == DataCollection.id)
         .where(AutoProcProgram.pj_id == ProcessingJob.id)
-        .where(ProcessingJob.recipe == "sxt-tomo-align")
+        .where(ProcessingJob.recipe == "sxt-aretomo")
     ).one()
     instrument_name = (
         murfey_db.exec(select(Session).where(Session.id == session_id))
@@ -93,7 +93,7 @@ def process_sxt_tilt_series_workflow(
     )
     stack_file.parent.mkdir(parents=True, exist_ok=True)
     zocalo_message = {
-        "recipes": ["sxt-tomo-align"],
+        "recipes": ["sxt-aretomo"],
         "parameters": {
             "txrm_file": tilt_series_info.txrm,
             "dcid": collected_ids[1].id,
