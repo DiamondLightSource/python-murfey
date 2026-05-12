@@ -478,7 +478,7 @@ async def get_tiff_file(visit_name: str, session_id: int, tiff_path: str, db=mur
 def get_silences(instrument_name: MurfeyInstrumentName):
     machine_config = machine_info_by_instrument(instrument_name)
     alertmanager_url = machine_config.alertmanager_url
-    silences = requests.get(f"{alertmanager_url}/api/v2/silences?filter=microscope={instrument_name}")
+    silences = requests.get(f"{alertmanager_url}/api/v2/silences?filter=microscope={sanitise(instrument_name)}")
     active_silences = []
     for silence in silences.json():
         if silence['status']['state'] == 'active':
