@@ -60,47 +60,7 @@ router = APIRouter(
     tags=["Session Info: General"],
 )
 
-alertmanager_url = "https://murfey-alertmanager.diamond.ac.uk"
 
-@router.get("/silences/{microscope}")
-def get_silences(microscope: str):
-    silences = requests.get(f"{alertmanager_url}/api/v2/silences?filter=microscope={microscope}")
-    active_silences = []
-    for silence in silences.json():
-        if silence['status']['state'] == 'active':
-            active_silences.append(silence)
-    return (active_silences)
-
-@router.post("/silences/{microscope}")
-def create_silence(microscope: str, end_time: datetime ):
-    start_time = datetime.now().astimezone().isoformat()
-    end_time = end_time.astimezone().isoformat()
-    silence_json = {
-    "matchers":[
-        {
-            "name": "microscope",
-            "value": microscope,
-            "isRegex": False
-        }],
-    "createdBy": "murfey",
-    "annotations":{"description": "Test"},
-    "comment": "silence created from murfey",
-    "status": {"state": "active"},
-    "startsAt": str(start_time),
-    "endsAt": str(end_time)
-    }
-    response = requests.post(f"{alertmanager_url}/api/v2/silences", json=silence_json)
-    return JSONResponse(status_code=response.status_code, content=response.json())
-
-@router.delete("/silences/{microscope}")
-def delete_silences(microscope: str):
-    silences = get_silences(microscope)
-    if len(silences) == 0:
-        return None
-    for silence in silences:
-        id = silence['id']
-        response = requests.delete(f"{alertmanager_url}/api/v2/silence/{id}")
-    return response  #returns final response in loop
 
 @router.get("/health/")
 def health_check(db=ispyb_db):
@@ -513,3 +473,46 @@ async def get_tiff_file(visit_name: str, session_id: int, tiff_path: str, db=mur
         visit_name=visit_name, session_id=session_id, tiff_path=tiff_path, db=db
     )
     return FileResponse(path=tiff_file) if isinstance(tiff_file, Path) else tiff_file
+
+#Methods for turning alerts on and off
+alertmanager_url = "https://murfey-alertmanager.diamond.ac.uk"
+
+@router.get("/silences/{microscope}")
+def get_silences(microscope: str):
+    silences = requests.get(f"{alertmanager_url}/api/v2/silences?filter=microscope={microscope}")
+    active_silences = []
+    for silence in silences.json():
+        if silence['status']['state'] == 'active':
+            active_silences.append(silence)
+    return (active_silences)
+
+@router.post("/silences/{microscope}")
+def create_silence(microscope: str, end_time: datetime ):
+    start_time = datetime.now().astimezone().isoformat()
+    end_time = end_time.astimezone().isoformat()
+    silence_json = {
+    "matchers":[
+        {
+            "name": "microscope",
+            "value": microscope,
+            "isRegex": False
+        }],
+    "createdBy": "murfey",
+    "annotations":{"description": "Test"},
+    "comment": "silence created from murfey",
+    "status": {"state": "active"},
+    "startsAt": str(start_time),
+    "endsAt": str(end_time)
+    }
+    response = requests.post(f"{alertmanager_url}/api/v2/silences", json=silence_json)
+    return JSONResponse(status_code=response.status_code, content=response.json()) #return a response with same data and code as from alertmanager
+
+@router.delete("/silences/{microscope}") #delete all silences for given microscope
+def delete_silences(microscope: str):
+    silences = get_silences(microscope)
+    if len(silences) == 0:
+        return None
+    for silence in silences:
+        id = silence['id']
+        response = requests.delete(f"{alertmanager_url}/api/v2/silence/{id}")
+    return response  #returns final response in loop
