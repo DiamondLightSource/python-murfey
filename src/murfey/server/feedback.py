@@ -355,6 +355,7 @@ def _release_2d_hold(message: dict, _db):
                 "nr_classes": default_spa_parameters.nr_classes_2d,
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
                 "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
+                "seed": int(np.random.randint(1, 100)),
                 "class_uuids": _2d_class_murfey_ids(
                     first_class2d.particles_file, message["program_id"], _db
                 ),
@@ -445,6 +446,7 @@ def _release_3d_hold(message: dict, _db):
                 )
                 .one()
                 .murfey_id,
+                "seed": int(np.random.randint(1, 100)),
                 "nr_iter": default_spa_parameters.nr_iter_3d,
                 "initial_model_iterations": default_spa_parameters.nr_iter_ini_model,
                 "nr_classes": default_spa_parameters.nr_classes_3d,
@@ -517,6 +519,7 @@ def _release_refine_hold(message: dict, _db):
                 "symmetry": relion_params.symmetry,
                 "node_creator_queue": machine_config.node_creator_queue,
                 "nr_iter": default_spa_parameters.nr_iter_3d,
+                "seed": int(np.random.randint(1, 100)),
                 "refined_class_uuid": _refine_murfey_id(
                     refine_dir=refine_params.refine_dir,
                     tag=refine_params.tag,
@@ -627,6 +630,7 @@ def _register_incomplete_2d_batch(message: dict, _db):
             "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
             "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
             "mask_diameter": 0,
+            "seed": int(np.random.randint(1, 100)),
             "class_uuids": _2d_class_murfey_ids(
                 class2d_message["particles_file"], _app_id(pj_id, _db), _db
             ),
@@ -785,6 +789,7 @@ def _register_complete_2d_batch(message: dict, _db):
                 "class_uuids": class_uuids,
                 "class2d_grp_uuid": class2d_grp_uuid,
                 "nr_iter": default_spa_parameters.nr_iter_2d,
+                "seed": int(np.random.randint(1, 100)),
                 "batch_size": default_spa_parameters.batch_size_2d,
                 "nr_classes": default_spa_parameters.nr_classes_2d,
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
@@ -859,6 +864,7 @@ def _register_complete_2d_batch(message: dict, _db):
                 "class_uuids": class_uuids,
                 "class2d_grp_uuid": class2d_grp_uuid,
                 "nr_iter": default_spa_parameters.nr_iter_2d,
+                "seed": int(np.random.randint(1, 100)),
                 "batch_size": default_spa_parameters.batch_size_2d,
                 "nr_classes": default_spa_parameters.nr_classes_2d,
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
@@ -951,6 +957,7 @@ def _flush_class2d(
                 ),
                 "class2d_grp_uuid": saved_message.murfey_id,
                 "nr_iter": default_spa_parameters.nr_iter_2d,
+                "seed": int(np.random.randint(1, 100)),
                 "nr_classes": default_spa_parameters.nr_classes_2d,
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
                 "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
@@ -1265,6 +1272,7 @@ def _register_3d_batch(message: dict, _db):
                 "class_uuids": {i + 1: m for i, m in enumerate(class_uuids)},
                 "class3d_grp_uuid": class3d_grp_uuid,
                 "nr_iter": default_spa_parameters.nr_iter_3d,
+                "seed": int(np.random.randint(1, 100)),
                 "initial_model_iterations": default_spa_parameters.nr_iter_ini_model,
                 "nr_classes": default_spa_parameters.nr_classes_3d,
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
@@ -1307,6 +1315,7 @@ def _register_3d_batch(message: dict, _db):
                 ),
                 "class3d_grp_uuid": class3d_params.murfey_id,
                 "nr_iter": default_spa_parameters.nr_iter_3d,
+                "seed": int(np.random.randint(1, 100)),
                 "initial_model_iterations": default_spa_parameters.nr_iter_ini_model,
                 "nr_classes": default_spa_parameters.nr_classes_3d,
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
@@ -1602,6 +1611,7 @@ def _register_refinement(message: dict, _db):
                 "symmetry": relion_options["symmetry"],
                 "node_creator_queue": machine_config.node_creator_queue,
                 "nr_iter": default_spa_parameters.nr_iter_3d,
+                "seed": int(np.random.randint(1, 100)),
                 "refined_class_uuid": _refine_murfey_id(
                     refine_dir=refine_params.refine_dir,
                     tag=refine_params.tag,
