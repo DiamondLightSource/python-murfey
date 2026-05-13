@@ -22,7 +22,6 @@ logger = logging.getLogger("murfey.workflows.sxt.process_sxt_tilt_series")
 
 
 class SXTTiltSeriesInfo(BaseModel):
-    session_id: int
     tag: str
     source: str
     txrm: str
@@ -39,7 +38,7 @@ def process_sxt_tilt_series_workflow(
 ):
     tilt_series_query = murfey_db.exec(
         select(TiltSeries)
-        .where(TiltSeries.session_id == tilt_series_info.session_id)
+        .where(TiltSeries.session_id == session_id)
         .where(TiltSeries.tag == tilt_series_info.tag)
         .where(TiltSeries.rsync_source == tilt_series_info.source)
     ).all()

@@ -46,12 +46,9 @@ class SXTContext(Context):
             )
             return
         try:
-            metadata_source = (
-                self._basepath.parent / environment.visit / self._basepath.name
-            )
             ensure_dcg_exists(
                 collection_type="sxt",
-                metadata_source=metadata_source,
+                metadata_source=self._basepath,
                 environment=environment,
                 machine_config=self._machine_config,
                 token=self._token,
@@ -120,7 +117,11 @@ class SXTContext(Context):
 
         data_suffixes = [".txrm"]
 
-        if transferred_file.suffix in data_suffixes and environment:
+        if (
+            transferred_file.name.startswith("tomo")
+            and transferred_file.suffix in data_suffixes
+            and environment
+        ):
             source = _get_source(transferred_file, environment)
             if not source:
                 logger.warning(f"No source found for file {transferred_file}")
@@ -197,7 +198,7 @@ class SXTContext(Context):
                     strict=True,
                 )
                 if tilt_count_txrm:
-                    metadata["tilt_count"] = tilt_count_txrm[0]
+                    metadata["tilt_series_length"] = tilt_count_txrm[0]
 
             self.register_sxt_data_collection(
                 tilt_series=transferred_file.stem,
@@ -227,11 +228,13 @@ class SXTContext(Context):
                 visit_name=environment.visit,
                 session_id=environment.murfey_session,
                 data={
-                    "session_id": environment.murfey_session,
                     "tag": transferred_file.stem,
                     "source": str(transferred_file.parent),
                     "pixel_size": metadata.get("pixel_size", 100),
                     "tilt_offset": midpoint(angles),
+                    "tilt_series_length": metadata.get(
+                        "tilt_series_length", len(angles)
+                    ),
                     "txrm": str(file_transferred_to),
                 },
             )
