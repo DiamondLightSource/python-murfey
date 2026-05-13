@@ -103,12 +103,17 @@ def ensure_dcg_exists(
         logger.error(f"Unknown collection type {collection_type}")
         return None
 
-    dcg_tag = "/".join(
-        [part for part in metadata_source.parts if part != environment.visit]
-    ).replace("//", "/")
-    if session_file is None or not session_file.is_file():
-        if session_file is not None:
-            logger.warning(f"Cannot find session file {str(session_file)}")
+    if session_file is None:
+        dcg_data = {
+            "experiment_type_id": experiment_type_id,
+            "tag": metadata_source,
+        }
+    elif not session_file.is_file():
+        logger.warning(f"Cannot find session file {str(session_file)}")
+        dcg_tag = "/".join(
+            [part for part in metadata_source.parts if part != environment.visit]
+            ## problem
+        ).replace("//", "/")
         dcg_data = {
             "experiment_type_id": experiment_type_id,
             "tag": dcg_tag,
@@ -155,6 +160,11 @@ def ensure_dcg_exists(
         environment.samples[metadata_source] = SampleInfo(
             atlas=Path(partial_path), sample=sample
         )
+
+        dcg_tag = "/".join(
+            [part for part in metadata_source.parts if part != environment.visit]
+            ## problem
+        ).replace("//", "/")
 
         if atlas_xml_search := list(
             (source_visit_dir / partial_path).parent.glob("Atlas_*.xml")
