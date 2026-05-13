@@ -76,6 +76,7 @@ def ensure_dcg_exists(
     token: str,
 ) -> str | None:
     """Create  a data collection group"""
+    session_file: Path | None = None
     if collection_type == "tomo":
         experiment_type_id = 36
         session_file = metadata_source / "Session.dm"
@@ -97,17 +98,17 @@ def ensure_dcg_exists(
                 logger.warning(f"Get EPU session hook failed: {e}")
     elif collection_type == "sxt":
         experiment_type_id = 47
-        session_file = metadata_source / "Session.dm"
         source_visit_dir = metadata_source.parent
     else:
         logger.error(f"Unknown collection type {collection_type}")
         return None
 
-    if not session_file.is_file():
-        logger.warning(f"Cannot find session file {str(session_file)}")
-        dcg_tag = "/".join(
-            [part for part in metadata_source.parts if part != environment.visit]
-        ).replace("//", "/")
+    dcg_tag = "/".join(
+        [part for part in metadata_source.parts if part != environment.visit]
+    ).replace("//", "/")
+    if session_file is None or not session_file.is_file():
+        if session_file is not None:
+            logger.warning(f"Cannot find session file {str(session_file)}")
         dcg_data = {
             "experiment_type_id": experiment_type_id,
             "tag": dcg_tag,
@@ -143,10 +144,6 @@ def ensure_dcg_exists(
         logger.info(
             f"Looking for atlas XML file in metadata directory {str((source_visit_dir / partial_path).parent)}"
         )
-
-        dcg_tag = "/".join(
-            [part for part in metadata_source.parts if part != environment.visit]
-        ).replace("//", "/")
 
         for p in partial_path.split("/"):
             if p.startswith("Sample"):
