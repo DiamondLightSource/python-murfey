@@ -283,17 +283,18 @@ def update_current_gain_ref(
 @router.get("/silences/{instrument_name}")
 def get_silences(instrument_name: MurfeyInstrumentName):
     all_configs = get_machine_config()
-    microscopes = list(all_configs.keys())
-    if instrument_name not in microscopes:
+    valid_instrument_names = list(all_configs.keys())
+    if instrument_name in valid_instrument_names:
+        index = valid_instrument_names.index(instrument_name)
+        query_params = f"filter=microscope={sanitise(valid_instrument_names[index])}"
+    else:
         return None
     machine_config = all_configs[instrument_name]
     alertmanager_url = machine_config.alertmanager_url
     if alertmanager_url == "":
         logger.warning(f"alertmanager_url not set for {sanitise(instrument_name)}")
         return None
-    response = requests.get(
-        f"{alertmanager_url}/api/v2/silences?filter=microscope={sanitise(instrument_name)}"
-    )
+    response = requests.get(f"{alertmanager_url}/api/v2/silences?{query_params}")
     if response.status_code != 200:
         logger.warning(
             f"Tried to get silences for {sanitise(instrument_name)}, but received status {response.status_code} from alertmanager API"
