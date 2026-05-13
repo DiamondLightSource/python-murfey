@@ -277,6 +277,65 @@ def update_current_gain_ref(
     db.commit()
 
 
+# Methods for turning alerts on and off
+
+
+@router.get("/silences/{instrument_name}")
+def get_silences(instrument_name: MurfeyInstrumentName):
+    all_configs = get_machine_config()
+    microscopes = list(all_configs.keys())
+    if instrument_name not in microscopes:
+        return None
+    machine_config = all_configs[instrument_name]
+    alertmanager_url = machine_config.alertmanager_url
+    silences = requests.get(
+        f"{alertmanager_url}/api/v2/silences?filter=microscope={sanitise(instrument_name)}"
+    )
+    active_silences = []
+    for silence in silences.json():
+        if silence["status"]["state"] == "active":
+            active_silences.append(silence)
+    return active_silences
+
+
+@router.post("/silences/{instrument_name}")
+def create_silence(instrument_name: MurfeyInstrumentName, end_time: datetime):
+    machine_config = machine_info_by_instrument(instrument_name)
+    alertmanager_url = machine_config.alertmanager_url
+    start_time = datetime.now().astimezone().isoformat()
+    end_time_str = end_time.astimezone().isoformat()
+    silence_json = {
+        "matchers": [
+            {"name": "microscope", "value": instrument_name, "isRegex": False}
+        ],
+        "createdBy": "murfey",
+        "annotations": {"description": "Test"},
+        "comment": "silence created from murfey",
+        "status": {"state": "active"},
+        "startsAt": str(start_time),
+        "endsAt": str(end_time_str),
+    }
+    response = requests.post(f"{alertmanager_url}/api/v2/silences", json=silence_json)
+    return JSONResponse(
+        status_code=response.status_code, content=response.json()
+    )  # return a response with same data and code as from alertmanager
+
+
+@router.delete(
+    "/silences/{instrument_name}"
+)  # delete all silences for given microscope
+def delete_silences(instrument_name: MurfeyInstrumentName):
+    machine_config = machine_info_by_instrument(instrument_name)
+    alertmanager_url = machine_config.alertmanager_url
+    silences = get_silences(instrument_name)
+    if len(silences) == 0:
+        return None
+    for silence in silences:
+        id = silence["id"]
+        response = requests.delete(f"{alertmanager_url}/api/v2/silence/{id}")
+    return response  # returns final response in loop
+
+
 spa_router = APIRouter(
     prefix="/session_info/spa",
     dependencies=[Depends(validate_token)],
@@ -471,62 +530,3 @@ async def get_tiff_file(visit_name: str, session_id: int, tiff_path: str, db=mur
         visit_name=visit_name, session_id=session_id, tiff_path=tiff_path, db=db
     )
     return FileResponse(path=tiff_file) if isinstance(tiff_file, Path) else tiff_file
-
-
-# Methods for turning alerts on and off
-
-
-@router.get("/silences/{instrument_name}")
-def get_silences(instrument_name: MurfeyInstrumentName):
-    all_configs = get_machine_config()
-    microscopes = list(all_configs.keys())
-    if instrument_name not in microscopes:
-        return None
-    machine_config = all_configs[instrument_name]
-    alertmanager_url = machine_config.alertmanager_url
-    silences = requests.get(
-        f"{alertmanager_url}/api/v2/silences?filter=microscope={sanitise(instrument_name)}"
-    )
-    active_silences = []
-    for silence in silences.json():
-        if silence["status"]["state"] == "active":
-            active_silences.append(silence)
-    return active_silences
-
-
-@router.post("/silences/{instrument_name}")
-def create_silence(instrument_name: MurfeyInstrumentName, end_time: datetime):
-    machine_config = machine_info_by_instrument(instrument_name)
-    alertmanager_url = machine_config.alertmanager_url
-    start_time = datetime.now().astimezone().isoformat()
-    end_time_str = end_time.astimezone().isoformat()
-    silence_json = {
-        "matchers": [
-            {"name": "microscope", "value": instrument_name, "isRegex": False}
-        ],
-        "createdBy": "murfey",
-        "annotations": {"description": "Test"},
-        "comment": "silence created from murfey",
-        "status": {"state": "active"},
-        "startsAt": str(start_time),
-        "endsAt": str(end_time_str),
-    }
-    response = requests.post(f"{alertmanager_url}/api/v2/silences", json=silence_json)
-    return JSONResponse(
-        status_code=response.status_code, content=response.json()
-    )  # return a response with same data and code as from alertmanager
-
-
-@router.delete(
-    "/silences/{instrument_name}"
-)  # delete all silences for given microscope
-def delete_silences(instrument_name: MurfeyInstrumentName):
-    machine_config = machine_info_by_instrument(instrument_name)
-    alertmanager_url = machine_config.alertmanager_url
-    silences = get_silences(instrument_name)
-    if len(silences) == 0:
-        return None
-    for silence in silences:
-        id = silence["id"]
-        response = requests.delete(f"{alertmanager_url}/api/v2/silence/{id}")
-    return response  # returns final response in loop
