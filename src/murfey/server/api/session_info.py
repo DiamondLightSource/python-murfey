@@ -476,7 +476,11 @@ async def get_tiff_file(visit_name: str, session_id: int, tiff_path: str, db=mur
 
 @router.get("/silences/{instrument_name}")
 def get_silences(instrument_name: MurfeyInstrumentName):
-    machine_config = machine_info_by_instrument(instrument_name)
+    all_configs = get_machine_config()
+    microscopes = list(all_configs.keys())
+    if (instrument_name not in microscopes):
+        return None
+    machine_config = all_configs[instrument_name]
     alertmanager_url = machine_config.alertmanager_url
     silences = requests.get(f"{alertmanager_url}/api/v2/silences?filter=microscope={sanitise(instrument_name)}")
     active_silences = []
