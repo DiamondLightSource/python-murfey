@@ -288,12 +288,15 @@ def get_silences(instrument_name: MurfeyInstrumentName):
         index = valid_instrument_names.index(instrument_name)
         query_params = f"filter=microscope={sanitise(valid_instrument_names[index])}"
     else:
-        return None
+        logger.warning(
+            f"invalid query parameters for get alerts on {sanitise(instrument_name)}"
+        )
+        return []
     machine_config = all_configs[instrument_name]
     alertmanager_url = machine_config.alertmanager_url
-    if alertmanager_url == "":
+    if not alertmanager_url:
         logger.warning(f"alertmanager_url not set for {sanitise(instrument_name)}")
-        return None
+        return []
     response = requests.get(f"{alertmanager_url}/api/v2/silences?{query_params}")
     if response.status_code != 200:
         logger.warning(
@@ -307,12 +310,16 @@ def get_silences(instrument_name: MurfeyInstrumentName):
 
 
 @router.post("/silences/{instrument_name}")
-def create_silence(instrument_name: MurfeyInstrumentName, end_time: datetime):
+def create_silence(
+    instrument_name: MurfeyInstrumentName, end_time: datetime
+) -> JSONResponse:
     machine_config = machine_info_by_instrument(instrument_name)
     alertmanager_url = machine_config.alertmanager_url
-    if alertmanager_url == "":
+    if not alertmanager_url:
         logger.warning(f"alertmanager_url not set for {sanitise(instrument_name)}")
-        return None
+        return JSONResponse(
+            status_code=500, content="URL not set. Could not turn off alerts"
+        )
     start_time = datetime.now().astimezone().isoformat()
     end_time_str = end_time.astimezone().isoformat()
     silence_json = {
@@ -329,7 +336,7 @@ def create_silence(instrument_name: MurfeyInstrumentName, end_time: datetime):
     response = requests.post(f"{alertmanager_url}/api/v2/silences", json=silence_json)
     if response.status_code != 200:
         logger.warning(
-            f"Tried to create silence for {sanitise(instrument_name)}, but received status {response.status_code} from alertmanager API"
+            f"Create silence for {sanitise(instrument_name)} received status {response.status_code} from alertmanager API"
         )
     return JSONResponse(
         status_code=response.status_code, content=response.json()
@@ -342,18 +349,18 @@ def create_silence(instrument_name: MurfeyInstrumentName, end_time: datetime):
 def delete_silences(instrument_name: MurfeyInstrumentName):
     machine_config = machine_info_by_instrument(instrument_name)
     alertmanager_url = machine_config.alertmanager_url
-    if alertmanager_url == "":
+    if not alertmanager_url:
         logger.warning(f"alertmanager_url not set for {sanitise(instrument_name)}")
-        return None
+        return JSONResponse(status_code=500, content="URL not set")
     silences = get_silences(instrument_name)
-    if len(silences) == 0:
-        return None
+    if not silences:
+        return {"success": False}
     for silence in silences:
         id = silence["id"]
         response = requests.delete(f"{alertmanager_url}/api/v2/silence/{id}")
         if response.status_code != 200:
             logger.warning(
-                f"Tried to delete silence {id} for {sanitise(instrument_name)}, but received status {response.status_code} from alertmanager API"
+                f"Delete silence {id} for {sanitise(instrument_name)} received status {response.status_code} from alertmanager API"
             )
     return response  # returns final response in loop
 

@@ -109,6 +109,7 @@ class MachineConfig(BaseModel):  # type: ignore
     frontend_url: str = "http://localhost:3000"
     instrument_server_url: str = "http://localhost:8001"
     smartem_api_url: str = ""
+    alertmanager_url: str = ""
 
     # Messaging queues
     failure_queue: str = ""
@@ -117,9 +118,6 @@ class MachineConfig(BaseModel):  # type: ignore
 
     # Pydantic BaseModel settings
     model_config = ConfigDict(extra="allow")
-
-    # Alertmanager URL
-    alertmanager_url: str = "https://murfey-alertmanager.diamond.ac.uk"
 
     @field_validator("calibrations", mode="before")
     @classmethod
