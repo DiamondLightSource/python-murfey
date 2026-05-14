@@ -104,9 +104,10 @@ def ensure_dcg_exists(
         return None
 
     if session_file is None:
+        dcg_tag = "/".join(metadata_source.parts).replace("//", "/")
         dcg_data = {
             "experiment_type_id": experiment_type_id,
-            "tag": metadata_source,
+            "tag": dcg_tag,
         }
     elif not session_file.is_file():
         logger.warning(f"Cannot find session file {str(session_file)}")
