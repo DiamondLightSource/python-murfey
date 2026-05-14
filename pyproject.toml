@@ -72,7 +72,8 @@ smartem = [
     "smartem-decisions[backend]",
 ]
 sxt = [
-    "txrm2tiff",
+    "numpy<3",
+    "olefile",
 ]
 [project.urls]
 Bug-Tracker = "https://github.com/DiamondLightSource/python-murfey/issues"

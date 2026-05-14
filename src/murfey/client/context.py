@@ -112,7 +112,6 @@ def ensure_dcg_exists(
         logger.warning(f"Cannot find session file {str(session_file)}")
         dcg_tag = "/".join(
             [part for part in metadata_source.parts if part != environment.visit]
-            ## problem
         ).replace("//", "/")
         dcg_data = {
             "experiment_type_id": experiment_type_id,
@@ -150,6 +149,10 @@ def ensure_dcg_exists(
             f"Looking for atlas XML file in metadata directory {str((source_visit_dir / partial_path).parent)}"
         )
 
+        dcg_tag = "/".join(
+            [part for part in metadata_source.parts if part != environment.visit]
+        ).replace("//", "/")
+
         for p in partial_path.split("/"):
             if p.startswith("Sample"):
                 sample = int(p.replace("Sample", ""))
@@ -160,11 +163,6 @@ def ensure_dcg_exists(
         environment.samples[metadata_source] = SampleInfo(
             atlas=Path(partial_path), sample=sample
         )
-
-        dcg_tag = "/".join(
-            [part for part in metadata_source.parts if part != environment.visit]
-            ## problem
-        ).replace("//", "/")
 
         if atlas_xml_search := list(
             (source_visit_dir / partial_path).parent.glob("Atlas_*.xml")
