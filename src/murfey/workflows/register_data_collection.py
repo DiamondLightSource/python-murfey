@@ -65,6 +65,7 @@ def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
                 imageDirectory=message["image_directory"],
                 imageSuffix=message["image_suffix"],
                 voltage=message["voltage"],
+                wavelength=message["energy"],
                 dataCollectionGroupId=dcgid,
                 pixelSizeOnImage=message["pixel_size"],
                 imageSizeX=message["image_size_x"],
@@ -81,7 +82,11 @@ def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
                 tag=(
                     message.get("tag")
                     if message["experiment_type"] == "tomography"
-                    else ""
+                    else (
+                        message.get("tag", "").split("_angle")[0]
+                        if message["experiment_type"] == "sxt"
+                        else ""
+                    )
                 ),
             ).get("return_value", None)
             if dcid is None:

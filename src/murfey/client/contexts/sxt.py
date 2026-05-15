@@ -61,11 +61,12 @@ class SXTContext(Context):
                 "source": str(self._basepath),
                 "tag": tilt_series,
                 "pixel_size_on_image": str(
-                    data_collection_parameters.get("pixel_size", 100)
+                    data_collection_parameters.get("pixel_size", 100) * 1e-10
                 ),
                 "image_size_x": data_collection_parameters.get("image_size_x", 0),
                 "image_size_y": data_collection_parameters.get("image_size_y", 0),
                 "magnification": data_collection_parameters.get("magnification", 0),
+                "energy": data_collection_parameters.get("energy", 0),
                 "voltage": 0,
             }
             capture_post(
@@ -177,16 +178,43 @@ class SXTContext(Context):
                     ).tolist()
                     metadata["tilt_series_length"] = tilt_count_txrm[0]
 
+                if txrm_ole.exists("PositionInfo/AxisNames") and txrm_ole.exists(
+                    "PositionInfo/MotorPositions"
+                ):
+                    # The ImageInfo/Energy field is empty
+                    # Instead it needs extracting from the PositionInfo list
+                    axis_names = [
+                        i
+                        for i in txrm_ole.openstream("PositionInfo/AxisNames")
+                        .read()
+                        .decode("ascii")
+                        .split("\x00")
+                        if i
+                    ]
+                    axis_values = np.frombuffer(
+                        txrm_ole.openstream("PositionInfo/MotorPositions").getvalue(),
+                        np.float32,
+                    )
+                    if "Energy" in axis_names:
+                        energy_index = list(np.array(axis_names) == "Energy").index(
+                            True
+                        )
+                        metadata["energy"] = int(round(axis_values[energy_index]))
+
             if not metadata.get("has_reference", False):
                 logger.debug(f"Reference image {transferred_file} not processed")
                 return True
 
+            visit_index = transferred_file.parent.parts.index(environment.visit)
+            destination_search_dir = "/".join(
+                transferred_file.parent.parts[: visit_index + 2]
+            )
             self.register_sxt_data_collection(
                 tilt_series=transferred_file.stem,
                 data_collection_parameters=metadata,
                 file_extension=transferred_file.suffix,
                 image_directory=environment.default_destinations.get(
-                    transferred_file.parent, transferred_file.parent
+                    Path(destination_search_dir), destination_search_dir
                 ),
                 environment=environment,
             )

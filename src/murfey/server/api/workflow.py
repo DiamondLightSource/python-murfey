@@ -301,6 +301,7 @@ class DCParameters(BaseModel):
     exposure_time: Optional[float] = None
     slit_width: Optional[float] = None
     phase_plate: bool = False
+    energy: float = 0
     data_collection_tag: str = ""
 
 
@@ -327,6 +328,7 @@ def start_dc(
         "image_directory": str(rsync_basepath / dc_params.image_directory),
         "start_time": str(datetime.now()),
         "voltage": dc_params.voltage,
+        "energy": dc_params.energy,
         "pixel_size": str(float(dc_params.pixel_size_on_image) * 1e9),
         "image_suffix": dc_params.file_extension,
         "experiment_type": dc_params.experiment_type,
