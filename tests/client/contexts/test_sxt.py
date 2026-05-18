@@ -120,6 +120,9 @@ def test_sxt_context_txrm(mock_ole_file, mock_post, tmp_path):
             "magnification": 1000,
             "energy": 519,
             "voltage": 0,
+            "axis_start": -55,
+            "axis_end": 65,
+            "tilt_series_length": 5,
         },
         headers={"Authorization": "Bearer "},
     )

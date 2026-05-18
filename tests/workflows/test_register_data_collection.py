@@ -86,6 +86,9 @@ def test_run(
         "total_exposed_dose": 30,
         "c2aperture": 5,
         "phase_plate": 1,
+        "axis_start": -60,
+        "axis_end": 55,
+        "tilt_series_length": 250,
     }
     result = run(message=message, murfey_db=mock_murfey_db)
     if dcg_result is None:

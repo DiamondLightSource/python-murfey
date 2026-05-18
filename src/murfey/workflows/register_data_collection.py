@@ -76,6 +76,9 @@ def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
                 totalExposedDose=message.get("total_exposed_dose"),
                 c2aperture=message.get("c2aperture"),
                 phasePlate=int(message.get("phase_plate", 0)),
+                axisStart=message.get("axis_start"),
+                axisEnd=message.get("axis_end"),
+                numberOfImages=message.get("tilt_series_length"),
             )
             dcid = _transport_object.do_insert_data_collection(
                 record,
