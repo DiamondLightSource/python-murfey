@@ -208,13 +208,18 @@ class SXTContext(Context):
             visit_index = transferred_file.parent.parts.index(environment.visit)
             destination_search_dir = "/".join(
                 transferred_file.parent.parts[: visit_index + 2]
-            )
+            ).replace("//", "/")
             self.register_sxt_data_collection(
                 tilt_series=transferred_file.stem,
                 data_collection_parameters=metadata,
                 file_extension=transferred_file.suffix,
-                image_directory=environment.default_destinations.get(
-                    Path(destination_search_dir), destination_search_dir
+                image_directory=str(
+                    Path(
+                        environment.default_destinations.get(
+                            Path(destination_search_dir), destination_search_dir
+                        )
+                    )
+                    / transferred_file.parent.relative_to(destination_search_dir)
                 ),
                 environment=environment,
             )
@@ -238,7 +243,7 @@ class SXTContext(Context):
                 session_id=environment.murfey_session,
                 data={
                     "tag": transferred_file.stem,
-                    "source": str(transferred_file.parent),
+                    "source": destination_search_dir,
                     "pixel_size": metadata.get("pixel_size", 100),
                     "tilt_offset": midpoint(angles),
                     "tilt_series_length": metadata.get(
