@@ -61,7 +61,7 @@ class SXTContext(Context):
                 "source": str(self._basepath),
                 "tag": tilt_series,
                 "pixel_size_on_image": str(
-                    data_collection_parameters.get("pixel_size", 100) * 1e-10
+                    round(data_collection_parameters.get("pixel_size", 100), 2) * 1e-10
                 ),
                 "image_size_x": data_collection_parameters.get("image_size_x", 0),
                 "image_size_y": data_collection_parameters.get("image_size_y", 0),
@@ -244,7 +244,7 @@ class SXTContext(Context):
                 data={
                     "tag": transferred_file.stem,
                     "source": destination_search_dir,
-                    "pixel_size": metadata.get("pixel_size", 100),
+                    "pixel_size": round(metadata.get("pixel_size", 100), 2),
                     "tilt_offset": midpoint(angles),
                     "tilt_series_length": metadata.get(
                         "tilt_series_length", len(angles)

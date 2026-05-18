@@ -76,6 +76,7 @@ def test_run(
         "experiment_type": "SPA",
         "image_suffix": ".jpg",
         "voltage": 200,
+        "energy": 520,
         "pixel_size": 1e-9,
         "image_size_x": 2048,
         "image_size_y": 2048,
