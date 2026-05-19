@@ -53,7 +53,7 @@ def process_sxt_tilt_series_workflow(
             tag=tilt_series_info.tag,
             rsync_source=tilt_series_info.source,
             tilt_series_length=tilt_series_info.tilt_series_length,
-            processing_requested=True,
+            processing_requested=False,
         )
         murfey_db.add(tilt_series)
         murfey_db.commit()
@@ -116,3 +116,6 @@ def process_sxt_tilt_series_workflow(
         logger.info(
             f"No transport object found. Zocalo message would be {sanitise(str(zocalo_message))}"
         )
+    tilt_series.processing_requested = True
+    murfey_db.add(tilt_series)
+    murfey_db.commit()
