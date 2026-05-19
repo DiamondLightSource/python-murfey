@@ -85,15 +85,16 @@ def suggest_path(
             raise FileNotFoundError(log_message)
 
     check_path_name = check_path.name
-    while check_path.exists():
-        count = count + 1 if count else 2
-        check_path = check_path.parent / f"{check_path_name}{count}"
+    if not machine_config.single_data_directory:
+        while check_path.exists():
+            count = count + 1 if count else 2
+            check_path = check_path.parent / f"{check_path_name}{count}"
     if params.touch:
-        check_path.mkdir()
+        check_path.mkdir(exist_ok=True)
         os.chmod(check_path, mode=machine_config.mkdir_chmod)
         if params.extra_directory:
             extra_dir = check_path / secure_filename(params.extra_directory)
-            extra_dir.mkdir()
+            extra_dir.mkdir(exist_ok=True)
             os.chmod(extra_dir, mode=machine_config.mkdir_chmod)
     return {"suggested_path": check_path.relative_to(rsync_basepath)}
 
