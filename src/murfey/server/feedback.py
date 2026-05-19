@@ -372,7 +372,7 @@ def _release_2d_hold(message: dict, _db):
                 "session_id": message["session_id"],
                 "node_creator_queue": machine_config.node_creator_queue,
             },
-            "recipes": ["em-spa-class2d"],
+            "recipes": [machine_config.recipes.get("em-spa-class2d", "em-spa-class2d")],
         }
         if first_class2d.complete:
             feedback_params.next_job += (
@@ -458,7 +458,7 @@ def _release_3d_hold(message: dict, _db):
                 ),
                 "node_creator_queue": machine_config.node_creator_queue,
             },
-            "recipes": ["em-spa-class3d"],
+            "recipes": [machine_config.recipes.get("em-spa-class3d", "em-spa-class3d")],
         }
         if murfey.server._transport_object:
             zocalo_message["parameters"]["feedback_queue"] = (
@@ -539,7 +539,7 @@ def _release_refine_hold(message: dict, _db):
                     _pj_id(message["program_id"], _db, recipe="em-spa-refine"), _db
                 ),
             },
-            "recipes": ["em-spa-refine"],
+            "recipes": [machine_config.recipes.get("em-spa-refine", "em-spa-refine")],
         }
         if murfey.server._transport_object:
             zocalo_message["parameters"]["feedback_queue"] = (
@@ -649,7 +649,7 @@ def _register_incomplete_2d_batch(message: dict, _db):
             ),
             "node_creator_queue": machine_config.node_creator_queue,
         },
-        "recipes": ["em-spa-class2d"],
+        "recipes": [machine_config.recipes.get("em-spa-class2d", "em-spa-class2d")],
     }
     if murfey.server._transport_object:
         zocalo_message["parameters"]["feedback_queue"] = (
@@ -800,7 +800,7 @@ def _register_complete_2d_batch(message: dict, _db):
                 ),
                 "node_creator_queue": machine_config.node_creator_queue,
             },
-            "recipes": ["em-spa-class2d"],
+            "recipes": [machine_config.recipes.get("em-spa-class2d", "em-spa-class2d")],
         }
         if murfey.server._transport_object:
             zocalo_message["parameters"]["feedback_queue"] = (
@@ -875,7 +875,7 @@ def _register_complete_2d_batch(message: dict, _db):
                 ),
                 "node_creator_queue": machine_config.node_creator_queue,
             },
-            "recipes": ["em-spa-class2d"],
+            "recipes": [machine_config.recipes.get("em-spa-class2d", "em-spa-class2d")],
         }
         if murfey.server._transport_object:
             zocalo_message["parameters"]["feedback_queue"] = (
@@ -965,7 +965,7 @@ def _flush_class2d(
                 "autoproc_program_id": _app_id(pj_id, _db),
                 "node_creator_queue": machine_config.node_creator_queue,
             },
-            "recipes": ["em-spa-class2d"],
+            "recipes": [machine_config.recipes.get("em-spa-class2d", "em-spa-class2d")],
         }
         if murfey.server._transport_object:
             zocalo_message["parameters"]["feedback_queue"] = (
@@ -1283,7 +1283,7 @@ def _register_3d_batch(message: dict, _db):
                 ),
                 "node_creator_queue": machine_config.node_creator_queue,
             },
-            "recipes": ["em-spa-class3d"],
+            "recipes": [machine_config.recipes.get("em-spa-class3d", "em-spa-class3d")],
         }
         if murfey.server._transport_object:
             zocalo_message["parameters"]["feedback_queue"] = (
@@ -1326,7 +1326,7 @@ def _register_3d_batch(message: dict, _db):
                 ),
                 "node_creator_queue": machine_config.node_creator_queue,
             },
-            "recipes": ["em-spa-class3d"],
+            "recipes": [machine_config.recipes.get("em-spa-class3d", "em-spa-class3d")],
         }
         if murfey.server._transport_object:
             zocalo_message["parameters"]["feedback_queue"] = (
@@ -1631,7 +1631,7 @@ def _register_refinement(message: dict, _db):
                     _pj_id(message["program_id"], _db, recipe="em-spa-refine"), _db
                 ),
             },
-            "recipes": ["em-spa-refine"],
+            "recipes": [machine_config.recipes.get("em-spa-refine", "em-spa-refine")],
         }
         if murfey.server._transport_object:
             zocalo_message["parameters"]["feedback_queue"] = (
