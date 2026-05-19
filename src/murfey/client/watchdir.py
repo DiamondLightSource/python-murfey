@@ -250,7 +250,7 @@ class DirWatcher(Observer):
                 pattern in entry.name
                 for pattern in self._substrings_blacklist.get("directories", [])
             ):
-                log.debug(f"Skipping blacklisted directory {str(entry.name)!r}")
+                # log.debug(f"Skipping blacklisted directory {str(entry.name)!r}")
                 continue
             elif entry.is_dir() and (
                 modification_time is None or entry.stat().st_ctime >= modification_time
@@ -265,7 +265,7 @@ class DirWatcher(Observer):
                     pattern in entry.name
                     for pattern in self._substrings_blacklist.get("files", [])
                 ):
-                    log.debug(f"Skipping blacklisted file {str(entry.name)!r}")
+                    # log.debug(f"Skipping blacklisted file {str(entry.name)!r}")
                     continue
                 # Get file statistics and append file to dictionary
                 try:
