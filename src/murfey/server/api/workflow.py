@@ -290,11 +290,15 @@ class DCParameters(BaseModel):
     tag: str
     source: str
     magnification: float
-    total_exposed_dose: Optional[float] = None
-    c2aperture: Optional[float] = None
-    exposure_time: Optional[float] = None
-    slit_width: Optional[float] = None
+    total_exposed_dose: float | None = None
+    c2aperture: float | None = None
+    exposure_time: float | None = None
+    slit_width: float | None = None
     phase_plate: bool = False
+    energy: float | None = None
+    axis_start: float | None = None
+    axis_end: float | None = None
+    tilt_series_length: int | None = None
     data_collection_tag: str = ""
 
 
@@ -321,6 +325,7 @@ def start_dc(
         "image_directory": str(rsync_basepath / dc_params.image_directory),
         "start_time": str(datetime.now()),
         "voltage": dc_params.voltage,
+        "energy": dc_params.energy,
         "pixel_size": str(float(dc_params.pixel_size_on_image) * 1e9),
         "image_suffix": dc_params.file_extension,
         "experiment_type": dc_params.experiment_type,
@@ -335,6 +340,9 @@ def start_dc(
         "exposure_time": dc_params.exposure_time,
         "slit_width": dc_params.slit_width,
         "phase_plate": dc_params.phase_plate,
+        "axis_start": dc_params.axis_start,
+        "axis_end": dc_params.axis_end,
+        "tilt_series_length": dc_params.tilt_series_length,
         "session_id": session_id,
     }
 

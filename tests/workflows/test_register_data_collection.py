@@ -76,6 +76,7 @@ def test_run(
         "experiment_type": "SPA",
         "image_suffix": ".jpg",
         "voltage": 200,
+        "energy": 520,
         "pixel_size": 1e-9,
         "image_size_x": 2048,
         "image_size_y": 2048,
@@ -85,6 +86,9 @@ def test_run(
         "total_exposed_dose": 30,
         "c2aperture": 5,
         "phase_plate": 1,
+        "axis_start": -60,
+        "axis_end": 55,
+        "tilt_series_length": 250,
     }
     result = run(message=message, murfey_db=mock_murfey_db)
     if dcg_result is None:

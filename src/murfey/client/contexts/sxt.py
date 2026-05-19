@@ -2,10 +2,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from txrm2tiff.inspector import Inspector
-from txrm2tiff.txrm import open_txrm
-from txrm2tiff.txrm_functions.general import read_stream
-from txrm2tiff.xradia_properties.enums import XrmDataTypes
+import numpy as np
+from olefile import OleFileIO
 
 from murfey.client.context import (
     Context,
@@ -46,12 +44,9 @@ class SXTContext(Context):
             )
             return
         try:
-            metadata_source = (
-                self._basepath.parent / environment.visit / self._basepath.name
-            )
             ensure_dcg_exists(
                 collection_type="sxt",
-                metadata_source=metadata_source,
+                metadata_source=self._basepath,
                 environment=environment,
                 machine_config=self._machine_config,
                 token=self._token,
@@ -66,12 +61,18 @@ class SXTContext(Context):
                 "source": str(self._basepath),
                 "tag": tilt_series,
                 "pixel_size_on_image": str(
-                    data_collection_parameters.get("pixel_size", 100)
-                ),
+                    round(data_collection_parameters.get("pixel_size", 100), 2) * 1e-10
+                ),  # expected in metres
                 "image_size_x": data_collection_parameters.get("image_size_x", 0),
                 "image_size_y": data_collection_parameters.get("image_size_y", 0),
                 "magnification": data_collection_parameters.get("magnification", 0),
+                "energy": data_collection_parameters.get("energy"),
                 "voltage": 0,
+                "axis_start": data_collection_parameters.get("minimum_angle"),
+                "axis_end": data_collection_parameters.get("maximum_angle"),
+                "tilt_series_length": data_collection_parameters.get(
+                    "tilt_series_length"
+                ),
             }
             capture_post(
                 base_url=str(environment.url.geturl()),
@@ -127,84 +128,103 @@ class SXTContext(Context):
                 return False
 
             # Read the tilt angles and pixel size from the txrm
-            metadata = {
+            metadata: dict[str, Any] = {
                 "source": str(self._basepath),
                 "tilt_series_tag": transferred_file.stem,
             }
-            with open_txrm(
-                transferred_file, load_images=False, load_reference=False, strict=False
-            ) as txrm:
-                inspector = Inspector(txrm)
-                angles = read_stream(
-                    inspector.txrm.ole,
-                    "ImageInfo/Angles",
-                    XrmDataTypes.XRM_FLOAT,
-                    strict=True,
-                )
-                if angles:
+            with OleFileIO(str(transferred_file)) as txrm_ole:
+                if txrm_ole.exists("ReferenceData/Image"):
+                    metadata["has_reference"] = True
+
+                if txrm_ole.exists("ImageInfo/Angles"):
+                    angles = np.frombuffer(
+                        txrm_ole.openstream("ImageInfo/Angles").getvalue(), np.float32
+                    ).tolist()
                     metadata["minimum_angle"] = min(angles)
                     metadata["maximum_angle"] = max(angles)
 
-                pixel_size_txrm = read_stream(
-                    inspector.txrm.ole,
-                    "ImageInfo/PixelSize",
-                    XrmDataTypes.XRM_FLOAT,
-                    strict=True,
-                )
-                if pixel_size_txrm:
+                if txrm_ole.exists("ImageInfo/PixelSize"):
+                    pixel_size_txrm = np.frombuffer(
+                        txrm_ole.openstream("ImageInfo/PixelSize").getvalue(),
+                        np.float32,
+                    ).tolist()
                     metadata["pixel_size"] = pixel_size_txrm[0] * 1e4
 
-                image_width_txrm = read_stream(
-                    inspector.txrm.ole,
-                    "ImageInfo/ImageWidth",
-                    XrmDataTypes.XRM_INT,
-                    strict=True,
-                )
-                if image_width_txrm:
+                if txrm_ole.exists("ImageInfo/ImageWidth"):
+                    image_width_txrm = np.frombuffer(
+                        txrm_ole.openstream("ImageInfo/ImageWidth").getvalue(), np.int32
+                    ).tolist()
                     metadata["image_size_x"] = image_width_txrm[0]
 
-                image_height_txrm = read_stream(
-                    inspector.txrm.ole,
-                    "ImageInfo/ImageHeight",
-                    XrmDataTypes.XRM_INT,
-                    strict=True,
-                )
-                if image_height_txrm:
+                if txrm_ole.exists("ImageInfo/ImageHeight"):
+                    image_height_txrm = np.frombuffer(
+                        txrm_ole.openstream("ImageInfo/ImageHeight").getvalue(),
+                        np.int32,
+                    ).tolist()
                     metadata["image_size_y"] = image_height_txrm[0]
 
-                exposure_time_txrm = read_stream(
-                    inspector.txrm.ole,
-                    "ImageInfo/ExpTimes",
-                    XrmDataTypes.XRM_FLOAT,
-                    strict=True,
-                )
-                if exposure_time_txrm:
+                if txrm_ole.exists("ImageInfo/ExpTimes"):
+                    exposure_time_txrm = np.frombuffer(
+                        txrm_ole.openstream("ImageInfo/ExpTimes").getvalue(), np.float32
+                    ).tolist()
                     metadata["exposure_time"] = exposure_time_txrm[0]
 
-                magnification_txrm = read_stream(
-                    inspector.txrm.ole,
-                    "ImageInfo/XrayMagnification",
-                    XrmDataTypes.XRM_FLOAT,
-                    strict=True,
-                )
-                if magnification_txrm:
+                if txrm_ole.exists("ImageInfo/XrayMagnification"):
+                    magnification_txrm = np.frombuffer(
+                        txrm_ole.openstream("ImageInfo/XrayMagnification").getvalue(),
+                        np.float32,
+                    ).tolist()
                     metadata["magnification"] = magnification_txrm[0]
 
-                tilt_count_txrm = read_stream(
-                    inspector.txrm.ole,
-                    "ImageInfo/ImagesTaken",
-                    XrmDataTypes.XRM_INT,
-                    strict=True,
-                )
-                if tilt_count_txrm:
-                    metadata["tilt_count"] = tilt_count_txrm[0]
+                if txrm_ole.exists("ImageInfo/ImagesTaken"):
+                    tilt_count_txrm = np.frombuffer(
+                        txrm_ole.openstream("ImageInfo/ImagesTaken").getvalue(),
+                        np.int32,
+                    ).tolist()
+                    metadata["tilt_series_length"] = tilt_count_txrm[0]
 
+                if txrm_ole.exists("PositionInfo/AxisNames") and txrm_ole.exists(
+                    "PositionInfo/MotorPositions"
+                ):
+                    # The ImageInfo/Energy field is empty
+                    # Instead it needs extracting from the PositionInfo list
+                    axis_names = [
+                        i
+                        for i in txrm_ole.openstream("PositionInfo/AxisNames")
+                        .read()
+                        .decode("ascii")
+                        .split("\x00")
+                        if i
+                    ]
+                    axis_values = np.frombuffer(
+                        txrm_ole.openstream("PositionInfo/MotorPositions").getvalue(),
+                        np.float32,
+                    )
+                    if "Energy" in axis_names:
+                        energy_index = list(np.array(axis_names) == "Energy").index(
+                            True
+                        )
+                        metadata["energy"] = int(round(axis_values[energy_index]))
+
+            if not metadata.get("has_reference", False):
+                logger.debug(f"Reference image {transferred_file} not processed")
+                return True
+
+            visit_index = transferred_file.parent.parts.index(environment.visit)
+            destination_search_dir = "/".join(
+                transferred_file.parts[: visit_index + 2]
+            ).replace("//", "/")
             self.register_sxt_data_collection(
                 tilt_series=transferred_file.stem,
                 data_collection_parameters=metadata,
                 file_extension=transferred_file.suffix,
-                image_directory=environment.default_destinations.get(
-                    transferred_file.parent, transferred_file.parent
+                image_directory=str(
+                    Path(
+                        environment.default_destinations.get(
+                            Path(destination_search_dir), destination_search_dir
+                        )
+                    )
+                    / transferred_file.parent.relative_to(destination_search_dir)
                 ),
                 environment=environment,
             )
@@ -227,11 +247,15 @@ class SXTContext(Context):
                 visit_name=environment.visit,
                 session_id=environment.murfey_session,
                 data={
-                    "session_id": environment.murfey_session,
                     "tag": transferred_file.stem,
-                    "source": str(transferred_file.parent),
-                    "pixel_size": metadata.get("pixel_size", 100),
+                    "source": destination_search_dir,
+                    "pixel_size": round(
+                        metadata.get("pixel_size", 100), 2
+                    ),  # angstroms
                     "tilt_offset": midpoint(angles),
+                    "tilt_series_length": metadata.get(
+                        "tilt_series_length", len(angles)
+                    ),
                     "txrm": str(file_transferred_to),
                 },
             )
