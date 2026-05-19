@@ -50,6 +50,12 @@ class MultigridDirWatcher(Observer):
         log.debug("MultigridDirWatcher thread stop completed")
 
     def _handle_metadata(self, directory: Path, extra_directory: str, limited=True):
+        """
+        Handles all unknown directories in the visit folder
+        These are transferred into a raw folder as subdirectories
+        named using "extra_directory"
+        For SPA and Tomo this is metadata, for SXT this will be both metadata and data
+        """
         self.notify(
             directory,
             extra_directory=extra_directory,
