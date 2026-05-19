@@ -62,7 +62,7 @@ class SXTContext(Context):
                 "tag": tilt_series,
                 "pixel_size_on_image": str(
                     round(data_collection_parameters.get("pixel_size", 100), 2) * 1e-10
-                ),
+                ),  # expected in metres
                 "image_size_x": data_collection_parameters.get("image_size_x", 0),
                 "image_size_y": data_collection_parameters.get("image_size_y", 0),
                 "magnification": data_collection_parameters.get("magnification", 0),
@@ -212,7 +212,7 @@ class SXTContext(Context):
 
             visit_index = transferred_file.parent.parts.index(environment.visit)
             destination_search_dir = "/".join(
-                transferred_file.parent.parts[: visit_index + 2]
+                transferred_file.parts[: visit_index + 2]
             ).replace("//", "/")
             self.register_sxt_data_collection(
                 tilt_series=transferred_file.stem,
@@ -249,7 +249,9 @@ class SXTContext(Context):
                 data={
                     "tag": transferred_file.stem,
                     "source": destination_search_dir,
-                    "pixel_size": round(metadata.get("pixel_size", 100), 2),
+                    "pixel_size": round(
+                        metadata.get("pixel_size", 100), 2
+                    ),  # angstroms
                     "tilt_offset": midpoint(angles),
                     "tilt_series_length": metadata.get(
                         "tilt_series_length", len(angles)
