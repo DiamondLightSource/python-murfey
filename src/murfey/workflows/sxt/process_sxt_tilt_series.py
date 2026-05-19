@@ -44,6 +44,9 @@ def process_sxt_tilt_series_workflow(
     ).all()
     if tilt_series_query:
         tilt_series = tilt_series_query[0]
+        if tilt_series.processing_requested:
+            logger.info(f"Tilt series {tilt_series.tag} has already been processed")
+            return
     else:
         tilt_series = TiltSeries(
             session_id=session_id,
