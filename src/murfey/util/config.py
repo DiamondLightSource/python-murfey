@@ -50,6 +50,7 @@ class MachineConfig(BaseModel):  # type: ignore
     analyse_created_directories: list[str] = []
     gain_reference_directory: Optional[Path] = None
     eer_fractionation_file_template: str = ""
+    single_data_directory: bool = False
 
     # Data transfer setup -------------------------------------------------------------
     # General setup
