@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import re
 import threading
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
@@ -11,6 +10,7 @@ from typing import Callable, Type, TypeVar
 from murfey.client.context import Context
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.util.client import capture_post
+from murfey.util.fib import number_from_name
 from murfey.util.models import (
     LamellaSiteInfo,
     MillingStepInfo,
@@ -22,22 +22,6 @@ from murfey.util.models import (
 logger = logging.getLogger("murfey.client.contexts.fib")
 
 lock = threading.Lock()
-
-
-def _number_from_name(name: str) -> int:
-    """
-    In the AutoTEM and Maps workflows for the FIB, the sites and images are
-    auto-incremented with parenthesised numbers (e.g. "Lamella (2)"), with
-    the first site/image typically not having a number.
-
-    This function extracts the number from the file name, and returns 1 if
-    no such number is found.
-    """
-    return (
-        int(match.group(1))
-        if (match := re.search(r"^[\w\s]+\((\d+)\)$", name)) is not None
-        else 1
-    )
 
 
 T = TypeVar("T")
@@ -416,7 +400,7 @@ class FIBContext(Context):
             if (site_name := _parse_xml_text(site, "Name", str)) is None:
                 logger.warning("Current site doesn't have a name")
                 continue
-            site_num = _number_from_name(site_name)
+            site_num = number_from_name(site_name)
             site_info = LamellaSiteInfo(
                 project_name=project_name,
                 site_name=site_name,
@@ -555,7 +539,7 @@ class FIBContext(Context):
         parts = file.parts
         try:
             lamella_name = parts[parts.index("Sites") + 1]
-            lamella_number = _number_from_name(lamella_name)
+            lamella_number = number_from_name(lamella_name)
         except Exception:
             logger.warning(
                 f"Could not extract metadata from file {file}", exc_info=True
