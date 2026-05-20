@@ -9,6 +9,7 @@ from pydantic import BaseModel, computed_field, model_validator
 from sqlmodel import Session, select
 
 import murfey.util.db as MurfeyDB
+from murfey.util.fib import number_from_name
 
 logger = logging.getLogger("murfey.workflows.fib.register_atlas")
 
@@ -151,34 +152,48 @@ def _register_fib_imaging_site(
     Register FIB atlas in Murfey database or update existing entry.
     """
     # Create new entry if one doesn't already exist
-    if not (
+    if (
         fib_imaging_site := murfey_db.exec(
             select(MurfeyDB.ImagingSite)
             .where(MurfeyDB.ImagingSite.session_id == session_id)
-            .where(MurfeyDB.ImagingSite.image_path == str(metadata.file))
+            .where(MurfeyDB.ImagingSite.site_name == metadata.site_name)
+            .where(MurfeyDB.ImagingSite.data_type == "atlas")
         ).one_or_none()
-    ):
+    ) is None:
         fib_imaging_site = MurfeyDB.ImagingSite(
             session_id=session_id,
+            site_name=metadata.site_name,
             image_path=str(metadata.file),
             data_type="atlas",
         )
-    # Add/update entries
-    fib_imaging_site.site_name = metadata.site_name
-    fib_imaging_site.pos_x = metadata.pos_x
-    fib_imaging_site.pos_y = metadata.pos_y
-    fib_imaging_site.pos_z = metadata.pos_z
-    fib_imaging_site.rotation = float(np.rad2deg(metadata.rotation))
-    fib_imaging_site.tilt_alpha = float(np.rad2deg(metadata.tilt_alpha))
-    fib_imaging_site.tilt_beta = float(np.rad2deg(metadata.tilt_beta))
-    fib_imaging_site.len_x = metadata.len_x
-    fib_imaging_site.len_y = metadata.len_y
-    fib_imaging_site.image_pixels_x = metadata.pixels_x
-    fib_imaging_site.image_pixels_y = metadata.pixels_y
-    fib_imaging_site.image_pixel_size = metadata.pixel_size
 
-    murfey_db.add(fib_imaging_site)
-    murfey_db.commit()
+    # Check if the entry is new or newer than the current stored one
+    incoming_number = number_from_name(metadata.file.stem)
+    # Handle empty string
+    if not fib_imaging_site.image_path:
+        current_number = 0
+    # Read 'maps' atlases in one way
+    elif "maps" in (curr_path := Path(fib_imaging_site.image_path)).parts:
+        current_number = number_from_name(curr_path.stem)
+    else:
+        current_number = 0
+    # Update if incoming one is newer
+    if incoming_number > current_number:
+        fib_imaging_site.image_path = str(metadata.file)
+        fib_imaging_site.pos_x = metadata.pos_x
+        fib_imaging_site.pos_y = metadata.pos_y
+        fib_imaging_site.pos_z = metadata.pos_z
+        fib_imaging_site.rotation = float(np.rad2deg(metadata.rotation))
+        fib_imaging_site.tilt_alpha = float(np.rad2deg(metadata.tilt_alpha))
+        fib_imaging_site.tilt_beta = float(np.rad2deg(metadata.tilt_beta))
+        fib_imaging_site.len_x = metadata.len_x
+        fib_imaging_site.len_y = metadata.len_y
+        fib_imaging_site.image_pixels_x = metadata.pixels_x
+        fib_imaging_site.image_pixels_y = metadata.pixels_y
+        fib_imaging_site.image_pixel_size = metadata.pixel_size
+
+        murfey_db.add(fib_imaging_site)
+        murfey_db.commit()
 
 
 def run(
