@@ -7,6 +7,7 @@ from pytest_mock import MockerFixture
 from sqlmodel import Session, select
 
 import murfey.util.db as MurfeyDB
+import murfey.workflows.fib.register_atlas
 from murfey.workflows.fib.register_atlas import FIBAtlasMetadata, _parse_metadata, run
 
 session_id = 10
@@ -334,9 +335,13 @@ def test_run_with_db(
         )
         for test_file in test_files
     ]
-    mocker.patch(
+    mock_parse = mocker.patch(
         "murfey.workflows.fib.register_atlas._parse_metadata",
         side_effect=mock_metadata,
+    )
+    spy_register = mocker.spy(
+        murfey.workflows.fib.register_atlas,
+        "_register_fib_imaging_site",
     )
 
     # Run the function and check that it's run through to completion
@@ -346,11 +351,13 @@ def test_run_with_db(
             file=test_file,
             murfey_db=murfey_db_session,
         )
+    assert mock_parse.call_count == len(test_files)
+    assert spy_register.call_count == len(test_files)
+
     search_results = murfey_db_session.exec(
         select(MurfeyDB.ImagingSite).where(
             MurfeyDB.ImagingSite.session_id == session_id
         )
     ).all()
-
     assert len(search_results) == 1
     assert search_results[0].image_path == str(mock_metadata[-1].file)
