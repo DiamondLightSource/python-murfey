@@ -1,5 +1,4 @@
 import asyncio
-import os
 from datetime import datetime
 from logging import getLogger
 from pathlib import Path
@@ -609,10 +608,6 @@ async def request_spa_preprocessing(
 
         db.close()
 
-        if not mrc_out.parent.exists():
-            mrc_out_dir = Path(secure_filename(str(mrc_out))).parent
-            mrc_out_dir.mkdir(parents=True, exist_ok=True)
-            os.chmod(mrc_out_dir, mode=machine_config.mkdir_chmod)
         recipe_name = machine_config.recipes.get(
             "em-spa-preprocess", "em-spa-preprocess"
         )
@@ -837,9 +832,6 @@ async def request_tomography_preprocessing(
         dcid = data_collection[0][1].id
         appid = data_collection[0][3].id
         murfey_ids = _murfey_id(appid, db, number=1, close=False)
-        if not mrc_out.parent.exists():
-            mrc_out.parent.mkdir(parents=True, exist_ok=True)
-            os.chmod(mrc_out.parent, mode=machine_config.mkdir_chmod)
 
         session_processing_parameters = db.exec(
             select(SessionProcessingParameters).where(
@@ -990,9 +982,6 @@ def register_completed_tilt_series(
                 / "tomograms"
                 / f"{ts.tag}_stack.mrc"
             )
-            if not stack_file.parent.exists():
-                stack_file.parent.mkdir(parents=True)
-                os.chmod(stack_file.parent, mode=machine_config.mkdir_chmod)
             tilt_offset = midpoint([float(get_angle(t)) for t in tilts])
             zocalo_message = {
                 "recipes": ["em-tomo-align"],
