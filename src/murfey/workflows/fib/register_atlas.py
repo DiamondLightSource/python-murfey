@@ -151,7 +151,26 @@ def _register_fib_imaging_site(
     """
     Register FIB atlas in Murfey database or update existing entry.
     """
-    # Create new entry if one doesn't already exist
+
+    def _update_entry(
+        site: MurfeyDB.ImagingSite,
+        metadata: FIBAtlasMetadata,
+    ):
+        site.image_path = str(metadata.file)
+        site.pos_x = metadata.pos_x
+        site.pos_y = metadata.pos_y
+        site.pos_z = metadata.pos_z
+        site.rotation = float(np.rad2deg(metadata.rotation))
+        site.tilt_alpha = float(np.rad2deg(metadata.tilt_alpha))
+        site.tilt_beta = float(np.rad2deg(metadata.tilt_beta))
+        site.len_x = metadata.len_x
+        site.len_y = metadata.len_y
+        site.image_pixels_x = metadata.pixels_x
+        site.image_pixels_y = metadata.pixels_y
+        site.image_pixel_size = metadata.pixel_size
+
+        return site
+
     if (
         fib_imaging_site := murfey_db.exec(
             select(MurfeyDB.ImagingSite)
@@ -160,40 +179,31 @@ def _register_fib_imaging_site(
             .where(MurfeyDB.ImagingSite.data_type == "atlas")
         ).one_or_none()
     ) is None:
+        # Create new entry if one doesn't already exist
         fib_imaging_site = MurfeyDB.ImagingSite(
             session_id=session_id,
             site_name=metadata.site_name,
             image_path=str(metadata.file),
             data_type="atlas",
         )
-
-    # Check if the entry is new or newer than the current stored one
-    incoming_number = number_from_name(metadata.file.stem)
-    # Handle empty string
-    if not fib_imaging_site.image_path:
-        current_number = 0
-    # Read 'maps' atlases in one way
-    elif "maps" in (curr_path := Path(fib_imaging_site.image_path)).parts:
-        current_number = number_from_name(curr_path.stem)
+        fib_imaging_site = _update_entry(fib_imaging_site, metadata)
     else:
-        current_number = 0
-    # Update if incoming one is newer
-    if incoming_number > current_number:
-        fib_imaging_site.image_path = str(metadata.file)
-        fib_imaging_site.pos_x = metadata.pos_x
-        fib_imaging_site.pos_y = metadata.pos_y
-        fib_imaging_site.pos_z = metadata.pos_z
-        fib_imaging_site.rotation = float(np.rad2deg(metadata.rotation))
-        fib_imaging_site.tilt_alpha = float(np.rad2deg(metadata.tilt_alpha))
-        fib_imaging_site.tilt_beta = float(np.rad2deg(metadata.tilt_beta))
-        fib_imaging_site.len_x = metadata.len_x
-        fib_imaging_site.len_y = metadata.len_y
-        fib_imaging_site.image_pixels_x = metadata.pixels_x
-        fib_imaging_site.image_pixels_y = metadata.pixels_y
-        fib_imaging_site.image_pixel_size = metadata.pixel_size
+        # Check if the entry is new or newer than the current stored one
+        incoming_number = number_from_name(metadata.file.stem)
+        # Handle empty string
+        if not fib_imaging_site.image_path:
+            current_number = 0
+        # Read 'maps' atlases in one way
+        elif "maps" in (curr_path := Path(fib_imaging_site.image_path)).parts:
+            current_number = number_from_name(curr_path.stem)
+        else:
+            current_number = 0
+        # Update if incoming one is newer
+        if incoming_number > current_number:
+            fib_imaging_site = _update_entry(fib_imaging_site, metadata)
 
-        murfey_db.add(fib_imaging_site)
-        murfey_db.commit()
+    murfey_db.add(fib_imaging_site)
+    murfey_db.commit()
 
 
 def run(
