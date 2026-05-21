@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from sqlmodel import select
 
 import murfey.server.api.websocket as ws
+import murfey.server.prometheus as prom
 from murfey.server import _transport_object
 from murfey.server.api import templates
 from murfey.server.api.auth import (
@@ -186,6 +187,11 @@ def create_session(
     db.add(s)
     db.commit()
     sid = s.id
+    alert_end_time = prom.alert_end_time._value.get()  # timestamp
+    if visit_end_time.end_time:
+        visit_end_timestamp = visit_end_time.end_time.timestamp()
+        if alert_end_time < visit_end_timestamp:
+            prom.alert_end_time.set(visit_end_timestamp)
     return sid
 
 
@@ -300,7 +306,7 @@ def get_silences(instrument_name: MurfeyInstrumentName):
     response = requests.get(f"{alertmanager_url}/api/v2/silences?{query_params}")
     if response.status_code != 200:
         logger.warning(
-            f"Tried to get silences for {sanitise(instrument_name)}, but received status {response.status_code} from alertmanager API"
+            f"Get silences for {sanitise(instrument_name)} received status {response.status_code} from alertmanager API"
         )
     active_silences = []
     for silence in response.json():
