@@ -2,17 +2,21 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import ispyb.sqlalchemy as ISPyBDB
 import pytest
 from pytest_mock import MockerFixture
-from sqlmodel import Session, select
+from sqlalchemy import select as sa_select
+from sqlalchemy.orm import Session as SQLAlchemySession
+from sqlmodel import Session as SQLModelSession, select as sm_select
 
 import murfey.util.db as MurfeyDB
 import murfey.workflows.fib.register_atlas
 from murfey.workflows.fib.register_atlas import FIBAtlasMetadata, _parse_metadata, run
+from tests.conftest import ExampleVisit
 
 session_id = 10
-visit_name = "cm12345-6"
-instrument_name = "test_instrument"
+visit_name = f"{ExampleVisit.proposal_code}{ExampleVisit.proposal_number}-{ExampleVisit.visit_number}"
+instrument_name = ExampleVisit.instrument_name
 
 
 @pytest.fixture
@@ -290,7 +294,9 @@ def test_register_fib_imaging_site():
 def test_run_with_db(
     mocker: MockerFixture,
     visit_dir: Path,
-    murfey_db_session: Session,
+    murfey_db_session: SQLModelSession,
+    ispyb_db_session: SQLAlchemySession,
+    mock_ispyb_credentials,
 ):
     test_files = (
         visit_dir / "maps/LayersData/Layer/Electron Snapshot/Electron Snapshot.tiff",
@@ -301,7 +307,7 @@ def test_run_with_db(
     # Add a test visit to the database
     if not (
         session_entry := murfey_db_session.exec(
-            select(MurfeyDB.Session).where(MurfeyDB.Session.id == session_id)
+            sm_select(MurfeyDB.Session).where(MurfeyDB.Session.id == session_id)
         ).one_or_none()
     ):
         session_entry = MurfeyDB.Session(id=session_id)
@@ -311,6 +317,36 @@ def test_run_with_db(
 
     murfey_db_session.add(session_entry)
     murfey_db_session.commit()
+
+    # Mock the ISPyB connection where the TransportManager class is located
+    mock_security_config = MagicMock()
+    mock_security_config.ispyb_credentials = mock_ispyb_credentials
+    mocker.patch(
+        "murfey.server.ispyb.get_security_config",
+        return_value=mock_security_config,
+    )
+    mocker.patch(
+        "murfey.server.ispyb.ISPyBSession",
+        return_value=ispyb_db_session,
+    )
+
+    # Mock the ISPYB connection when registering data collection group
+    mocker.patch(
+        "murfey.workflows.register_data_collection_group.ISPyBSession",
+        return_value=ispyb_db_session,
+    )
+
+    # Patch the TransportManager object in the workflows called
+    from murfey.server.ispyb import TransportManager
+
+    mocker.patch(
+        "murfey.workflows.register_data_collection_group._transport_object",
+        new=TransportManager("PikaTransport"),
+    )
+    mocker.patch(
+        "murfey.workflows.register_atlas_update._transport_object",
+        new=TransportManager("PikaTransport"),
+    )
 
     # Mock the metadata returned from the image file
     mock_metadata = [
@@ -354,10 +390,45 @@ def test_run_with_db(
     assert mock_parse.call_count == len(test_files)
     assert spy_register.call_count == len(test_files)
 
+    # Murfey's ImagingSite should have an entry
     search_results = murfey_db_session.exec(
-        select(MurfeyDB.ImagingSite).where(
+        sm_select(MurfeyDB.ImagingSite).where(
             MurfeyDB.ImagingSite.session_id == session_id
         )
     ).all()
     assert len(search_results) == 1
     assert search_results[0].image_path == str(mock_metadata[-1].file)
+
+    # Murfey's DataCollectionGroup should have an entry
+    murfey_dcg_search = murfey_db_session.exec(
+        sm_select(MurfeyDB.DataCollectionGroup).where(
+            MurfeyDB.DataCollectionGroup.session_id == session_id
+        )
+    ).all()
+    assert len(murfey_dcg_search) == 1
+
+    # ISPyB's DataCollectionGroup should have an entry
+    murfey_dcg = murfey_dcg_search[0]
+    ispyb_dcg_search = (
+        ispyb_db_session.execute(
+            sa_select(ISPyBDB.DataCollectionGroup).where(
+                ISPyBDB.DataCollectionGroup.dataCollectionGroupId == murfey_dcg.id
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert len(ispyb_dcg_search) == 1
+
+    # Atlas should have an entry
+    ispyb_dcg = ispyb_dcg_search[0]
+    ispyb_atlas_search = (
+        ispyb_db_session.execute(
+            sa_select(ISPyBDB.Atlas).where(
+                ISPyBDB.Atlas.dataCollectionGroupId == ispyb_dcg.dataCollectionGroupId
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert len(ispyb_atlas_search) == 1
