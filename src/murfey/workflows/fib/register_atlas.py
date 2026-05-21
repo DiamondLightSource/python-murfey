@@ -1,6 +1,8 @@
 import logging
+import traceback
 import xml.etree.ElementTree as ET
 from functools import cached_property
+from importlib.metadata import entry_points
 from pathlib import Path
 
 import numpy as np
@@ -153,23 +155,23 @@ def _register_fib_imaging_site(
     """
 
     def _update_entry(
-        site: MurfeyDB.ImagingSite,
+        imaging_site: MurfeyDB.ImagingSite,
         metadata: FIBAtlasMetadata,
     ):
-        site.image_path = str(metadata.file)
-        site.pos_x = metadata.pos_x
-        site.pos_y = metadata.pos_y
-        site.pos_z = metadata.pos_z
-        site.rotation = float(np.rad2deg(metadata.rotation))
-        site.tilt_alpha = float(np.rad2deg(metadata.tilt_alpha))
-        site.tilt_beta = float(np.rad2deg(metadata.tilt_beta))
-        site.len_x = metadata.len_x
-        site.len_y = metadata.len_y
-        site.image_pixels_x = metadata.pixels_x
-        site.image_pixels_y = metadata.pixels_y
-        site.image_pixel_size = metadata.pixel_size
+        imaging_site.image_path = str(metadata.file)
+        imaging_site.pos_x = metadata.pos_x
+        imaging_site.pos_y = metadata.pos_y
+        imaging_site.pos_z = metadata.pos_z
+        imaging_site.rotation = float(np.rad2deg(metadata.rotation))
+        imaging_site.tilt_alpha = float(np.rad2deg(metadata.tilt_alpha))
+        imaging_site.tilt_beta = float(np.rad2deg(metadata.tilt_beta))
+        imaging_site.len_x = metadata.len_x
+        imaging_site.len_y = metadata.len_y
+        imaging_site.image_pixels_x = metadata.pixels_x
+        imaging_site.image_pixels_y = metadata.pixels_y
+        imaging_site.image_pixel_size = metadata.pixel_size
 
-        return site
+        return imaging_site
 
     if (
         fib_imaging_site := murfey_db.exec(
@@ -205,6 +207,93 @@ def _register_fib_imaging_site(
     murfey_db.add(fib_imaging_site)
     murfey_db.commit()
 
+    return fib_imaging_site
+
+
+def _register_dcg_and_atlas(
+    session_id: int,
+    instrument_name: str,
+    visit_name: str,
+    imaging_site: MurfeyDB.ImagingSite,
+    metadata: FIBAtlasMetadata,
+    murfey_db: Session,
+):
+    proposal_code = "".join(char for char in visit_name.split("-")[0] if char.isalpha())
+    proposal_number = "".join(
+        char for char in visit_name.split("-")[0] if char.isdigit()
+    )
+    visit_number = visit_name.split("-")[-1]
+
+    # Register using thumbnail values if they are provided
+    if (
+        imaging_site.thumbnail_path is not None
+        and imaging_site.thumbnail_pixel_size is not None
+    ):
+        atlas_name: str | None = imaging_site.thumbnail_path
+        atlas_pixel_size: float | None = imaging_site.thumbnail_pixel_size
+    else:
+        atlas_name = imaging_site.image_path
+        atlas_pixel_size = imaging_site.image_pixel_size
+
+    if dcg_search := murfey_db.exec(
+        select(MurfeyDB.DataCollectionGroup)
+        .where(MurfeyDB.DataCollectionGroup.session_id == session_id)
+        .where(MurfeyDB.DataCollectionGroup.tag == imaging_site.site_name)
+    ).all():
+        dcg_entry = dcg_search[0]
+        atlas_message = {
+            "session_id": session_id,
+            "dcgid": dcg_entry.id,
+            "atlas_id": dcg_entry.atlas_id,
+            "atlas": atlas_name,
+            "atlas_pixel_size": atlas_pixel_size,
+            "sample": dcg_entry.sample,
+        }
+        if entry_point_result := entry_points(
+            group="murfey.workflows", name="atlas_update"
+        ):
+            (workflow,) = entry_point_result
+            _ = workflow.load()(
+                message=atlas_message,
+                murfey_db=murfey_db,
+            )
+        else:
+            logger.warning("No workflow found for 'atlas_update'")
+    else:
+        dcg_message = {
+            "microscope": instrument_name,
+            "proposal_code": proposal_code,
+            "proposal_number": proposal_number,
+            "visit_number": visit_number,
+            "session_id": session_id,
+            "tag": imaging_site.site_name,
+            "experiment_type_id": 46,
+            "atlas": atlas_name,
+            "atlas_pixel_size": atlas_pixel_size,
+            "sample": metadata.slot_number,
+        }
+        if entry_point_result := entry_points(
+            group="murfey.workflows", name="data_collection_group"
+        ):
+            (workflow,) = entry_point_result
+            # Register grid square
+            _ = workflow.load()(
+                message=dcg_message,
+                murfey_db=murfey_db,
+            )
+        else:
+            logger.warning("No workflow found for 'data_collection_group'")
+    dcg_entry = murfey_db.exec(
+        select(MurfeyDB.DataCollectionGroup)
+        .where(MurfeyDB.DataCollectionGroup.session_id == session_id)
+        .where(MurfeyDB.DataCollectionGroup.tag == imaging_site.site_name)
+    ).one()
+
+    imaging_site.dcg_id = dcg_entry.id
+    imaging_site.dcg_name = dcg_entry.tag
+    murfey_db.add(imaging_site)
+    murfey_db.commit()
+
 
 def run(
     session_id: int,
@@ -213,28 +302,30 @@ def run(
 ):
     # Outer try-finally block to ensure database connection closes
     try:
-        # Load visit information
         try:
-            session_entry = murfey_db.exec(
+            # Load visit information
+            murfey_session = murfey_db.exec(
                 select(MurfeyDB.Session).where(MurfeyDB.Session.id == session_id)
             ).one()
-            visit_name = session_entry.visit
+            visit_name = murfey_session.visit
         except Exception:
             logger.error(
                 "Exception encountered while querying Murfey database", exc_info=True
             )
             return False
 
-        # Extract metadata from Electron Snapshot image
         try:
+            # Extract metadata from Electron Snapshot image
             metadata = _parse_metadata(file, visit_name)
         except Exception:
             logger.error(f"Error extracting metadata from file {file}", exc_info=True)
             return False
 
-        # Register imaging site in Murfey, or update existing one
         try:
-            _register_fib_imaging_site(session_id, metadata, murfey_db)
+            # Register imaging site in Murfey, or update existing one
+            fib_imaging_site = _register_fib_imaging_site(
+                session_id, metadata, murfey_db
+            )
             logger.info(
                 f"Registered FIB atlas image {file} for slot {metadata.slot_number} in Murfey database"
             )
@@ -244,6 +335,26 @@ def run(
                 exc_info=True,
             )
             return False
+
+        try:
+            # Register data collection group and atlas in ISPyB
+            _register_dcg_and_atlas(
+                session_id=session_id,
+                instrument_name=murfey_session.instrument_name,
+                visit_name=murfey_session.visit,
+                imaging_site=fib_imaging_site,
+                metadata=metadata,
+                murfey_db=murfey_db,
+            )
+        except Exception:
+            # Log error but allow workflow to proceed
+            logger.error(
+                "Exception encountered when registering data collection group for FIB workflow "
+                f"for {metadata.site_name!r}: \n"
+                f"{traceback.format_exc()}"
+            )
+
         return True
+
     finally:
         murfey_db.close()
