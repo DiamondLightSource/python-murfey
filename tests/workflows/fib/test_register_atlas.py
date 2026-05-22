@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session as SQLAlchemySession
 from sqlmodel import Session as SQLModelSession, select as sm_select
 
 import murfey.util.db as MurfeyDB
-import murfey.workflows.fib.register_atlas
 from murfey.workflows.fib.register_atlas import FIBAtlasMetadata, _parse_metadata, run
 from tests.conftest import ExampleVisit
 
@@ -349,6 +348,8 @@ def test_run_with_db(
     )
 
     # Mock the metadata returned from the image file
+    import murfey.workflows.fib.register_atlas
+
     mock_metadata = [
         FIBAtlasMetadata(
             visit_name=visit_name,
