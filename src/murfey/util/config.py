@@ -59,7 +59,7 @@ class MachineConfig(BaseModel):  # type: ignore
         "directories": [],
         "files": [],
     }
-    mkdir_chmod: int = 0o750
+    mkdir_chmod: int = 0o2750
 
     # Rsync setup
     rsync_url: str = ""

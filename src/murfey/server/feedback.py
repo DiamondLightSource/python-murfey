@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import logging
 import math
-import os
 import subprocess
 import time
 from datetime import datetime
@@ -1409,10 +1408,6 @@ def _flush_tomography_preprocessing(message: dict, _db):
         detached_ids = [c.id for c in collected_ids]
 
         murfey_ids = _murfey_id(detached_ids[3], _db, number=1, close=False)
-        p = Path(f.mrc_out)
-        if not p.parent.exists():
-            p.parent.mkdir(parents=True)
-            os.chmod(p.parent, mode=machine_config.mkdir_chmod)
         movie = db.Movie(
             murfey_id=murfey_ids[0],
             data_collection_id=detached_ids[1],
@@ -1886,9 +1881,6 @@ def feedback_callback(header: dict, message: dict, _db=murfey_db) -> None:
                     / "tomograms"
                     / f"{relevant_tilt_series.tag}_stack.mrc"
                 )
-                if not stack_file.parent.exists():
-                    stack_file.parent.mkdir(parents=True)
-                    os.chmod(stack_file.parent, machine_config.mkdir_chmod)
                 tilt_offset = midpoint([float(get_angle(t)) for t in tilts])
                 zocalo_message = {
                     "recipes": ["em-tomo-align"],
