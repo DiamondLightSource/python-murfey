@@ -44,4 +44,4 @@ monitoring_switch = Gauge(
     ["visit"],
 )
 
-alert_end_time = Gauge("alert_end_time", "End time for alerts", [])
+alert_end_time = Gauge("alert_end_time", "End time for alerts", ["visit"])
