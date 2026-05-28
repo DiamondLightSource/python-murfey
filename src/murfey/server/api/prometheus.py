@@ -99,12 +99,6 @@ def increment_rsync_skipped_files_prometheus(
     ).inc(rsyncer_skipped_files.increment_count)
 
 
-@router.post("/visits/{visit_name}/monitoring/{on}")
-def change_monitoring_status(visit_name: str, on: int):
-    prom.monitoring_switch.labels(visit=visit_name)
-    prom.monitoring_switch.labels(visit=visit_name).set(on)
-
-
 @router.get("/metrics/{metric_name}")
 def inspect_prometheus_metrics(
     metric_name: str,
