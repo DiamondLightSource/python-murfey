@@ -4,6 +4,7 @@ import xml.etree.ElementTree as ET
 from functools import cached_property
 from importlib.metadata import entry_points
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import PIL.Image
@@ -295,51 +296,68 @@ def _register_dcg_and_atlas(
     murfey_db.commit()
 
 
+class FIBAtlasRegistrationInfo(BaseModel):
+    register: str
+    session_id: int
+    atlas_file: Path
+
+
 def run(
-    session_id: int,
-    file: Path,
+    message: dict[str, Any],
     murfey_db: Session,
 ):
     # Outer try-finally block to ensure database connection closes
     try:
         try:
+            # Validate incoming message
+            fib_info = FIBAtlasRegistrationInfo(**message)
+        except Exception:
+            logger.error("Could not validate incoming message", exc_info=True)
+            return {"success": False, "requeue": False}
+
+        try:
             # Load visit information
             murfey_session = murfey_db.exec(
-                select(MurfeyDB.Session).where(MurfeyDB.Session.id == session_id)
+                select(MurfeyDB.Session).where(
+                    MurfeyDB.Session.id == fib_info.session_id
+                )
             ).one()
             visit_name = murfey_session.visit
         except Exception:
             logger.error(
                 "Exception encountered while querying Murfey database", exc_info=True
             )
-            return False
+            return {"success": False, "requeue": False}
 
         try:
             # Extract metadata from Electron Snapshot image
-            metadata = _parse_metadata(file, visit_name)
+            metadata = _parse_metadata(fib_info.atlas_file, visit_name)
         except Exception:
-            logger.error(f"Error extracting metadata from file {file}", exc_info=True)
-            return False
+            logger.error(
+                f"Error extracting metadata from file {fib_info.atlas_file}",
+                exc_info=True,
+            )
+            return {"success": False, "requeue": False}
 
         try:
             # Register imaging site in Murfey, or update existing one
             fib_imaging_site = _register_fib_imaging_site(
-                session_id, metadata, murfey_db
+                fib_info.session_id, metadata, murfey_db
             )
             logger.info(
-                f"Registered FIB atlas image {file} for slot {metadata.slot_number} in Murfey database"
+                f"Registered FIB atlas image {fib_info.atlas_file} for slot {metadata.slot_number} in Murfey database"
             )
         except Exception:
             logger.error(
-                f"Error registering FIB atlas image {file} in Murfey database",
+                f"Error registering FIB atlas image {fib_info.atlas_file} in Murfey database",
                 exc_info=True,
             )
-            return False
+            return {"success": False, "requeue": False}
 
         try:
             # Register data collection group and atlas in ISPyB
             _register_dcg_and_atlas(
-                session_id=session_id,
+                session_id=fib_info.session_id,
                 instrument_name=murfey_session.instrument_name,
                 visit_name=murfey_session.visit,
                 imaging_site=fib_imaging_site,
@@ -353,8 +371,8 @@ def run(
                 f"for {metadata.site_name!r}: \n"
                 f"{traceback.format_exc()}"
             )
-
-        return True
+            return {"success": False, "requeue": True}
+        return {"success": True, "requeue": False}
 
     finally:
         murfey_db.close()
