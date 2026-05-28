@@ -188,11 +188,8 @@ def create_session(
     db.commit()
     sid = s.id
 
-    alert_end_time = prom.alert_end_time._value.get()  # timestamp
     if visit_end_time.end_time:
-        visit_end_timestamp = visit_end_time.end_time.timestamp()
-        if alert_end_time < visit_end_timestamp:
-            prom.alert_end_time.set(visit_end_timestamp)
+        prom.alert_end_time.labels(visit=visit).set(visit_end_time.end_time.timestamp())
 
     return sid
 

@@ -247,11 +247,8 @@ async def update_visit_end_time(
     db.commit()
 
     # Update the alert endtime on prometheus
-    alert_end_time = prom.alert_end_time._value.get()
     if end_time:
-        visit_end_timestamp = end_time.timestamp()
-        if alert_end_time < visit_end_timestamp:
-            prom.alert_end_time.set(visit_end_timestamp)
+        prom.alert_end_time.labels(visit=session_entry.visit).set(end_time.timestamp())
 
     # Update the multigrid controller
     data = {}
