@@ -26,15 +26,14 @@ router = APIRouter(
 )
 
 
-class FIBAtlasInfo(BaseModel):
-    file: Path | None = None
+class FIBAtlasFile(BaseModel):
+    file: Path
 
 
 @router.post("/sessions/{session_id}/register_atlas")
 def register_fib_atlas(
     session_id: int,
-    fib_atlas_info: FIBAtlasInfo,
-    db: Session = murfey_db,
+    fib_atlas: FIBAtlasFile,
 ):
     if _transport_object is None:
         logger.error("No Transport Manager object was set up")
@@ -44,7 +43,7 @@ def register_fib_atlas(
         {
             "register": "fib.register_atlas",
             "session_id": session_id,
-            "atlas_file": str(fib_atlas_info.file),
+            "atlas_file": str(fib_atlas.file),
         },
     )
 
