@@ -384,8 +384,11 @@ def test_run_with_db(
     # Run the function and check that it's run through to completion
     for test_file in test_files:
         run(
-            session_id=session_id,
-            file=test_file,
+            message={
+                "register": "fib.register_atlas",
+                "session_id": session_id,
+                "atlas_file": str(test_file),
+            },
             murfey_db=murfey_db_session,
         )
     assert mock_parse.call_count == len(test_files)
