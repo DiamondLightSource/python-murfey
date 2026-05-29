@@ -1,5 +1,4 @@
 import logging
-import os
 import traceback
 import xml.etree.ElementTree as ET
 from functools import cached_property
@@ -13,7 +12,6 @@ from pydantic import BaseModel, computed_field, model_validator
 from sqlmodel import Session, select
 
 import murfey.util.db as MurfeyDB
-from murfey.util.config import get_machine_config
 from murfey.util.fib import number_from_name
 
 logger = logging.getLogger("murfey.workflows.fib.register_atlas")
@@ -157,7 +155,7 @@ def _parse_metadata(file: Path, visit_name: str):
     )
 
 
-def _make_thumbnail(file: Path, metadata: FIBAtlasMetadata, visit_name: str, mode: int):
+def _make_thumbnail(file: Path, metadata: FIBAtlasMetadata, visit_name: str):
     img = PIL.Image.open(file)
     img.thumbnail((512, 512))
 
@@ -165,12 +163,8 @@ def _make_thumbnail(file: Path, metadata: FIBAtlasMetadata, visit_name: str, mod
     visit_idx = file.parts.index(visit_name)
     visit_dir = list(reversed(file.parents))[visit_idx]
 
-    # Construct processed directory and set permissions
-    processed_dir = visit_dir / "processed"
-    processed_dir.mkdir(exist_ok=True)
-    os.chmod(processed_dir, mode=mode)
-
     # Construct path to thumbnail
+    processed_dir = visit_dir / "processed"
     image_number = number_from_name(file.stem)
     save_path = (
         processed_dir
@@ -370,8 +364,6 @@ def run(
                 )
             ).one()
             visit_name = murfey_session.visit
-            instrument_name = murfey_session.instrument_name
-            machine_config = get_machine_config(instrument_name)[instrument_name]
         except Exception:
             logger.error(
                 "Exception encountered while querying Murfey database", exc_info=True
@@ -394,7 +386,6 @@ def run(
                 file=metadata.file,
                 metadata=metadata,
                 visit_name=visit_name,
-                mode=machine_config.mkdir_chmod,
             )
         except Exception:
             logger.warning(
