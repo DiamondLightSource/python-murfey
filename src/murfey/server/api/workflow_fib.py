@@ -1,7 +1,6 @@
 import json
 import logging
 import os
-from importlib.metadata import entry_points
 from pathlib import Path
 
 import numpy as np
@@ -11,6 +10,7 @@ from pydantic import BaseModel
 from sqlmodel import Session, select
 
 import murfey.util.db as MurfeyDB
+from murfey.server import _transport_object
 from murfey.server.api.auth import validate_instrument_token
 from murfey.server.murfey_db import murfey_db
 from murfey.util import sanitise_path
@@ -26,30 +26,25 @@ router = APIRouter(
 )
 
 
-class FIBAtlasInfo(BaseModel):
-    file: Path | None = None
+class FIBAtlasFile(BaseModel):
+    file: Path
 
 
 @router.post("/sessions/{session_id}/register_atlas")
 def register_fib_atlas(
     session_id: int,
-    fib_atlas_info: FIBAtlasInfo,
-    db: Session = murfey_db,
+    fib_atlas: FIBAtlasFile,
 ):
-    # See if the relevant workflow is available
-    if not (
-        workflow_search := list(
-            entry_points(group="murfey.workflows", name="fib.register_atlas")
-        )
-    ):
-        raise RuntimeError("Unable to find Murfey workflow to register FIB atlas")
-    workflow = workflow_search[0]
-
-    # Run the workflow
-    workflow.load()(
-        session_id=session_id,
-        file=fib_atlas_info.file,
-        murfey_db=db,
+    if _transport_object is None:
+        logger.error("No Transport Manager object was set up")
+        return None
+    _transport_object.send(
+        _transport_object.feedback_queue,
+        {
+            "register": "fib.register_atlas",
+            "session_id": session_id,
+            "atlas_file": str(fib_atlas.file),
+        },
     )
 
 

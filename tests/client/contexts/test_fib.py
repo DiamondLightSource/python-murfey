@@ -14,7 +14,6 @@ from murfey.client.contexts.fib import (
     FIBImage,
     _file_transferred_to,
     _get_source,
-    _number_from_name,
     _parse_boolean,
 )
 from murfey.util.models import LamellaSiteInfo
@@ -390,24 +389,6 @@ def fib_maps_images(visit_dir: Path):
 # -------------------------------------------------------------------------------------
 # Tests
 # -------------------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    "test_params",
-    (  # File name | Expected number
-        # AutoTEM examples
-        ("Lamella", 1),
-        ("Lamella (2)", 2),
-        ("Lamella (12)", 12),
-        # Maps examples
-        ("Electron Snapshot", 1),
-        ("Electron Snapshot (3)", 3),
-        ("Electron Snapshot (21)", 21),
-    ),
-)
-def test_number_from_name(test_params: tuple[str, int]):
-    name, number = test_params
-    assert _number_from_name(name) == number
 
 
 @pytest.mark.parametrize(
