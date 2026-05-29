@@ -1,4 +1,5 @@
 import logging
+import os
 import traceback
 import xml.etree.ElementTree as ET
 from functools import cached_property
@@ -12,6 +13,7 @@ from pydantic import BaseModel, computed_field, model_validator
 from sqlmodel import Session, select
 
 import murfey.util.db as MurfeyDB
+from murfey.util.config import get_machine_config
 from murfey.util.fib import number_from_name
 
 logger = logging.getLogger("murfey.workflows.fib.register_atlas")
@@ -25,6 +27,7 @@ class FIBAtlasMetadata(BaseModel):
 
     visit_name: str
     file: Path
+    thumbnail_path: Path | None = None
     # Acceleration voltage
     voltage: float
     # Beam shifts
@@ -79,16 +82,24 @@ class FIBAtlasMetadata(BaseModel):
     # mypy doesn't support decorators on @property
     @computed_field  # type: ignore
     @cached_property
-    def site_name(self) -> str:
+    def project_name(self) -> str:
         """
-        Create a site name for the current image based on the project name
-        and its slot number. This assumes a specific folder structure of
-        {visit_name}/maps/{project_name}
+        Extract the project name from the file path. This assumes a specific
+        folder structure of '{visit_name}/maps/{project_name}'.
         """
         path_parts = self.file.parts
         visit_idx = path_parts.index(self.visit_name)
-        project_name = path_parts[visit_idx + 2]  # {visit}/maps/{project_name}
-        return f"{project_name}--slot_{self.slot_number}"
+        return path_parts[visit_idx + 2]  # {visit}/maps/{project_name}
+
+    # mypy doesn't support decorators on @property
+    @computed_field  # type: ignore
+    @cached_property
+    def site_name(self) -> str:
+        """
+        Create a site name for the current image based on the project name
+        and its slot number.
+        """
+        return f"{self.project_name}--slot_{self.slot_number}"
 
 
 def _parse_metadata(file: Path, visit_name: str):
@@ -146,6 +157,35 @@ def _parse_metadata(file: Path, visit_name: str):
     )
 
 
+def _make_thumbnail(file: Path, metadata: FIBAtlasMetadata, visit_name: str, mode: int):
+    img = PIL.Image.open(file)
+    img.thumbnail((512, 512))
+
+    # Find visit directory path
+    visit_idx = file.parts.index(visit_name)
+    visit_dir = list(reversed(file.parents))[visit_idx]
+
+    # Construct processed directory and set permissions
+    processed_dir = visit_dir / "processed"
+    processed_dir.mkdir(exist_ok=True)
+    os.chmod(processed_dir, mode=mode)
+
+    # Construct path to thumbnail
+    image_number = number_from_name(file.stem)
+    save_path = (
+        processed_dir
+        / metadata.project_name
+        / f"grid_{metadata.slot_number}"
+        / "atlas"
+        / f"atlas_{str(image_number).zfill(2)}.png"
+    )
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Save the thumbnail
+    img.save(save_path)
+    return save_path
+
+
 def _register_fib_imaging_site(
     session_id: int,
     metadata: FIBAtlasMetadata,
@@ -171,6 +211,13 @@ def _register_fib_imaging_site(
         imaging_site.image_pixels_x = metadata.pixels_x
         imaging_site.image_pixels_y = metadata.pixels_y
         imaging_site.image_pixel_size = metadata.pixel_size
+
+        if metadata.thumbnail_path is not None:
+            scale = 512 / (max(metadata.pixels_x, metadata.pixels_y) or 1)
+            imaging_site.thumbnail_path = str(metadata.thumbnail_path)
+            imaging_site.thumbnail_pixels_x = int(round(metadata.pixels_x * scale)) or 1
+            imaging_site.thumbnail_pixels_y = int(round(metadata.pixels_y * scale)) or 1
+            imaging_site.thumbnail_pixel_size = metadata.pixel_size / scale
 
         return imaging_site
 
@@ -202,7 +249,7 @@ def _register_fib_imaging_site(
         else:
             current_number = 0
         # Update if incoming one is newer
-        if incoming_number > current_number:
+        if incoming_number >= current_number:
             fib_imaging_site = _update_entry(fib_imaging_site, metadata)
 
     murfey_db.add(fib_imaging_site)
@@ -323,6 +370,8 @@ def run(
                 )
             ).one()
             visit_name = murfey_session.visit
+            instrument_name = murfey_session.instrument_name
+            machine_config = get_machine_config(instrument_name)[instrument_name]
         except Exception:
             logger.error(
                 "Exception encountered while querying Murfey database", exc_info=True
@@ -338,6 +387,19 @@ def run(
                 exc_info=True,
             )
             return {"success": False, "requeue": False}
+
+        try:
+            # Make a thumbnail of the image and update metadata accordingly
+            metadata.thumbnail_path = _make_thumbnail(
+                file=metadata.file,
+                metadata=metadata,
+                visit_name=visit_name,
+                mode=machine_config.mkdir_chmod,
+            )
+        except Exception:
+            logger.warning(
+                f"Error creating thumbnail of file {fib_info.atlas_file}", exc_info=True
+            )
 
         try:
             # Register imaging site in Murfey, or update existing one
