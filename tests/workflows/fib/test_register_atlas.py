@@ -3,6 +3,8 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import ispyb.sqlalchemy as ISPyBDB
+import numpy as np
+import PIL.Image
 import pytest
 from pytest_mock import MockerFixture
 from sqlalchemy import select as sa_select
@@ -381,6 +383,12 @@ def test_run_with_db(
         "_register_fib_imaging_site",
     )
 
+    # Mock 'PIL.Image.open' and create a test image
+    mocker.patch(
+        "murfey.workflows.fib.register_atlas.PIL.Image.open",
+        return_value=PIL.Image.fromarray(np.ones((2048, 1152), dtype=np.uint8)),
+    )
+
     # Run the function and check that it's run through to completion
     for test_file in test_files:
         run(
@@ -436,3 +444,7 @@ def test_run_with_db(
         .all()
     )
     assert len(ispyb_atlas_search) == 1
+    ispyb_atlas_entry = ispyb_atlas_search[0]
+    assert ispyb_atlas_entry.atlasImage.endswith(
+        f"atlas_{str(mock_metadata[-1].slot_number).zfill(2)}.png"
+    )
