@@ -64,7 +64,7 @@ def test_register_fib_atlas(
             },
         )
     else:
-        mock_logger.error.assert_called_with("No Transport Manager object was set up")
+        mock_logger.error.assert_called_with("No TransportManager object was set up")
 
 
 @pytest.mark.asyncio
