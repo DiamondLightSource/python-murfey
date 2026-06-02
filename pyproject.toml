@@ -124,6 +124,7 @@ TomographyMetadataContext = "murfey.client.contexts.tomo_metadata:TomographyMeta
 "spa.ctf_estimated" = "murfey.workflows.spa.ctf_estimation:ctf_estimated"
 "spa.flush_spa_preprocess" = "murfey.workflows.spa.flush_spa_preprocess:flush_spa_preprocess"
 "spa.motion_corrected" = "murfey.workflows.spa.motion_correction:motion_corrected"
+"spa.register_foil_holes" = "murfey.workflows.spa.register_foil_holes:register_foil_holes"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

@@ -1,4 +1,5 @@
 import logging
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -12,8 +13,8 @@ from murfey.client.context import (
 )
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.util.client import capture_post
+from murfey.util.models import FoilHoleParameters
 from murfey.util.spa_metadata import (
-    FoilHoleInfo,
     get_grid_square_atlas_positions,
     grid_square_data,
 )
@@ -21,55 +22,75 @@ from murfey.util.spa_metadata import (
 logger = logging.getLogger("murfey.client.contexts.spa_metadata")
 
 
-def _foil_hole_positions(xml_path: Path, grid_square: int) -> Dict[str, FoilHoleInfo]:
-    with open(xml_path, "r") as xml:
-        for_parsing = xml.read()
-        data = xmltodict.parse(for_parsing)
-    data = data["GridSquareXml"]
-    if "TargetLocationsEfficient" in data["TargetLocations"].keys():
-        # Grids with regular foil holes
-        serialization_array = data["TargetLocations"]["TargetLocationsEfficient"][
-            "a:m_serializationArray"
-        ]
-    elif "TargetLocations" in data["TargetLocations"].keys():
-        # Lacey grids
-        serialization_array = data["TargetLocations"]["TargetLocations"][
-            "a:m_serializationArray"
-        ]
-    else:
+def _foil_hole_positions(
+    xml_path: Path, tag: str, grid_square: int
+) -> Dict[str, FoilHoleParameters]:
+    tree = ET.parse(xml_path)
+    for elem in tree.iter():
+        if "}" in elem.tag:
+            elem.tag = elem.tag.split("}")[1]
+    tree_root = tree.getroot()
+    target_locations = tree_root.find("TargetLocations")
+    serialization_array = None
+    if target_locations:
+        if eff_target_locations := target_locations.find("TargetLocationsEfficient"):
+            # Grids with regular foil holes
+            serialization_array = eff_target_locations.find("m_serializationArray")
+        elif eff_target_locations := target_locations.find("TargetLocations"):
+            # Lacey grids
+            serialization_array = eff_target_locations.find("m_serializationArray")
+    if not serialization_array:
         logger.warning(f"Target locations not found for {str(xml_path)}")
         return {}
-    required_key = ""
-    for key in serialization_array.keys():
-        if key.startswith("b:KeyValuePairOfintTargetLocation"):
-            required_key = key
-            break
-    if not required_key:
-        logger.info(f"Required key not found for {str(xml_path)}")
-        return {}
+
+    fh_blocks = [
+        i
+        for i in serialization_array.iter()
+        if "KeyValuePairOfintTargetLocationXml" in i.tag
+    ]
     foil_holes = {}
-    for fh_block in serialization_array[required_key]:
-        if fh_block["b:value"]["IsNearGridBar"] == "false":
-            image_paths = list(
-                (xml_path.parent.parent).glob(
-                    f"Images-Disc*/GridSquare_{grid_square}/FoilHoles/FoilHole_{fh_block['b:key']}_*.jpg"
+    for fh_block in fh_blocks:
+        fh_block_values = fh_block.find("value")
+        fh_key = fh_block.find("key")
+        if fh_key and fh_key.text and fh_block_values:
+            near_grid_bar = fh_block_values.find("IsNearGridBar")
+            if near_grid_bar and near_grid_bar.text == "false":
+                image_paths = list(
+                    (xml_path.parent.parent).glob(
+                        f"Images-Disc*/GridSquare_{grid_square}/FoilHoles/FoilHole_{fh_key.text}_*.jpg"
+                    )
                 )
-            )
-            image_paths.sort(key=lambda x: x.stat().st_ctime)
-            image_path: str = str(image_paths[-1]) if image_paths else ""
-            pix_loc = fh_block["b:value"]["PixelCenter"]
-            stage = fh_block["b:value"]["StagePosition"]
-            diameter = fh_block["b:value"]["PixelWidthHeight"]["c:width"]
-            foil_holes[fh_block["b:key"]] = FoilHoleInfo(
-                id=int(fh_block["b:key"]),
-                grid_square_id=grid_square,
-                x_location=int(float(pix_loc["c:x"])),
-                y_location=int(float(pix_loc["c:y"])),
-                x_stage_position=float(stage["c:X"]),
-                y_stage_position=float(stage["c:Y"]),
-                image=str(image_path),
-                diameter=int(float(diameter)),
-            )
+                image_paths.sort(key=lambda x: x.stat().st_ctime)
+                image_path: str = str(image_paths[-1]) if image_paths else ""
+                pix_loc = fh_block_values.find("PixelCenter")
+                stage = fh_block_values.find("StagePosition")
+                width_height = fh_block_values.find("PixelWidthHeight")
+                diameter = width_height.find("width") if width_height else None
+                if pix_loc and stage:
+                    x_pix = pix_loc.find("x")
+                    y_pix = pix_loc.find("y")
+                    x_stage = stage.find("X")
+                    y_stage = stage.find("Y")
+                    foil_holes[fh_key.text] = FoilHoleParameters(
+                        name=int(fh_key.text),
+                        tag=tag,
+                        x_location=int(float(x_pix.text))
+                        if (x_pix and x_pix.text)
+                        else None,
+                        y_location=int(float(y_pix.text))
+                        if (y_pix and y_pix.text)
+                        else None,
+                        x_stage_position=int(float(x_stage.text))
+                        if (x_stage and x_stage.text)
+                        else None,
+                        y_stage_position=int(float(y_stage.text))
+                        if (y_stage and y_stage.text)
+                        else None,
+                        image=str(image_path),
+                        diameter=int(float(diameter.text))
+                        if (diameter and diameter.text)
+                        else None,
+                    ).model_dump()
     return foil_holes
 
 
@@ -193,7 +214,6 @@ class SPAMetadataContext(Context):
             logger.info(
                 f"Collecting foil hole positions for {str(transferred_file)} and grid square {gs_name}"
             )
-            fh_positions = _foil_hole_positions(transferred_file, gs_name)
             visitless_source_search_dir = "/".join(
                 [part for part in source.parts if part != environment.visit]
             ).replace("//", "/")
@@ -209,6 +229,11 @@ class SPAMetadataContext(Context):
                     Path(visitless_source_search_dir) / "Images-Disc1"
                 ]
             visitless_source = str(visitless_source_images_dirs[-1])
+            fh_positions = _foil_hole_positions(
+                xml_path=transferred_file,
+                tag=visitless_source,
+                grid_square=gs_name,
+            )
 
             if fh_positions:
                 gs_info = grid_square_data(
@@ -244,44 +269,28 @@ class SPAMetadataContext(Context):
                     },
                 )
 
-            if gs_name not in self._registered_squares:
-                for fh, fh_data in fh_positions.items():
-                    capture_post(
-                        base_url=str(environment.url.geturl()),
-                        router_name="session_control.spa_router",
-                        function_name="register_foil_hole",
-                        token=self._token,
-                        instrument_name=environment.instrument_name,
-                        session_id=environment.murfey_session,
-                        gs_name=gs_name,
-                        data={
-                            "name": fh,
-                            "x_location": fh_data.x_location,
-                            "y_location": fh_data.y_location,
-                            "x_stage_position": fh_data.x_stage_position,
-                            "y_stage_position": fh_data.y_stage_position,
-                            "readout_area_x": fh_data.readout_area_x,
-                            "readout_area_y": fh_data.readout_area_y,
-                            "thumbnail_size_x": fh_data.thumbnail_size_x,
-                            "thumbnail_size_y": fh_data.thumbnail_size_y,
-                            "pixel_size": fh_data.pixel_size,
-                            "diameter": fh_data.diameter,
-                            "tag": visitless_source,
-                            "image": fh_data.image,
-                        },
-                    )
-                if fh_positions:
-                    capture_post(
-                        base_url=str(environment.url.geturl()),
-                        router_name="session_control.spa_router",
-                        function_name="register_square",
-                        token=self._token,
-                        instrument_name=environment.instrument_name,
-                        session_id=environment.murfey_session,
-                        gsid=gs_name,
-                        data={
-                            "tag": visitless_source,
-                            "count": len(self._registered_squares) + 1,
-                        },
-                    )
-                    self._registered_squares.add(gs_name)
+            if fh_positions and gs_name not in self._registered_squares:
+                capture_post(
+                    base_url=str(environment.url.geturl()),
+                    router_name="session_control.spa_router",
+                    function_name="register_foil_holes",
+                    token=self._token,
+                    instrument_name=environment.instrument_name,
+                    session_id=environment.murfey_session,
+                    gs_name=gs_name,
+                    data=fh_positions,
+                )
+                capture_post(
+                    base_url=str(environment.url.geturl()),
+                    router_name="session_control.spa_router",
+                    function_name="register_square",
+                    token=self._token,
+                    instrument_name=environment.instrument_name,
+                    session_id=environment.murfey_session,
+                    gsid=gs_name,
+                    data={
+                        "tag": visitless_source,
+                        "count": len(self._registered_squares) + 1,
+                    },
+                )
+                self._registered_squares.add(gs_name)

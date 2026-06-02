@@ -941,8 +941,8 @@ murfey.server.api.session_control.spa_router:
         type: int
     methods:
       - POST
-  - path: /session_control/spa/sessions/{session_id}/grid_square/{gs_name}/foil_hole
-    function: register_foil_hole
+  - path: /session_control/spa/sessions/{session_id}/grid_square/{gs_name}/foil_holes
+    function: register_foil_holes
     path_params:
       - name: gs_name
         type: int
