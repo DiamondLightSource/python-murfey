@@ -3,7 +3,6 @@ import logging
 from importlib.metadata import entry_points
 from typing import Any
 
-import ispyb.sqlalchemy._auto_db_schema as ISPyBDB
 from sqlmodel import Session as SQLModelSession, select
 
 import murfey.util.db as MurfeyDB
@@ -202,15 +201,28 @@ def _register_milling_step(
     if site_info.stage_info is None:
         logger.error("No stage info found in current message")
         return None
+    # Check that GridSquare has ID (for type checking)
+    if grid_square.id is None:
+        logger.error("Current GridSquare entry has no ID")
+        return None
 
     # Iteratively go through the LamellaSiteInfo model and insert for each step
     for steps, stage_name in MILLING_STEP_LOOKUP:
-        for step_name, step_id in steps:
+        for step_name, _ in steps:
             step_info: MillingStepInfo | None = site_info.steps.__getattribute__(
                 step_name
             )
+            # Early continues if key information is missing
             if step_info is None:
+                logger.debug(f"No step info found for {step_name}")
                 continue
+            if step_info.recipe_name is None:
+                logger.debug(f"No recipe name found for {step_name}")
+                continue
+            if step_info.step_name is None:
+                logger.debug(f"No step name found for {step_name}")
+                continue
+
             stage_values: StagePositionValues | None = (
                 site_info.stage_info.__getattribute__(stage_name)
             )
@@ -227,33 +239,33 @@ def _register_milling_step(
 
             if milling_step_entry is None:
                 # Create a new ISPyB entry if no Murfey one is found
-                record = ISPyBDB.MillingStep(
+                result = _transport_object.do_insert_milling_step(
                     # IDs
-                    millingStepNameId=step_id,
-                    gridSquareId=grid_square.id,
+                    recipe_name=step_info.recipe_name,
+                    activity_name=step_info.step_name,
+                    grid_square_id=grid_square.id,
                     # Values
-                    isEnabled=step_info.is_enabled,
+                    is_enabled=step_info.is_enabled,
                     status=step_info.status,
-                    executionTime=step_info.execution_time,
-                    stageX=stage_values.x,
-                    stageY=stage_values.y,
-                    stageZ=stage_values.z,
+                    execution_time=step_info.execution_time,
+                    stage_x=stage_values.x,
+                    stage_y=stage_values.y,
+                    stage_z=stage_values.z,
                     rotation=stage_values.rotation,
-                    alphaTilt=stage_values.tilt_alpha,
-                    beamType=step_info.beam_type,
-                    beamVoltage=step_info.voltage,
-                    beamCurrent=step_info.current,
-                    millingAngle=step_info.milling_angle,
-                    depthCorrection=step_info.depth_correction,
-                    lamellaOffset=step_info.lamella_offset,
-                    trenchHeightFront=step_info.trench_height_front,
-                    trenchHeightRear=step_info.trench_height_rear,
-                    widthOverlapFrontLeft=step_info.width_overlap_front_left,
-                    widthOverlapFrontRight=step_info.width_overlap_front_right,
-                    widthOverlapRearLeft=step_info.width_overlap_rear_left,
-                    widthOverlapRearRight=step_info.width_overlap_rear_right,
+                    tilt_alpha=stage_values.tilt_alpha,
+                    beam_type=step_info.beam_type,
+                    beam_voltage=step_info.voltage,
+                    beam_current=step_info.current,
+                    milling_angle=step_info.milling_angle,
+                    depth_correction=step_info.depth_correction,
+                    lamella_offset=step_info.lamella_offset,
+                    trench_height_front=step_info.trench_height_front,
+                    trench_height_rear=step_info.trench_height_rear,
+                    width_overlap_front_left=step_info.width_overlap_front_left,
+                    width_overlap_front_right=step_info.width_overlap_front_right,
+                    width_overlap_rear_left=step_info.width_overlap_rear_left,
+                    width_overlap_rear_right=step_info.width_overlap_rear_right,
                 )
-                result = _transport_object.do_insert_milling_step(record)
                 if result.get("return_value") is None:
                     logger.error(
                         f"No MillingStep entry created for {step_info.step_name}"

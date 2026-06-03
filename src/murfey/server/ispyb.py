@@ -21,6 +21,7 @@ from ispyb.sqlalchemy import (
     FoilHole,
     GridSquare,
     MillingStep,
+    MillingStepName,
     ProcessingJob,
     ProcessingJobParameter,
     Proposal,
@@ -711,9 +712,71 @@ class TransportManager:
             )
             return {"success": False, "return_value": None}
 
-    def do_insert_milling_step(self, record: MillingStep):
+    def do_insert_milling_step(
+        self,
+        # MillingStepName identifiers
+        recipe_name: str,
+        activity_name: str,
+        grid_square_id: int,
+        # Values
+        is_enabled: bool | None = None,
+        status: str | None = None,
+        execution_time: float | None = None,
+        stage_x: float | None = None,
+        stage_y: float | None = None,
+        stage_z: float | None = None,
+        rotation: float | None = None,
+        tilt_alpha: float | None = None,
+        beam_type: str | None = None,
+        beam_voltage: float | None = None,
+        beam_current: float | None = None,
+        milling_angle: float | None = None,
+        depth_correction: float | None = None,
+        lamella_offset: float | None = None,
+        trench_height_front: float | None = None,
+        trench_height_rear: float | None = None,
+        width_overlap_front_left: float | None = None,
+        width_overlap_front_right: float | None = None,
+        width_overlap_rear_left: float | None = None,
+        width_overlap_rear_right: float | None = None,
+    ):
         try:
             with ISPyBSession() as db:
+                # Find the ID of this MillingStep
+                milling_step_name = (
+                    db.query(MillingStepName)
+                    .filter(
+                        MillingStepName.recipe == recipe_name,
+                        MillingStepName.step == activity_name,
+                    )
+                    .one()
+                )
+                record = MillingStep(
+                    # IDs
+                    millingStepNameId=milling_step_name.millingStepNameId,
+                    gridSquareId=grid_square_id,
+                    # Values
+                    isEnabled=is_enabled,
+                    status=status,
+                    executionTime=execution_time,
+                    stageX=stage_x,
+                    stageY=stage_y,
+                    stageZ=stage_z,
+                    rotation=rotation,
+                    alphaTilt=tilt_alpha,
+                    beamType=beam_type,
+                    beamVoltage=beam_voltage,
+                    beamCurrent=beam_current,
+                    millingAngle=milling_angle,
+                    depthCorrection=depth_correction,
+                    lamellaOffset=lamella_offset,
+                    trenchHeightFront=trench_height_front,
+                    trenchHeightRear=trench_height_rear,
+                    widthOverlapFrontLeft=width_overlap_front_left,
+                    widthOverlapFrontRight=width_overlap_front_right,
+                    widthOverlapRearLeft=width_overlap_rear_left,
+                    widthOverlapRearRight=width_overlap_rear_right,
+                )
                 db.add(record)
                 db.commit()
                 log.info(f"Created MillingStep {record.millingStepId}")
