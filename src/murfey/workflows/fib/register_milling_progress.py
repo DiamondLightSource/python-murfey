@@ -8,7 +8,6 @@ from sqlmodel import Session as SQLModelSession, select
 
 import murfey.util.db as MurfeyDB
 from murfey.server import _transport_object
-from murfey.util.fib import number_from_name
 from murfey.util.models import (
     GridSquareParameters,
     LamellaSiteInfo,
@@ -40,6 +39,10 @@ def _ensure_prerequisites(
     if site_info.project_name is None:
         logger.error("Could not construct lookup tags; 'project_name' is missing")
         return None
+    if site_info.site_number is None:
+        logger.error("Could not construct lookup tags; 'site_number' is missing")
+        return None
+    site_number = site_info.site_number
     if site_info.stage_info is None:
         logger.error("Could not construct lookup tags; 'stage_info' is missing")
         return None
@@ -55,7 +58,6 @@ def _ensure_prerequisites(
         return None
 
     # Construct the DataCollectionGroup and GridSquare lookup tags
-    lamella_num = number_from_name(site_info.site_name)
     dcg_tag = f"{site_info.project_name}--slot_{slot_number}"
 
     # Determine variables to register data collection group and atlas with
@@ -101,7 +103,7 @@ def _ensure_prerequisites(
     grid_square_entry = murfey_db.exec(
         select(MurfeyDB.GridSquare)
         .where(MurfeyDB.GridSquare.session_id == session_id)
-        .where(MurfeyDB.GridSquare.name == lamella_num)
+        .where(MurfeyDB.GridSquare.name == site_number)
         .where(MurfeyDB.GridSquare.tag == dcg_tag)
     ).one_or_none()
     if grid_square_entry is None:
@@ -112,7 +114,7 @@ def _ensure_prerequisites(
         ).one()
         grid_square_ispyb_result = _transport_object.do_insert_grid_square(
             atlas_id=dcg_entry.atlas_id,
-            grid_square_id=lamella_num,
+            grid_square_id=site_number,
             grid_square_parameters=GridSquareParameters(
                 tag=dcg_tag,
             ),
@@ -120,7 +122,7 @@ def _ensure_prerequisites(
         # Register to Murfey
         grid_square_entry = MurfeyDB.GridSquare(
             id=grid_square_ispyb_result.get("return_value", None),
-            name=lamella_num,
+            name=site_number,
             session_id=session_id,
             tag=dcg_tag,
         )
@@ -226,7 +228,10 @@ def _register_milling_step(
             if milling_step_entry is None:
                 # Create a new ISPyB entry if no Murfey one is found
                 record = ISPyBDB.MillingStep(
+                    # IDs
                     millingStepNameId=step_id,
+                    gridSquareId=grid_square.id,
+                    # Values
                     isEnabled=step_info.is_enabled,
                     status=step_info.status,
                     executionTime=step_info.execution_time,
@@ -284,7 +289,7 @@ def _register_milling_step(
                 )
             else:
                 # Update the existing ISPyB one if it already exists
-                _transport_object.do_update_milling_step(
+                result = _transport_object.do_update_milling_step(
                     milling_step_id=milling_step_entry.id,
                     is_enabled=step_info.is_enabled,
                     status=step_info.status,
@@ -307,6 +312,11 @@ def _register_milling_step(
                     width_overlap_rear_left=step_info.width_overlap_rear_left,
                     width_overlap_rear_right=step_info.width_overlap_rear_right,
                 )
+                if result.get("return_value", None) is None:
+                    logger.error(
+                        f"Could not update MillingStep entry for {step_info.step_name}"
+                    )
+                    continue
 
                 # Update the existing Murfey one
                 milling_step_entry.is_enabled = step_info.is_enabled
