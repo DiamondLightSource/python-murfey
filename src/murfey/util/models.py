@@ -180,6 +180,7 @@ class MillingStepInfo(BaseModel):
     width_overlap_rear_right: float | None = None
 
     @field_validator("status", mode="before")
+    @classmethod
     def handle_stringified_none(cls, v: Any) -> None:
         if isinstance(v, str) and v.lower() == "none":
             return None
