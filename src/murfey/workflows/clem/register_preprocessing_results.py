@@ -59,11 +59,13 @@ class CLEMPreprocessingResult(BaseModel):
     @cached_property
     def is_denoised(self) -> bool:
         """
-        The "_Lng_LVCC" suffix appended to a CLEM dataset's position name indicates
-        that it's a denoised image set of the same position. These results should
-        override or supersede the original ones once they're available.
+        The "_Lng_LVCC" and "_Lng_SVCC" suffixes appended to a CLEM dataset's position
+        name indicate that it's a denoised image set of the same position. They should
+        override or supersede the original ones if they're present
         """
-        return "_Lng_LVCC" in self.series_name
+        return any(
+            pattern in self.series_name for pattern in ("_Lng_LVCC", "_Lng_SVCC")
+        )
 
     # Valid Pydantic decorator not supported by MyPy
     @computed_field  # type: ignore
@@ -73,7 +75,7 @@ class CLEMPreprocessingResult(BaseModel):
         Extract just the name of the site by removing the "_Lng_LVCC" suffix from
         the series name.
         """
-        return self.series_name.replace("_Lng_LVCC", "")
+        return self.series_name.replace("_Lng_LVCC", "").replace("_Lng_SVCC", "")
 
     # Valid Pydantic decorator not supported by MyPy
     @computed_field  # type: ignore
