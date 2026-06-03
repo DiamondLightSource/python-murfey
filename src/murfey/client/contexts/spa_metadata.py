@@ -73,10 +73,14 @@ def _foil_hole_positions(xml_path: Path, grid_square: int) -> Dict[str, FoilHole
     return foil_holes
 
 
-def _get_visitless_source(source: Path, environment: MurfeyInstanceEnvironment) -> str:
+def _get_visitless_source(
+    source: Path, environment: MurfeyInstanceEnvironment, skip_search: bool = False
+) -> str:
     visitless_source_search_dir = "/".join(
         [part for part in source.parts if part != environment.visit]
     ).replace("//", "/")
+    if skip_search:
+        return visitless_source_search_dir
     visitless_source_images_dirs = sorted(
         Path(visitless_source_search_dir).glob("Images-Disc*"),
         key=lambda x: x.stat().st_ctime,
@@ -131,7 +135,9 @@ class SPAMetadataContext(Context):
         if environment and transferred_file.suffix == ".mrc":
             source = _get_source(transferred_file, environment)
             if source:
-                visitless_source = _get_visitless_source(source, environment)
+                visitless_source = _get_visitless_source(
+                    source, environment, skip_search=True
+                )
                 capture_post(
                     base_url=str(environment.url.geturl()),
                     router_name="session_control.spa_router",
