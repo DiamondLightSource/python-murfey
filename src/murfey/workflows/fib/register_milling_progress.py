@@ -136,43 +136,43 @@ MILLING_STEP_LOOKUP = (
     # Preparation stage
     (
         (
-            ("eucentric_tilt", 2),
-            ("artificial_features", 5),
-            ("milling_angle", 8),
-            ("image_acquisition", 11),
-            ("lamella_placement", 14),
+            "eucentric_tilt",
+            "artificial_features",
+            "milling_angle",
+            "image_acquisition",
+            "lamella_placement",
         ),
         "preparation_site",
     ),
     # Milling stage
     (
         (
-            ("delay_1", 20),
-            ("reference_definition", 23),
-            ("reference_definition_electron", 26),
-            ("stress_relief_cuts", 29),
-            ("reference_redefinition_1", 32),
-            ("rough_milling", 35),
-            ("rough_milling_electron", 38),
-            ("reference_redefinition_2", 41),
-            ("medium_milling", 44),
-            ("medium_milling_electron", 47),
-            ("fine_milling", 50),
-            ("fine_milling_electron", 53),
-            ("finer_milling", 56),
-            ("finer_milling_electron", 59),
+            "delay_1",
+            "reference_definition",
+            "reference_definition_electron",
+            "stress_relief_cuts",
+            "reference_redefinition_1",
+            "rough_milling",
+            "rough_milling_electron",
+            "reference_redefinition_2",
+            "medium_milling",
+            "medium_milling_electron",
+            "fine_milling",
+            "fine_milling_electron",
+            "finer_milling",
+            "finer_milling_electron",
         ),
         "chunk_site",
     ),
     # Thinning stage
     (
         (
-            ("delay_2", 65),
-            ("polishing_1", 68),
-            ("polishing_1_electron", 71),
-            ("polishing_2", 74),
-            ("polishing_2_ion", 77),
-            ("polishing_2_electron", 80),
+            "delay_2",
+            "polishing_1",
+            "polishing_1_electron",
+            "polishing_2",
+            "polishing_2_ion",
+            "polishing_2_electron",
         ),
         "thinning_site",
     ),
@@ -208,7 +208,7 @@ def _register_milling_step(
 
     # Iteratively go through the LamellaSiteInfo model and insert for each step
     for steps, stage_name in MILLING_STEP_LOOKUP:
-        for step_name, _ in steps:
+        for step_name in steps:
             step_info: MillingStepInfo | None = site_info.steps.__getattribute__(
                 step_name
             )
