@@ -391,7 +391,7 @@ def run(message: dict[str, Any], murfey_db: SQLModelSession):
     # Milling step information
     if site_info.steps is None:
         logger.error("No milling step info found in current message")
-        return None
+        return {"success": False, "requeue": False}
     milling_steps = site_info.steps
 
     # Outer try-finally block to handle database cleanup
