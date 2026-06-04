@@ -1,7 +1,10 @@
 from pathlib import Path
+from typing import Any, cast
 from unittest.mock import MagicMock
 
+import ispyb.sqlalchemy._auto_db_schema as ISPyBDB
 from pytest_mock import MockerFixture
+from sqlalchemy import select as sa_select
 from sqlalchemy.orm import Session as SQLAlchemySession
 from sqlmodel import Session as SQLModelSession, select as sm_select
 
@@ -401,3 +404,64 @@ def test_run_with_db(
             murfey_db=murfey_db_session,
         )
     assert result.get("success", False)
+
+    # There should be a DataCollectionGroup entry in Murfey
+    dcg_murfey = murfey_db_session.exec(
+        sm_select(MurfeyDB.DataCollectionGroup)
+        .where(MurfeyDB.DataCollectionGroup.session_id == session_id)
+        .where(
+            MurfeyDB.DataCollectionGroup.tag == f"{site_info['project_name']}--slot_1"
+        )
+    ).one_or_none()
+    assert dcg_murfey is not None
+
+    # There should be a DataCollectionGroup entry in ISPyB
+    dcg_ispyb = ispyb_db_session.execute(
+        sa_select(ISPyBDB.DataCollectionGroup).where(
+            ISPyBDB.DataCollectionGroup.dataCollectionGroupId == dcg_murfey.id
+        )
+    ).scalar_one_or_none()
+    assert dcg_ispyb is not None
+
+    # There should be an Atlas in ISPyB
+    atlas_ispyb = ispyb_db_session.execute(
+        sa_select(ISPyBDB.Atlas).where(
+            ISPyBDB.Atlas.dataCollectionGroupId == dcg_ispyb.dataCollectionGroupId
+        )
+    ).scalar_one_or_none()
+    assert atlas_ispyb is not None
+
+    # There should be one GridSquare entry in ISPyB per lamella site tested
+    gs_ispyb_rows = (
+        ispyb_db_session.execute(
+            sa_select(ISPyBDB.GridSquare).where(
+                ISPyBDB.GridSquare.atlasId == atlas_ispyb.atlasId
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert len(gs_ispyb_rows) >= 1
+    gs_ispyb = gs_ispyb_rows[0]
+
+    steps = cast(dict[str, Any], site_info["steps"])
+
+    # There should be one MillingStep entry in ISPyB for each step in the message
+    milling_step_ispyb_rows = (
+        ispyb_db_session.execute(
+            sa_select(ISPyBDB.MillingStep).where(
+                ISPyBDB.MillingStep.gridSquareId == gs_ispyb.gridSquareId
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert len(milling_step_ispyb_rows) == len(steps.keys())
+
+    # There should be the same thing in Murfey
+    milling_step_murfey_rows = murfey_db_session.exec(
+        sm_select(MurfeyDB.MillingStep).where(
+            MurfeyDB.MillingStep.grid_square_id == gs_ispyb.gridSquareId
+        )
+    ).all()
+    assert len(milling_step_murfey_rows) == len(steps.keys())
