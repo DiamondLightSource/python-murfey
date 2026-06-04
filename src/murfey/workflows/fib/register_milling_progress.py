@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import json
 import logging
 from importlib.metadata import entry_points
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sqlmodel import Session as SQLModelSession, select
 
@@ -11,8 +13,14 @@ from murfey.util.models import (
     GridSquareParameters,
     LamellaSiteInfo,
     MillingStepInfo,
+    MillingSteps,
+    StagePositionInfo,
     StagePositionValues,
 )
+
+if TYPE_CHECKING:
+    from murfey.server.ispyb import TransportManager
+
 
 logger = logging.getLogger("murfey.workflows.fib.register_milling_progress")
 
@@ -21,7 +29,10 @@ def _ensure_prerequisites(
     session_id: int,
     instrument_name: str,
     visit_name: str,
-    site_info: LamellaSiteInfo,
+    project_name: str,
+    slot_number: int,
+    site_number: int,
+    transport_object: TransportManager,
     murfey_db: SQLModelSession,
 ):
     """
@@ -29,35 +40,8 @@ def _ensure_prerequisites(
     Atlas, and GridSquare placeholders in Murfey if they don't already exist
 
     """
-    # Skip this step if no TransportManager object is configured
-    if _transport_object is None:
-        logger.error("No TransportManager object was configured")
-        return None
-
-    # Early exits if information needed to construct lookup tags are missing
-    if site_info.project_name is None:
-        logger.error("Could not construct lookup tags; 'project_name' is missing")
-        return None
-    if site_info.site_number is None:
-        logger.error("Could not construct lookup tags; 'site_number' is missing")
-        return None
-    site_number = site_info.site_number
-    if site_info.stage_info is None:
-        logger.error("Could not construct lookup tags; 'stage_info' is missing")
-        return None
-    if site_info.stage_info.preparation_site is None:
-        logger.error("Could not construct lookup tags; 'preparation_site' is missing")
-        return None
-    if site_info.stage_info.preparation_site.slot_number is None:
-        logger.error("Could not construct lookup tags; 'slot_number' is missing")
-        return None
-    slot_number = site_info.stage_info.preparation_site.slot_number
-    if site_info.site_name is None:
-        logger.error("Could not construct lookup tags; 'site_name' is missing")
-        return None
-
     # Construct the DataCollectionGroup and GridSquare lookup tags
-    dcg_tag = f"{site_info.project_name}--slot_{slot_number}"
+    dcg_tag = f"{project_name}--slot_{slot_number}"
 
     # Determine variables to register data collection group and atlas with
     proposal_code = "".join(char for char in visit_name.split("-")[0] if char.isalpha())
@@ -111,7 +95,7 @@ def _ensure_prerequisites(
             .where(MurfeyDB.DataCollectionGroup.session_id == session_id)
             .where(MurfeyDB.DataCollectionGroup.tag == dcg_tag)
         ).one()
-        grid_square_ispyb_result = _transport_object.do_insert_grid_square(
+        grid_square_ispyb_result = transport_object.do_insert_grid_square(
             atlas_id=dcg_entry.atlas_id,
             grid_square_id=site_number,
             grid_square_parameters=GridSquareParameters(
@@ -180,8 +164,10 @@ MILLING_STEP_LOOKUP = (
 
 
 def _register_milling_step(
-    site_info: LamellaSiteInfo,
+    milling_steps: MillingSteps,
+    stage_info: StagePositionInfo,
     grid_square: MurfeyDB.GridSquare,
+    transport_object: TransportManager,
     murfey_db: SQLModelSession,
 ):
     """
@@ -189,18 +175,6 @@ def _register_milling_step(
     in ISPyB. If successful, will proceed to create a backup copy of the inserted row
     in Murfey.
     """
-
-    # Check if TransportManager has been configured
-    if _transport_object is None:
-        logger.error("No TransportManager object was configured")
-        return None
-    # Check information for milling steps is present
-    if site_info.steps is None:
-        logger.error("No milling step info found in current message")
-        return None
-    if site_info.stage_info is None:
-        logger.error("No stage info found in current message")
-        return None
     # Check that GridSquare has ID (for type checking)
     if grid_square.id is None:
         logger.error("Current GridSquare entry has no ID")
@@ -209,7 +183,7 @@ def _register_milling_step(
     # Iteratively go through the LamellaSiteInfo model and insert for each step
     for steps, stage_name in MILLING_STEP_LOOKUP:
         for step_name in steps:
-            step_info: MillingStepInfo | None = site_info.steps.__getattribute__(
+            step_info: MillingStepInfo | None = milling_steps.__getattribute__(
                 step_name
             )
             # Early continues if key information is missing
@@ -223,8 +197,8 @@ def _register_milling_step(
                 logger.debug(f"No step name found for {step_name}")
                 continue
 
-            stage_values: StagePositionValues | None = (
-                site_info.stage_info.__getattribute__(stage_name)
+            stage_values: StagePositionValues | None = stage_info.__getattribute__(
+                stage_name
             )
             if stage_values is None:
                 stage_values = StagePositionValues()
@@ -239,7 +213,7 @@ def _register_milling_step(
 
             if milling_step_entry is None:
                 # Create a new ISPyB entry if no Murfey one is found
-                result = _transport_object.do_insert_milling_step(
+                result = transport_object.do_insert_milling_step(
                     # IDs
                     recipe_name=step_info.recipe_name,
                     activity_name=step_info.step_name,
@@ -301,7 +275,7 @@ def _register_milling_step(
                 )
             else:
                 # Update the existing ISPyB one if it already exists
-                result = _transport_object.do_update_milling_step(
+                result = transport_object.do_update_milling_step(
                     milling_step_id=milling_step_entry.id,
                     is_enabled=step_info.is_enabled,
                     status=step_info.status,
@@ -368,20 +342,60 @@ def _register_milling_step(
 
 
 def run(message: dict[str, Any], murfey_db: SQLModelSession):
+    # Early exit if no TransportManager was set up
+    if _transport_object is None:
+        logger.error("No TransportManager object was configured")
+        return {"success": False, "requeue": False}
+
+    try:
+        # Parse and unpack incoming message
+        session_id = int(message["session_id"])
+        site_info = LamellaSiteInfo(**message["site_info"])
+        logger.debug(
+            "Received the following FIB metadata for registration:\n"
+            f"{json.dumps(site_info.model_dump(exclude_none=True), indent=2, default=str)}"
+        )
+    except Exception:
+        logger.error("Error parsing contents of message", exc_info=True)
+        return {"success": False, "requeue": False}
+
+    # Early exits if information needed to construct lookup tags are missing
+    # Project and site values
+    if site_info.project_name is None:
+        logger.error("Could not construct lookup tags; 'project_name' is missing")
+        return {"success": False, "requeue": False}
+    project_name = site_info.project_name
+    if site_info.site_number is None:
+        logger.error("Could not construct lookup tags; 'site_number' is missing")
+        return {"success": False, "requeue": False}
+    site_number = site_info.site_number
+    if site_info.site_name is None:
+        logger.error("Could not construct lookup tags; 'site_name' is missing")
+        return {"success": False, "requeue": False}
+    site_name = site_info.site_name
+
+    # Stage information
+    if site_info.stage_info is None:
+        logger.error("Could not construct lookup tags; 'stage_info' is missing")
+        return {"success": False, "requeue": False}
+    stage_info = site_info.stage_info
+    if stage_info.preparation_site is None:
+        logger.error("Could not construct lookup tags; 'preparation_site' is missing")
+        return {"success": False, "requeue": False}
+    preparation_site = stage_info.preparation_site
+    if preparation_site.slot_number is None:
+        logger.error("Could not construct lookup tags; 'slot_number' is missing")
+        return {"success": False, "requeue": False}
+    slot_number = preparation_site.slot_number
+
+    # Milling step information
+    if site_info.steps is None:
+        logger.error("No milling step info found in current message")
+        return None
+    milling_steps = site_info.steps
+
     # Outer try-finally block to handle database cleanup
     try:
-        try:
-            # Parse and unpack incoming message
-            session_id = int(message["session_id"])
-            site_info = LamellaSiteInfo(**message["site_info"])
-            logger.debug(
-                "Received the following FIB metadata for registration:\n"
-                f"{json.dumps(site_info.model_dump(exclude_none=True), indent=2, default=str)}"
-            )
-        except Exception:
-            logger.error("Error parsing contents of message", exc_info=True)
-            return {"success": False, "requeue": False}
-
         try:
             # Load instrument name and visit ID
             murfey_session = murfey_db.exec(
@@ -401,7 +415,10 @@ def run(message: dict[str, Any], murfey_db: SQLModelSession):
                 session_id=session_id,
                 instrument_name=instrument_name,
                 visit_name=visit_name,
-                site_info=site_info,
+                project_name=project_name,
+                slot_number=slot_number,
+                site_number=site_number,
+                transport_object=_transport_object,
                 murfey_db=murfey_db,
             )
         except Exception:
@@ -412,15 +429,17 @@ def run(message: dict[str, Any], murfey_db: SQLModelSession):
             return {"success": False, "requeue": False}
         if grid_square_entry is None:
             logger.error(
-                f"Could not create GridSquare database entry for site {site_info.site_name}"
+                f"Could not create GridSquare database entry for site {site_name}"
             )
             return {"success": False, "requeue": False}
 
         try:
             # Insert or update MillingStep entries
             _register_milling_step(
-                site_info=site_info,
+                milling_steps=milling_steps,
+                stage_info=stage_info,
                 grid_square=grid_square_entry,
+                transport_object=_transport_object,
                 murfey_db=murfey_db,
             )
         except Exception:
@@ -429,9 +448,7 @@ def run(message: dict[str, Any], murfey_db: SQLModelSession):
                 exc_info=True,
             )
             return {"success": False, "requeue": False}
-        logger.info(
-            f"Successfully registered milling progress of site {site_info.site_name}"
-        )
+        logger.info(f"Successfully registered milling progress of site {site_name}")
         return {"success": True}
     finally:
         murfey_db.close()
