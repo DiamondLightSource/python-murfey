@@ -73,6 +73,27 @@ def _foil_hole_positions(xml_path: Path, grid_square: int) -> Dict[str, FoilHole
     return foil_holes
 
 
+def _get_visitless_source(
+    source: Path, environment: MurfeyInstanceEnvironment, skip_search: bool = False
+) -> str:
+    visitless_source_search_dir = "/".join(
+        [part for part in source.parts if part != environment.visit]
+    ).replace("//", "/")
+    if skip_search:
+        return visitless_source_search_dir
+    visitless_source_images_dirs = sorted(
+        Path(visitless_source_search_dir).glob("Images-Disc*"),
+        key=lambda x: x.stat().st_ctime,
+    )
+    if not visitless_source_images_dirs:
+        logger.warning(f"Cannot find Images-Disc* in {visitless_source_search_dir}")
+        visitless_source_images_dirs = [
+            Path(visitless_source_search_dir) / "Images-Disc1"
+        ]
+    visitless_source = str(visitless_source_images_dirs[-1])
+    return visitless_source
+
+
 class SPAMetadataContext(Context):
     def __init__(
         self,
@@ -85,8 +106,54 @@ class SPAMetadataContext(Context):
         self._basepath = basepath
         self._machine_config = machine_config
         self._registered_squares: set[int] = set()
+        self._registered_squares_serialem: set[str] = set()
 
     def post_transfer(
+        self,
+        transferred_file: Path,
+        environment: Optional[MurfeyInstanceEnvironment] = None,
+        **kwargs,
+    ):
+        super().post_transfer(
+            transferred_file=transferred_file,
+            environment=environment,
+            **kwargs,
+        )
+        if self._acquisition_software == "serialem":
+            self.post_transfer_serialem(
+                transferred_file, environment=environment, **kwargs
+            )
+        else:
+            self.post_transfer_epu(transferred_file, environment=environment, **kwargs)
+
+    def post_transfer_serialem(
+        self,
+        transferred_file: Path,
+        environment: Optional[MurfeyInstanceEnvironment] = None,
+        **kwargs,
+    ):
+        if environment and transferred_file.suffix == ".mrc":
+            source = _get_source(transferred_file, environment)
+            if source:
+                visitless_source = _get_visitless_source(
+                    source, environment, skip_search=True
+                )
+                capture_post(
+                    base_url=str(environment.url.geturl()),
+                    router_name="session_control.spa_router",
+                    function_name="register_square",
+                    token=self._token,
+                    instrument_name=environment.instrument_name,
+                    session_id=environment.murfey_session,
+                    gsid=transferred_file.stem,
+                    data={
+                        "tag": visitless_source,
+                        "count": len(self._registered_squares_serialem) + 1,
+                    },
+                )
+                self._registered_squares_serialem.add(transferred_file.stem)
+
+    def post_transfer_epu(
         self,
         transferred_file: Path,
         environment: Optional[MurfeyInstanceEnvironment] = None,
@@ -194,21 +261,7 @@ class SPAMetadataContext(Context):
                 f"Collecting foil hole positions for {str(transferred_file)} and grid square {gs_name}"
             )
             fh_positions = _foil_hole_positions(transferred_file, gs_name)
-            visitless_source_search_dir = "/".join(
-                [part for part in source.parts if part != environment.visit]
-            ).replace("//", "/")
-            visitless_source_images_dirs = sorted(
-                Path(visitless_source_search_dir).glob("Images-Disc*"),
-                key=lambda x: x.stat().st_ctime,
-            )
-            if not visitless_source_images_dirs:
-                logger.warning(
-                    f"Cannot find Images-Disc* in {visitless_source_search_dir}"
-                )
-                visitless_source_images_dirs = [
-                    Path(visitless_source_search_dir) / "Images-Disc1"
-                ]
-            visitless_source = str(visitless_source_images_dirs[-1])
+            visitless_source = _get_visitless_source(source, environment)
 
             if fh_positions:
                 gs_info = grid_square_data(
