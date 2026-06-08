@@ -104,31 +104,32 @@ async def make_gif(
                 continue
 
     # Load the images as PIL Image objects
-    images = [PIL.Image.open(f) for f in gif_params.images]
-    for im in images:
-        im.thumbnail((512, 512))
-
-    # Normalize and convert individual frames to 8-bit
     arr: list[np.ndarray] = []
-    for im in images:
-        frame = np.array(im).astype(np.float32)
-        vmin, vmax = np.percentile(frame, (0.5, 99.5))
-        scale = 255 / ((vmax - vmin) or 1)
-        np.clip(frame, a_min=vmin, a_max=vmax, out=frame)
-        np.subtract(frame, vmin, out=frame)
-        np.multiply(frame, scale, out=frame)
-        arr.append(frame.astype(np.uint8))
+    for f in gif_params.images:
+        with PIL.Image.open(f) as im:
+            im.thumbnail((512, 512))
+            frame = np.array(im, dtype=np.float32)
+            vmin, vmax = np.percentile(frame, (0.5, 99.5))
+            scale = 255 / ((vmax - vmin) or 1)
+            np.clip(frame, a_min=vmin, a_max=vmax, out=frame)
+            np.subtract(frame, vmin, out=frame)
+            np.multiply(frame, scale, out=frame)
+            arr.append(frame.astype(np.uint8))
     arr = np.array(arr).astype(np.uint8)
 
     # Convert back to PIL.Image objects and save as GIF
-    converted = [PIL.Image.fromarray(arr[f], mode="L") for f in range(len(images))]
-    converted[0].save(
-        output_file,
-        format="GIF",
-        append_images=converted[1:],
-        save_all=True,
-        duration=30,
-        loop=0,
-    )
-    logger.info(f"Created GIF file {output_file}")
-    return {"output_gif": str(output_file)}
+    try:
+        converted = [PIL.Image.fromarray(a, mode="L") for a in arr]
+        converted[0].save(
+            output_file,
+            format="GIF",
+            append_images=converted[1:],
+            save_all=True,
+            duration=30,
+            loop=0,
+        )
+        logger.info(f"Created GIF file {output_file}")
+        return {"output_gif": str(output_file)}
+    finally:
+        for im in converted:
+            im.close()
