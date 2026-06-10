@@ -61,6 +61,7 @@ class RSyncer(Observer):
         local: bool = False,
         do_transfer: bool = True,
         remove_files: bool = False,
+        chmod: str = "D0750,F0750",
         required_substrings_for_removal: List[str] = [],
         substrings_blacklist: dict[str, list[str]] = {},
         notify: bool = True,
@@ -75,6 +76,7 @@ class RSyncer(Observer):
         self._local = local
         self._do_transfer = do_transfer
         self._remove_files = remove_files
+        self._chmod = chmod
         self._required_substrings_for_removal = required_substrings_for_removal
         self._substrings_blacklist = substrings_blacklist
         self._notify = notify
@@ -501,7 +503,7 @@ class RSyncer(Observer):
             # Needed as a pair to trigger permission modifications
             # Ref: https://serverfault.com/a/796341
             "-p",
-            "--chmod=D0750,F0750",  # Use extended chmod format
+            f"--chmod={self._chmod}",  # Set permissions for transferred files and folders
         ]
         # Add file locations
         rsync_cmd.extend([".", self._remote])

@@ -38,7 +38,7 @@ def set_up_db(murfey_db_session: Session):
         ProcessingJob,
         lookup_kwargs={
             "id": 1,
-            "recipe": "sxt-tomo-align",
+            "recipe": "sxt-aretomo",
             "dc_id": dc_entry.id,
         },
     )
@@ -92,7 +92,7 @@ def test_process_new_sxt_tilt_series(
                 "manual_tilt_offset": -1,
                 "node_creator_queue": "node_creator",
             },
-            "recipes": ["sxt-tomo-align"],
+            "recipes": ["sxt-aretomo"],
         },
         new_connection=True,
     )

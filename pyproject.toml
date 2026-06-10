@@ -7,7 +7,7 @@ requires = [
 
 [project]
 name = "murfey"
-version = "0.24.2"
+version = "0.25.3"
 description = "Client-Server architecture hauling Cryo-EM data"
 readme = "README.md"
 keywords = [
@@ -72,7 +72,8 @@ smartem = [
     "smartem-decisions[backend]",
 ]
 sxt = [
-    "txrm2tiff",
+    "numpy<3",
+    "olefile",
 ]
 [project.urls]
 Bug-Tracker = "https://github.com/DiamondLightSource/python-murfey/issues"

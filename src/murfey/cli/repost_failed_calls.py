@@ -93,7 +93,6 @@ def handle_failed_posts(messages_path: list[Path], murfey_db: Session):
     # These imports need to happen after transport object is configured
     import murfey.server.api.auth
     import murfey.server.api.bootstrap
-    import murfey.server.api.clem
     import murfey.server.api.display
     import murfey.server.api.file_io_frontend
     import murfey.server.api.file_io_instrument
@@ -106,6 +105,7 @@ def handle_failed_posts(messages_path: list[Path], murfey_db: Session):
     import murfey.server.api.session_info
     import murfey.server.api.websocket
     import murfey.server.api.workflow
+    import murfey.server.api.workflow_clem
 
     for json_file in messages_path:
         with open(json_file, "r") as json_data:

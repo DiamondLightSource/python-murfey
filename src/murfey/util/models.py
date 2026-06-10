@@ -5,11 +5,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, computed_field, field_validator
 
 """
+=======================================================================================
 General Models
-==============
+=======================================================================================
 Models used in multiple workflows.
 """
 
@@ -91,8 +92,144 @@ class UpstreamFileRequestInfo(BaseModel):
 
 
 """
+=======================================================================================
+FIB
+=======================================================================================
+Models related to the FIB workflow.
+"""
+
+
+class StagePositionValues(BaseModel):
+    # Coordinates are in metres
+    x: float | None = None
+    y: float | None = None
+    z: float | None = None
+    # Angles are in degrees
+    rotation: float | None = None
+    tilt_alpha: float | None = None
+
+    @computed_field
+    def slot_number(self) -> int | None:
+        if self.x is None:
+            return None
+        return 1 if self.x < 0 else 2
+
+
+class StagePositionInfo(BaseModel):
+    """
+    Stage position values associated with the different stages of the milling
+    process. The XML paths they're associated with (with "Site" as the parent
+    node) are indicated in the comments.
+
+    The image acquisition steps have a "SiteLocationType" field that appear to
+    be associated with either "ChunkSiteLocation" or "ThinningSiteLocation".
+    "ThinningStagePosition" appears to be a duplicate of "ThinningSiteLocation"
+    so far, and it is unclear for now what stages "PreparationSiteLocation" and
+    "ChunkCoincidenceStagePosition" currently correspond to.
+    """
+
+    # Top-level values
+    preparation_site: StagePositionValues | None = (
+        None  # PreparationSiteLocation/StagePosition/StagePosition
+    )
+    chunk_site: StagePositionValues | None = (
+        None  # ChunkSiteLocation/StagePosition/StagePosition
+    )
+    thinning_site: StagePositionValues | None = (
+        None  # ThinningSiteLocation/StagePosition/StagePosition
+    )
+    # Stored under Parameters
+    chunk_coincidence_params: StagePositionValues | None = (
+        None  # Parameters/ChunkCoincidenceStagePosition/StagePosition
+    )
+    thinning_params: StagePositionValues | None = (
+        None  # Parameters/ThinningStagePosition/StagePosition
+    )
+
+
+class MillingStepInfo(BaseModel):
+    """
+    These are the parameters configured per milling step that we are interested
+    in tracking. Some attributes are present only for certain steps.
+    """
+
+    # Step setup
+    step_name: str | None = None
+    recipe_name: str | None = None
+    is_enabled: bool | None = None
+    status: str | None = None
+    execution_time: float | None = None
+
+    # Associated stage position information
+    site_location_type: str | None = None
+
+    # Beam info
+    beam_type: str | None = None
+    voltage: float | None = None
+    current: float | None = None
+
+    # Milling info
+    milling_angle: float | None = None
+    depth_correction: float | None = None
+    lamella_offset: float | None = None
+    trench_height_front: float | None = None
+    trench_height_rear: float | None = None
+    width_overlap_front_left: float | None = None
+    width_overlap_front_right: float | None = None
+    width_overlap_rear_left: float | None = None
+    width_overlap_rear_right: float | None = None
+
+
+class MillingSteps(BaseModel):
+    # Processing steps supported by AutoTEM
+    # Preparation stage
+    eucentric_tilt: MillingStepInfo | None = None
+    artificial_features: MillingStepInfo | None = None
+    milling_angle: MillingStepInfo | None = None
+    image_acquisition: MillingStepInfo | None = None
+    lamella_placement: MillingStepInfo | None = None
+    # Milling stage
+    delay_1: MillingStepInfo | None = None
+    reference_definition: MillingStepInfo | None = None
+    reference_definition_electron: MillingStepInfo | None = None
+    stress_relief_cuts: MillingStepInfo | None = None
+    reference_redefinition_1: MillingStepInfo | None = None
+    rough_milling: MillingStepInfo | None = None
+    rough_milling_electron: MillingStepInfo | None = None
+    reference_redefinition_2: MillingStepInfo | None = None
+    medium_milling: MillingStepInfo | None = None
+    medium_milling_electron: MillingStepInfo | None = None
+    fine_milling: MillingStepInfo | None = None
+    fine_milling_electron: MillingStepInfo | None = None
+    finer_milling: MillingStepInfo | None = None
+    finer_milling_electron: MillingStepInfo | None = None
+    # Thinning stage
+    delay_2: MillingStepInfo | None = None
+    polishing_1: MillingStepInfo | None = None
+    polishing_1_electron: MillingStepInfo | None = None
+    polishing_2: MillingStepInfo | None = None
+    polishing_2_ion: MillingStepInfo | None = None
+    polishing_2_electron: MillingStepInfo | None = None
+
+
+class LamellaSiteInfo(BaseModel):
+    """
+    Pydantic model that stores all the metadata of interest for a single lamella
+    site.
+    """
+
+    # Values not associated with a single step
+    project_name: str | None = None
+    site_name: str | None = None
+    site_number: int | None = None
+    stage_info: StagePositionInfo | None = None
+    steps: MillingSteps | None = None
+
+
+"""
+=======================================================================================
 Single Particle Analysis
-========================
+=======================================================================================
 Models related to the single-particle analysis workflow.
 """
 
@@ -218,8 +355,9 @@ class Token(BaseModel):
 
 
 """
+=======================================================================================
 Tomography
-==========
+=======================================================================================
 Models related to the tomographic reconstruction workflow.
 """
 

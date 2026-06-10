@@ -63,7 +63,9 @@ class Analyser(Observer):
         self._acquisition_software = ""
         self._context: Context | None = None
         self.queue: queue.Queue = queue.Queue()
-        self.thread = threading.Thread(name="Analyser", target=self._analyse_in_thread)
+        self.thread = threading.Thread(
+            name=f"Analyser {basepath_local}", target=self._analyse_in_thread
+        )
         self._stopping = False
         self._halt_thread = False
         self._murfey_config = (
@@ -399,6 +401,7 @@ class Analyser(Observer):
                     "AtlasContext"
                     | "CLEMContext"
                     | "FIBContext"
+                    | "SIMContext"
                     | "SPAMetadataContext"
                     | "SXTContext"
                     | "TomographyMetadataContext"
@@ -408,7 +411,9 @@ class Analyser(Observer):
                     )
                     self.post_transfer(transferred_file)
                 case "SPAContext":
-                    logger.debug(f"File {transferred_file.name!r} is part of the atlas")
+                    logger.debug(
+                        f"File {transferred_file.name!r} transferred with context {self._context.name}"
+                    )
                     self.post_transfer(transferred_file)
 
                     # Find extension
@@ -444,7 +449,9 @@ class Analyser(Observer):
                             self.notify(dc_metadata)
 
                 case "TomographyContext":
-                    logger.debug(f"File {transferred_file.name!r} is part of the atlas")
+                    logger.debug(
+                        f"File {transferred_file.name!r} transferred with context {self._context.name}"
+                    )
                     self.post_transfer(transferred_file)
 
                     # Find extension

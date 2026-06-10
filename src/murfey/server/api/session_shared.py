@@ -31,9 +31,9 @@ def remove_session_by_id(session_id: int, db):
     # Don't remove prometheus metrics if there are other sessions using them
     if len(sessions_for_visit) == 1:
         safe_run(
-            prom.monitoring_switch.remove,
+            prom.alert_end_time.remove,
             args=(session.visit,),
-            label="monitoring_switch",
+            label="alert_end_time",
         )
         rsync_instances = db.exec(
             select(RsyncInstance).where(RsyncInstance.session_id == session_id)

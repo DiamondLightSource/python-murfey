@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from logging import getLogger
 from pathlib import Path
@@ -33,7 +34,9 @@ router = APIRouter(
 
 
 class SuggestedPathParameters(BaseModel):
-    base_path: Path
+    base_path: (
+        Path  # Partial Path starting from immediately after the rsync destination
+    )
     touch: bool = False
     extra_directory: str = ""
 
@@ -82,13 +85,17 @@ def suggest_path(
             raise FileNotFoundError(log_message)
 
     check_path_name = check_path.name
-    while check_path.exists():
-        count = count + 1 if count else 2
-        check_path = check_path.parent / f"{check_path_name}{count}"
+    if not machine_config.single_data_directory:
+        while check_path.exists():
+            count = count + 1 if count else 2
+            check_path = check_path.parent / f"{check_path_name}{count}"
     if params.touch:
-        check_path.mkdir(mode=0o750)
+        check_path.mkdir(exist_ok=True)
+        os.chmod(check_path, mode=machine_config.mkdir_chmod)
         if params.extra_directory:
-            (check_path / secure_filename(params.extra_directory)).mkdir(mode=0o750)
+            extra_dir = check_path / secure_filename(params.extra_directory)
+            extra_dir.mkdir(exist_ok=True)
+            os.chmod(extra_dir, mode=machine_config.mkdir_chmod)
     return {"suggested_path": check_path.relative_to(rsync_basepath)}
 
 
@@ -100,19 +107,35 @@ class Dest(BaseModel):
 def make_rsyncer_destination(session_id: int, destination: Dest, db=murfey_db):
     secure_path_parts = [secure_filename(p) for p in destination.destination.parts]
     destination_path = "/".join(secure_path_parts)
-    instrument_name = (
-        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
-    )
+    session_entry = db.exec(select(Session).where(Session.id == session_id)).one()
+    instrument_name = session_entry.instrument_name
+    visit = session_entry.visit
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
     if not machine_config:
         raise ValueError("No machine configuration set when making rsyncer destination")
+
+    # Make the destination directory and all parents
     full_destination_path = (
         machine_config.rsync_basepath or Path("")
     ).resolve() / destination_path
-    for parent_path in full_destination_path.parents:
-        parent_path.mkdir(mode=0o750, exist_ok=True)
+    full_destination_path.mkdir(parents=True, exist_ok=True)
+
+    # Change permissions for every folder after the visit directory
+    try:
+        visit_index = full_destination_path.parts.index(visit)
+    except ValueError:
+        logger.error(f"Could not find directory level {visit!r} in destination path")
+        raise
+    current_path = full_destination_path.parents[-(visit_index + 1)]
+    for part in full_destination_path.parts[visit_index + 1 :]:
+        current_path = current_path / part
+        try:
+            os.chmod(current_path, mode=machine_config.mkdir_chmod)
+        except PermissionError:
+            logger.warning(f"Unable to change permissions for {current_path}")
+            continue
     return destination
 
 

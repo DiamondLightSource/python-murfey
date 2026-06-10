@@ -4,7 +4,6 @@ from logging import getLogger
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import numpy as np
 import sqlalchemy
 from fastapi import APIRouter, Depends
 from ispyb.sqlalchemy import (
@@ -19,11 +18,6 @@ from pydantic import BaseModel
 from sqlalchemy.exc import NoResultFound, OperationalError
 from sqlmodel import col, select
 from werkzeug.utils import secure_filename
-
-try:
-    from PIL import Image
-except ImportError:
-    Image = None
 
 import murfey.server
 
@@ -295,11 +289,15 @@ class DCParameters(BaseModel):
     tag: str
     source: str
     magnification: float
-    total_exposed_dose: Optional[float] = None
-    c2aperture: Optional[float] = None
-    exposure_time: Optional[float] = None
-    slit_width: Optional[float] = None
+    total_exposed_dose: float | None = None
+    c2aperture: float | None = None
+    exposure_time: float | None = None
+    slit_width: float | None = None
     phase_plate: bool = False
+    energy: float | None = None
+    axis_start: float | None = None
+    axis_end: float | None = None
+    tilt_series_length: int | None = None
     data_collection_tag: str = ""
 
 
@@ -329,6 +327,7 @@ def start_dc(
         "image_directory": str(rsync_basepath / dc_params.image_directory),
         "start_time": str(datetime.now()),
         "voltage": dc_params.voltage,
+        "energy": dc_params.energy,
         "pixel_size": str(float(dc_params.pixel_size_on_image) * 1e9),
         "image_suffix": dc_params.file_extension,
         "experiment_type": dc_params.experiment_type,
@@ -343,6 +342,9 @@ def start_dc(
         "exposure_time": dc_params.exposure_time,
         "slit_width": dc_params.slit_width,
         "phase_plate": dc_params.phase_plate,
+        "axis_start": dc_params.axis_start,
+        "axis_end": dc_params.axis_end,
+        "tilt_series_length": dc_params.tilt_series_length,
         "session_id": session_id,
     }
 
@@ -618,10 +620,6 @@ async def request_spa_preprocessing(
 
         db.close()
 
-        if not mrc_out.parent.exists():
-            Path(secure_filename(str(mrc_out))).parent.mkdir(
-                parents=True, exist_ok=True
-            )
         recipe_name = machine_config.recipes.get(
             "em-spa-preprocess", "em-spa-preprocess"
         )
@@ -854,8 +852,6 @@ async def request_tomography_preprocessing(
         dcid = data_collection[0][1].id
         appid = data_collection[0][3].id
         murfey_ids = _murfey_id(appid, db, number=1, close=False)
-        if not mrc_out.parent.exists():
-            mrc_out.parent.mkdir(parents=True, exist_ok=True)
 
         session_processing_parameters = db.exec(
             select(SessionProcessingParameters).where(
@@ -1006,8 +1002,6 @@ def register_completed_tilt_series(
                 / "tomograms"
                 / f"{ts.tag}_stack.mrc"
             )
-            if not stack_file.parent.exists():
-                stack_file.parent.mkdir(parents=True)
             tilt_offset = midpoint([float(get_angle(t)) for t in tilts])
             zocalo_message = {
                 "recipes": ["em-tomo-align"],
@@ -1216,69 +1210,3 @@ def register_sample_image(
     if murfey.server._transport_object:
         return murfey.server._transport_object.do_insert_sample_image(record)
     return {"success": False}
-
-
-class MillingParameters(BaseModel):
-    lamella_number: int
-    images: List[str]
-    raw_directory: str
-
-
-@correlative_router.post(
-    "/year/{year}/visits/{visit_name}/sessions/{session_id}/make_milling_gif"
-)
-async def make_gif(
-    year: int,
-    visit_name: str,
-    session_id: int,
-    gif_params: MillingParameters,
-    db: Session = murfey_db,
-):
-    instrument_name = (
-        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
-    )
-    machine_config = get_machine_config(instrument_name=instrument_name)[
-        instrument_name
-    ]
-    output_dir = (
-        (machine_config.rsync_basepath or Path("")).resolve()
-        / secure_filename(str(year))
-        / secure_filename(visit_name)
-        / "processed"
-    )
-    output_dir.mkdir(exist_ok=True)
-    output_dir = output_dir / secure_filename(gif_params.raw_directory)
-    output_dir.mkdir(exist_ok=True)
-    output_path = output_dir / f"lamella_{gif_params.lamella_number}_milling.gif"
-
-    if Image is not None:
-        images = [Image.open(f) for f in gif_params.images]
-    else:
-        images = []
-    for im in images:
-        im.thumbnail((512, 512))
-
-    # Normalize and convert individual frames to 8-bit
-    arr: list[np.ndarray] = []
-    for im in images:
-        frame = np.array(im).astype(np.float32)
-        vmin, vmax = np.percentile(frame, (0.5, 99.5))
-        scale = 255 / ((vmax - vmin) or 1)
-        np.clip(frame, a_min=vmin, a_max=vmax, out=frame)
-        np.subtract(frame, vmin, out=frame)
-        np.multiply(frame, scale, out=frame)
-        arr.append(frame.astype(np.uint8))
-    arr = np.array(arr).astype(np.uint8)
-
-    # Convert back to Image objects and save as GIF
-    converted = [Image.fromarray(arr[f], mode="L") for f in range(len(images))]
-    converted[0].save(
-        output_path,
-        format="GIF",
-        append_images=converted[1:],
-        save_all=True,
-        duration=30,
-        loop=0,
-    )
-
-    return {"output_gif": str(output_path)}

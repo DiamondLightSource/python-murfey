@@ -378,6 +378,7 @@ class MultigridController:
                 stop_callback=self._rsyncer_stopped,
                 do_transfer=self.do_transfer,
                 remove_files=remove_files,
+                chmod=self._machine_config.get("rsync_chmod", "D0750,F0750"),
                 substrings_blacklist=self._machine_config.get(
                     "substrings_blacklist", {"directories": [], "files": []}
                 ),

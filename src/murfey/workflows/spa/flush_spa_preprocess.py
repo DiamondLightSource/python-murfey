@@ -533,10 +533,7 @@ def flush_spa_preprocess(message: dict, murfey_db: Session) -> dict[str, bool]:
             )
             foil_hole_id = None
 
-        mrcp = Path(f.mrc_out)
         ppath = Path(f.file_path)
-        if not mrcp.parent.exists():
-            mrcp.parent.mkdir(parents=True)
         movie = Movie(
             murfey_id=murfey_ids[2 * i],
             data_collection_id=collected_ids[1].id,

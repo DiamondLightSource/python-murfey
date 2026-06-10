@@ -326,7 +326,7 @@ class CLEMContext(Context):
         try:
             capture_post(
                 base_url=str(environment.url.geturl()),
-                router_name="clem.router",
+                router_name="workflow_clem.router",
                 function_name="process_raw_lifs",
                 token=self._token,
                 instrument_name=environment.instrument_name,
@@ -351,7 +351,7 @@ class CLEMContext(Context):
         try:
             capture_post(
                 base_url=str(environment.url.geturl()),
-                router_name="clem.router",
+                router_name="workflow_clem.router",
                 function_name="process_raw_tiffs",
                 token=self._token,
                 instrument_name=environment.instrument_name,

@@ -1,48 +1,185 @@
 from __future__ import annotations
 
 import logging
-import re
 import threading
-from datetime import datetime
+import xml.etree.ElementTree as ET
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import NamedTuple
-
-import xmltodict
+from typing import Callable, Type, TypeVar
 
 from murfey.client.context import Context
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.util.client import capture_post
+from murfey.util.fib import number_from_name
+from murfey.util.models import (
+    LamellaSiteInfo,
+    MillingStepInfo,
+    MillingSteps,
+    StagePositionInfo,
+    StagePositionValues,
+)
 
 logger = logging.getLogger("murfey.client.contexts.fib")
 
 lock = threading.Lock()
 
 
-class Lamella(NamedTuple):
-    name: str
-    number: int
-    angle: float | None = None
+T = TypeVar("T")
 
 
-class MillingProgress(NamedTuple):
-    file: Path
-    timestamp: float
-
-
-def _number_from_name(name: str) -> int:
+def _parse_xml_text(
+    node: ET.Element,
+    path: str,
+    func: Callable[[str], T] | Type,
+) -> T | None:
     """
-    In the AutoTEM and Maps workflows for the FIB, the sites and images are
-    auto-incremented with parenthesised numbers (e.g. "Lamella (2)"), with
-    the first site/image typically not having a number.
-
-    This function extracts the number from the file name, and returns 1 if
-    no such number is found.
+    Searches the XML Element using the provided path. If a matching node is found,
+    and it has a text attribute, processes the text using the provided function.
+    Otherwise, returns None.
     """
-    return (
-        int(match.group(1))
-        if (match := re.search(r"^[\w\s]+\((\d+)\)$", name)) is not None
-        else 1
-    )
+    if (match := node.find(path)) is None or (text := match.text) is None:
+        return None
+    try:
+        return func(text)
+    except (ValueError, TypeError):
+        logger.error(f"Error parsing XML text {text} at path {path}", exc_info=True)
+        return None
+
+
+SI_UNITS_KEY = {
+    # Length
+    "mm": 1e-3,
+    "um": 1e-6,
+    "μm": 1e-6,
+    "nm": 1e-9,
+    # Current
+    "mA": 1e-3,
+    "uA": 1e-6,
+    "μA": 1e-6,
+    "nA": 1e-9,
+    "pA": 1e-12,
+    # Voltage
+    "kV": 1e3,
+    "mV": 1e-3,
+    # Time
+    "ms": 1e-3,
+    "us": 1e-6,
+    "μs": 1e-6,
+    # Miscallenous
+    "%": 0.01,
+}
+
+
+def _parse_measurement(text: str):
+    """
+    The measurements in the ProjectData.dat file are stored in a human-readable format
+    as strings. This helper function converts them into their base SI unit and returns
+    the value as a float.
+
+    E.g. 5 um will be parsed as 0.000005
+    """
+    try:
+        value, unit = (s.strip() for s in text.split(" ", 1))
+        return float(value) * SI_UNITS_KEY.get(unit, 1)
+    except ValueError:
+        logger.warning(f"Could not parse {value} as a measurement")
+        return None
+
+
+def _parse_boolean(text: str):
+    """
+    Parses the XML element's text field and returns it as a Python boolean
+    """
+    if text.strip().lower() in ("true", "t", "1"):
+        return True
+    elif text.strip().lower() in ("false", "f", "0"):
+        return False
+    else:
+        logger.warning(f"Could not parse {text} as a boolean")
+        return None
+
+
+MILLING_STEP_NAMES = {
+    # Map unique activity name to class attribute
+    # Preparation stage
+    "Preparation - Eucentric Tilt": "eucentric_tilt",
+    "Preparation - Artificial Features": "artificial_features",
+    "Preparation - Milling Angle": "milling_angle",
+    "Preparation - Image Acquisition": "image_acquisition",
+    "Preparation - Lamella Placement": "lamella_placement",
+    # Milling stage
+    "Milling - Delay": "delay_1",
+    "Milling - Reference Definition": "reference_definition",
+    "Milling - Electron Reference Definition": "reference_definition_electron",
+    "Milling - Stress Relief Cuts": "stress_relief_cuts",
+    "Milling - Reference Redefinition 1": "reference_redefinition_1",
+    "Milling - Rough Milling": "rough_milling",
+    "Milling - Rough Milling - Electron Image": "rough_milling_electron",
+    "Milling - Reference Redefinition 2": "reference_redefinition_2",
+    "Milling - Medium Milling": "medium_milling",
+    "Milling - Medium Milling - Electron Image": "medium_milling_electron",
+    "Milling - Fine Milling": "fine_milling",
+    "Milling - Fine Milling - Electron Image": "fine_milling_electron",
+    "Milling - Finer Milling": "finer_milling",
+    "Milling - Finer Milling - Electron Image": "finer_milling_electron",
+    # Thinning stage
+    "Thinning - Delay": "delay_2",
+    "Thinning - Polishing 1": "polishing_1",
+    "Thinning - Polishing 1 - Electron Image": "polishing_1_electron",
+    "Thinning - Polishing 2": "polishing_2",
+    "Thinning - Polishing 2 - Ion Image": "polishing_2_ion",
+    "Thinning - Polishing 2 - Electron Image": "polishing_2_electron",
+}
+
+
+STAGE_POSITION_VALUES = {
+    # Map class attribute to element name
+    # Paths are relative to the "StagePosition" node
+    "x": "X",
+    "y": "Y",
+    "z": "Z",
+    "rotation": "R",
+    "tilt_alpha": "AT",
+}
+
+
+STAGE_POSITION_NAMES = {
+    # Map class attribute to element name
+    # Paths are relative to the "Site" node
+    "preparation_site": "PreparationSiteLocation/StagePosition/StagePosition",
+    "chunk_site": "ChunkSiteLocation/StagePosition/StagePosition",
+    "thinning_site": "ThinningSiteLocation/StagePosition/StagePosition",
+    "chunk_coincidence_params": "Parameters/ChunkCoincidenceStagePosition/StagePosition",
+    "thinning_params": "Parameters/ThinningStagePosition/StagePosition",
+}
+
+
+ACTIVITY_FIELD_MAP = (
+    # Model field name | Path relative to "Activity" | Function to apply
+    # These are relative to the "Activity" node
+    # Common parameters
+    ("is_enabled", "IsEnabled", _parse_boolean),
+    ("status", "ActivityMetadata/ExecutionResult", str),
+    ("execution_time", "ExecutionTime", _parse_measurement),
+    # Milling/Imaging beam parameters
+    ("site_location_type", "SiteLocationType", str),
+    ("beam_type", "MillingPreset/BeamType", str),
+    ("beam_type", "BeamPreset/BeamType", str),
+    ("voltage", "MillingPreset/HighVoltage", _parse_measurement),
+    ("voltage", "BeamPreset/HighVoltage", _parse_measurement),
+    ("current", "MillingPreset/BeamCurrent", _parse_measurement),
+    ("current", "BeamPreset/BeamCurrent", _parse_measurement),
+    # Milling parameters
+    ("depth_correction", "DepthCorrection", float),
+    ("milling_angle", "MillingAngle", _parse_measurement),
+    ("lamella_offset", "OffsetFromLamella", _parse_measurement),
+    ("trench_height_front", "FrontTrenchHeight", _parse_measurement),
+    ("trench_height_rear", "RearTrenchHeight", _parse_measurement),
+    ("width_overlap_front_left", "LamellaFrontLeftWidthOverlap", _parse_measurement),
+    ("width_overlap_front_right", "LamellaFrontRightWidthOverlap", _parse_measurement),
+    ("width_overlap_rear_left", "LamellaRearLeftWidthOverlap", _parse_measurement),
+    ("width_overlap_rear_right", "LamellaRearRightWidthOverlap", _parse_measurement),
+)
 
 
 def _get_source(file_path: Path, environment: MurfeyInstanceEnvironment) -> Path | None:
@@ -73,6 +210,13 @@ def _file_transferred_to(
     return destination
 
 
+@dataclass
+class FIBImage:
+    images: list[Path] = field(default_factory=list)
+    output_file: Path | None = None
+    is_submitted: bool = False
+
+
 class FIBContext(Context):
     def __init__(
         self,
@@ -84,8 +228,8 @@ class FIBContext(Context):
         super().__init__("FIBContext", acquisition_software, token)
         self._basepath = basepath
         self._machine_config = machine_config
-        self._milling: dict[int, list[MillingProgress]] = {}
-        self._lamellae: dict[int, Lamella] = {}
+        self._site_info: dict[int, LamellaSiteInfo] = {}
+        self._drift_correction_images: dict[int, FIBImage] = {}
 
     def post_transfer(
         self,
@@ -96,106 +240,101 @@ class FIBContext(Context):
         super().post_transfer(transferred_file, environment=environment, **kwargs)
         if environment is None:
             logger.warning("No environment passed in")
-            return
+            return None
 
         # -----------------------------------------------------------------------------
         # AutoTEM
         # -----------------------------------------------------------------------------
         if self._acquisition_software == "autotem":
-            parts = transferred_file.parts
-            if "DCImages" in parts and transferred_file.suffix == ".png":
-                lamella_name = parts[parts.index("Sites") + 1]
-                lamella_number = _number_from_name(lamella_name)
-                time_from_name = transferred_file.name.split("-")[:6]
-                timestamp = datetime.timestamp(
-                    datetime(
-                        year=int(time_from_name[0]),
-                        month=int(time_from_name[1]),
-                        day=int(time_from_name[2]),
-                        hour=int(time_from_name[3]),
-                        minute=int(time_from_name[4]),
-                        second=int(time_from_name[5]),
-                    )
-                )
-                if not self._lamellae.get(lamella_number):
-                    self._lamellae[lamella_number] = Lamella(
-                        name=lamella_name,
-                        number=lamella_number,
-                    )
-                if not (source := _get_source(transferred_file, environment)):
-                    logger.warning(f"No source found for file {transferred_file}")
-                    return
-                if not (
-                    destination_file := _file_transferred_to(
-                        environment=environment,
-                        source=source,
-                        file_path=transferred_file,
-                        rsync_basepath=Path(
-                            self._machine_config.get("rsync_basepath", "")
-                        ),
-                    )
-                ):
-                    logger.warning(
-                        f"File {transferred_file.name!r} not found on storage system"
-                    )
-                    return
-                if not self._milling.get(lamella_number):
-                    self._milling[lamella_number] = [
-                        MillingProgress(
-                            timestamp=timestamp,
-                            file=destination_file,
+            if transferred_file.name == "ProjectData.dat":
+                logger.info(f"Found metadata file {transferred_file} for parsing")
+
+                # Parse the metadata file
+                all_site_info_new = self._parse_autotem_metadata(transferred_file)
+                for site_num, site_info_new in all_site_info_new.items():
+                    # Post the data to the backend if it's been changed
+                    if (
+                        data := site_info_new.model_dump(exclude_none=True)
+                    ) != self._site_info.get(site_num, LamellaSiteInfo()).model_dump(
+                        exclude_none=True
+                    ):
+                        capture_post(
+                            base_url=str(environment.url.geturl()),
+                            router_name="workflow_fib.router",
+                            function_name="register_fib_milling_progress",
+                            token=self._token,
+                            instrument_name=environment.instrument_name,
+                            data=data,
+                            # Endpoint kwargs
+                            session_id=environment.murfey_session,
                         )
-                    ]
-                else:
-                    self._milling[lamella_number].append(
-                        MillingProgress(
-                            timestamp=timestamp,
-                            file=destination_file,
-                        )
-                    )
-                gif_list = [
-                    l.file
-                    for l in sorted(
-                        self._milling[lamella_number], key=lambda x: x.timestamp
-                    )
-                ]
-                raw_directory = Path(
-                    environment.default_destinations[self._basepath]
-                ).name
-                # Submit job to backend to construct a GIF
-                capture_post(
-                    base_url=str(environment.url.geturl()),
-                    router_name="workflow.correlative_router",
-                    function_name="make_gif",
-                    token=self._token,
-                    instrument_name=environment.instrument_name,
-                    year=datetime.now().year,
-                    visit_name=environment.visit,
-                    session_id=environment.murfey_session,
-                    data={
-                        "lamella_number": lamella_number,
-                        "images": [str(file) for file in gif_list],
-                        "raw_directory": raw_directory,
-                    },
-                )
-            elif transferred_file.name == "ProjectData.dat":
-                with open(transferred_file, "r") as dat:
-                    try:
-                        for_parsing = dat.read()
-                    except Exception:
-                        logger.warning(f"Failed to parse file {transferred_file}")
-                        return
-                    metadata = xmltodict.parse(for_parsing)
-                sites = metadata["AutoTEM"]["Project"]["Sites"]["Site"]
-                for site in sites:
-                    number = _number_from_name(site["Name"])
-                    milling_angle = site["Workflow"]["Recipe"][0]["Activities"][
-                        "MillingAngleActivity"
-                    ].get("MillingAngle")
-                    if self._lamellae.get(number) and milling_angle:
-                        self._lamellae[number]._replace(
-                            angle=float(milling_angle.split(" ")[0])
-                        )
+
+                        # Update existing dict
+                        self._site_info[site_num] = site_info_new
+                        logger.info(f"Updating metadata for site {site_num}")
+
+                    # Post drift correction GIF request if it hasn't already been done
+                    fib_image = self._drift_correction_images.get(site_num, None)
+                    if fib_image is not None and not fib_image.is_submitted:
+                        # Construct the output file name if it doesn't already exist
+                        if (output_file := fib_image.output_file) is None:
+                            source = _get_source(transferred_file, environment)
+                            if source is None:
+                                logger.warning(
+                                    f"No source found for file {transferred_file}"
+                                )
+                                continue
+                            destination_file = _file_transferred_to(
+                                environment=environment,
+                                source=source,
+                                file_path=transferred_file,
+                                rsync_basepath=Path(
+                                    self._machine_config.get("rsync_basepath", "")
+                                ),
+                            )
+                            if destination_file is None:
+                                logger.warning(
+                                    f"Could not find destination file path for {transferred_file.name!r}"
+                                )
+                                continue
+                            output_dir = self._determine_output_dir(
+                                site_num, destination_file, environment
+                            )
+                            if output_dir is None:
+                                logger.warning(
+                                    f"Could not determine output directory for lamella {site_num}"
+                                )
+                                continue
+                            output_file = (
+                                output_dir
+                                / "drift_correction"
+                                / f"lamella_{site_num}.gif"
+                            )
+                            with lock:
+                                self._drift_correction_images[
+                                    site_num
+                                ].output_file = output_file
+                            # Reload the new object
+                            fib_image = self._drift_correction_images[site_num]
+
+                        if self._make_gif(
+                            environment=environment,
+                            lamella_number=site_num,
+                            images=sorted(fib_image.images),
+                            output_file=output_file,
+                        ):
+                            with lock:
+                                self._drift_correction_images[
+                                    site_num
+                                ].is_submitted = True
+                return None
+
+            elif (
+                "DCImages" in transferred_file.parts
+                and transferred_file.suffix == ".png"
+            ):
+                self._make_drift_correction_gif(transferred_file, environment)
+
         # -----------------------------------------------------------------------------
         # Maps
         # -----------------------------------------------------------------------------
@@ -205,33 +344,293 @@ class FIBContext(Context):
                 "Electron Snapshot" in transferred_file.name
                 and transferred_file.suffix in (".tif", ".tiff")
             ):
-                if not (source := _get_source(transferred_file, environment)):
+                source = _get_source(transferred_file, environment)
+                if source is None:
                     logger.warning(f"No source found for file {transferred_file}")
-                    return
-                if not (
-                    destination_file := _file_transferred_to(
-                        environment=environment,
-                        source=source,
-                        file_path=transferred_file,
-                        rsync_basepath=Path(
-                            self._machine_config.get("rsync_basepath", "")
-                        ),
-                    )
-                ):
+                    return None
+                destination_file = _file_transferred_to(
+                    environment=environment,
+                    source=source,
+                    file_path=transferred_file,
+                    rsync_basepath=Path(self._machine_config.get("rsync_basepath", "")),
+                )
+                if destination_file is None:
                     logger.warning(
-                        f"File {transferred_file.name!r} not found on storage system"
+                        f"Could not find destination file path for {transferred_file.name!r}"
                     )
-                    return
+                    return None
 
                 # Register image in database
                 self._register_atlas(destination_file, environment)
-                return
+                return None
 
         # -----------------------------------------------------------------------------
         # Meteor
         # -----------------------------------------------------------------------------
         elif self._acquisition_software == "meteor":
             pass
+
+    def _parse_autotem_metadata(self, file: Path):
+        """
+        Helper function to parse the 'ProjectData.dat' file produced by the AutoTEM.
+        This file contains metadata information on the milling sites set by the user,
+        along with the configured milling steps and their completion status.
+        """
+
+        all_site_info: dict[int, LamellaSiteInfo] = {}
+        try:
+            root = ET.parse(file).getroot()
+        except Exception:
+            logger.warning(f"Error parsing file {str(file)}", exc_info=True)
+            return all_site_info
+
+        # Get the project name
+        if (project_name := _parse_xml_text(root, ".//Project/Name", str)) is None:
+            logger.warning("Metadata file has no project name")
+            return all_site_info
+
+        # Find all the Site nodes
+        if not (sites := root.findall(".//Sites/Site")):
+            logger.warning(f"No site information found in {str(file)}")
+            return all_site_info
+
+        # Iterate through Site nodes
+        for site in sites:
+            # Extract site name and number
+            if (site_name := _parse_xml_text(site, "Name", str)) is None:
+                logger.warning("Current site doesn't have a name")
+                continue
+            site_num = number_from_name(site_name)
+            site_info = LamellaSiteInfo(
+                project_name=project_name,
+                site_name=site_name,
+                site_number=site_num,
+                steps=MillingSteps(),
+            )
+
+            # Extract stage position information for all known stages in current site
+            site_info.stage_info = StagePositionInfo()
+            for stage_name, stage_path in STAGE_POSITION_NAMES.items():
+                if (stage := site.find(stage_path)) is not None:
+                    stage_values = StagePositionValues()
+                    for value_name, value_path in STAGE_POSITION_VALUES.items():
+                        if (
+                            value := _parse_xml_text(
+                                stage, value_path, _parse_measurement
+                            )
+                        ) is not None:
+                            stage_values.__setattr__(value_name, value)
+                    site_info.stage_info.__setattr__(stage_name, stage_values)
+
+            # Find all Recipe nodes for the Site
+            if not (recipes := site.findall("Workflow/Recipe")):
+                # Early skip if no recipes are found
+                logger.warning(f"No recipes found for site {site_name}")
+                continue
+
+            # Create dataclasses for each site
+            for recipe in recipes:
+                if (recipe_name := _parse_xml_text(recipe, "Name", str)) is None:
+                    # Early skip if the Recipe has no Name
+                    logger.warning("Recipe doesn't have a name, skipping")
+                    continue
+
+                # Find all the nodes under Activities
+                if (activities := recipe.find("Activities")) is None:
+                    # Early skip if none exist
+                    logger.warning(f"Recipe {recipe_name} doesn't have any activities")
+                    continue
+
+                # Iterate through the activities
+                for activity in activities:
+                    if (
+                        activity_name := _parse_xml_text(activity, "Name", str)
+                    ) is None:
+                        # Early skip if activity has no name
+                        logger.warning(
+                            f"Activitiy in recipe {recipe_name} doesn't have a name, skipping"
+                        )
+                        continue
+
+                    # Create a unique name based on recipe and activity names
+                    unique_name = f"{recipe_name} - {activity_name}"
+                    step_info = MillingStepInfo(
+                        step_name=activity_name, recipe_name=recipe_name
+                    )
+
+                    # Iteratively update fields in the MillingSteps model it's not None
+                    for field_name, path, func in ACTIVITY_FIELD_MAP:
+                        if (value := _parse_xml_text(activity, path, func)) is not None:
+                            step_info.__setattr__(field_name, value)
+
+                    # Add info for current step to the site info model
+                    site_info.steps.__setattr__(
+                        MILLING_STEP_NAMES[unique_name], step_info
+                    )
+
+            # Add info for current site to the dict
+            all_site_info[site_num] = site_info
+
+        logger.info(f"Successfully extracted AutoTEM metadata from file {file}")
+        return all_site_info
+
+    def _determine_output_dir(
+        self,
+        lamella_number: int,
+        destination_file: Path,
+        environment: MurfeyInstanceEnvironment,
+    ):
+        """
+        Helper function to determine the output directory for the current lamella site
+        on the server side.
+        """
+        # Early exits if data for creating output path is absent
+        # No site info
+        if (site_info := self._site_info.get(lamella_number)) is None:
+            logger.debug(f"No metadata found for site {lamella_number} yet")
+            return None
+        # No project name
+        if (project_name := site_info.project_name) is None:
+            logger.warning(f"No project name associated with site {lamella_number}")
+            return None
+        # No stage position information
+        if all(
+            getattr(site_info.stage_info, stage_name, None) is None
+            for stage_name in STAGE_POSITION_NAMES.keys()
+        ):
+            logger.warning(
+                f"No stage position information associated with site {lamella_number}"
+            )
+            return None
+        # Determine the slot number
+        slot_number: int | None = None
+        for stage_name in reversed(STAGE_POSITION_NAMES.keys()):
+            if (stage_info := getattr(site_info.stage_info, stage_name, None)) is None:
+                continue
+            if stage_info.slot_number is None:
+                continue
+            else:
+                slot_number = stage_info.slot_number
+                break
+        # Early exit if no slot number
+        if slot_number is None:
+            logger.warning(f"Could not determine slot number of site {lamella_number}")
+            return None
+        # Determine the path to save the GIF to
+        try:
+            visit_index = destination_file.parts.index(environment.visit)
+            visit_dir = list(reversed(destination_file.parents))[visit_index]
+            return visit_dir / "processed" / project_name / f"grid_{slot_number}"
+        except Exception:
+            logger.error(
+                f"Could not construct output directory path for site {lamella_number}"
+            )
+            return None
+
+    def _make_drift_correction_gif(
+        self,
+        file: Path,
+        environment: MurfeyInstanceEnvironment,
+    ):
+        """
+        Helper function to create GIFs using the drift correction images seen by the
+        FIBContext class. The function uses the metadata returned
+        """
+        parts = file.parts
+        try:
+            lamella_name = parts[parts.index("Sites") + 1]
+            lamella_number = number_from_name(lamella_name)
+        except Exception:
+            logger.warning(
+                f"Could not extract metadata from file {file}", exc_info=True
+            )
+            return None
+        source = _get_source(file, environment)
+        if source is None:
+            logger.warning(f"No source found for file {file}")
+            return
+        destination_file = _file_transferred_to(
+            environment=environment,
+            source=source,
+            file_path=file,
+            rsync_basepath=Path(self._machine_config.get("rsync_basepath", "")),
+        )
+        if destination_file is None:
+            logger.warning(f"Could not find destination file path for {file.name!r}")
+            return
+
+        # Create FIBImage instance for this lamella site, or update existing one
+        if not self._drift_correction_images.get(lamella_number):
+            with lock:
+                self._drift_correction_images[lamella_number] = FIBImage(
+                    images=[destination_file]
+                )
+        else:
+            with lock:
+                self._drift_correction_images[lamella_number].images.append(
+                    destination_file
+                )
+                self._drift_correction_images[lamella_number].is_submitted = False
+        if (
+            output_dir := self._determine_output_dir(
+                lamella_number,
+                destination_file,
+                environment,
+            )
+        ) is None:
+            logger.warning(
+                f"Could not determine output directory for lamella {lamella_number}"
+            )
+            return None
+        output_file = output_dir / "drift_correction" / f"lamella_{lamella_number}.gif"
+        with lock:
+            self._drift_correction_images[lamella_number].output_file = output_file
+
+        # Submit job to backend to construct a GIF
+        if self._make_gif(
+            environment=environment,
+            lamella_number=lamella_number,
+            images=sorted(self._drift_correction_images[lamella_number].images),
+            output_file=output_file,
+        ):
+            # Mark this dataset as having been submitted
+            with lock:
+                self._drift_correction_images[lamella_number].is_submitted = True
+            logger.info(
+                f"Submitted request to create drift correction GIF for site {lamella_number}"
+            )
+        return None
+
+    def _make_gif(
+        self,
+        environment: MurfeyInstanceEnvironment,
+        lamella_number: int,
+        images: list[Path],
+        output_file: Path,
+    ):
+        """
+        Submits a POST request to the backend server to create a GIF using the
+        JSON payload provided. The payload will contain
+        """
+        try:
+            capture_post(
+                base_url=str(environment.url.geturl()),
+                router_name="workflow_fib.router",
+                function_name="make_gif",
+                token=self._token,
+                instrument_name=environment.instrument_name,
+                data={
+                    "lamella_number": lamella_number,
+                    "images": [str(file) for file in images],
+                    "output_file": str(output_file),
+                },
+                # Endpoint kwargs
+                session_id=environment.murfey_session,
+            )
+            return True
+        except Exception:
+            logger.error(f"Could not submit GIF for site {lamella_number}")
+            return False
 
     def _register_atlas(self, file: Path, environment: MurfeyInstanceEnvironment):
         """
@@ -247,6 +646,7 @@ class FIBContext(Context):
                 token=self._token,
                 instrument_name=environment.instrument_name,
                 data={"file": str(file)},
+                # Endpoint kwargs
                 session_id=environment.murfey_session,
             )
             logger.info(f"Registering atlas image {file.name!r}")

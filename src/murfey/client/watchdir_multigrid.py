@@ -49,12 +49,18 @@ class MultigridDirWatcher(Observer):
             self.thread.join()
         log.debug("MultigridDirWatcher thread stop completed")
 
-    def _handle_metadata(self, directory: Path, extra_directory: str):
+    def _handle_metadata(self, directory: Path, extra_directory: str, limited=True):
+        """
+        Handles all unknown directories in the visit folder
+        These are transferred into a raw folder as subdirectories
+        named using "extra_directory"
+        For SPA and Tomo this is metadata, for SXT this will be both metadata and data
+        """
         self.notify(
             directory,
             extra_directory=extra_directory,
             analyse=self._analyse,
-            limited=True,
+            limited=limited,
             tag="metadata",
         )
         self._seen_dirs.append(directory)
@@ -110,7 +116,8 @@ class MultigridDirWatcher(Observer):
                     sample_dirs = list(d.glob("Sample*"))
                     if d.is_dir() and len(sample_dirs):
                         for sample in sample_dirs:
-                            if len(list(sample.glob("*.mdoc"))):
+                            if (sample / "Session.dm").is_file():
+                                # Transfer only folders where a tomo session exists
                                 if sample not in self._seen_dirs:
                                     self._handle_metadata(
                                         sample,
@@ -120,6 +127,12 @@ class MultigridDirWatcher(Observer):
                                     sample.parent.parent.parent
                                     / f"{sample.parent.name}_{sample.name}",
                                 )
+
+                    elif self._machine_config["single_data_directory"]:
+                        if d.is_dir() and d not in self._seen_dirs:
+                            self._handle_metadata(
+                                d, extra_directory=f"{d.name}", limited=False
+                            )
 
                     else:
                         if d.is_dir() and d not in self._seen_dirs:
