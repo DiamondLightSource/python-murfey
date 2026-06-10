@@ -487,7 +487,9 @@ def register_foil_holes(
                 "register": "spa.register_foil_holes",
                 "session_id": session_id,
                 "gs_name": gs_name,
-                "foil_hole_group": foil_hole_group,
+                "foil_hole_group": {
+                    k: v.model_dump() for k, v in foil_hole_group.items()
+                },
             },
         )
     return gs_name

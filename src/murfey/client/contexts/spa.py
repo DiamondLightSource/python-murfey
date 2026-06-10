@@ -377,39 +377,43 @@ class SPAContext(Context):
                 capture_post(
                     base_url=str(environment.url.geturl()),
                     router_name="session_control.spa_router",
-                    function_name="register_foil_hole",
+                    function_name="register_foil_holes",
                     token=self._token,
                     instrument_name=environment.instrument_name,
                     session_id=environment.murfey_session,
                     gs_name=grid_square,
                     data={
-                        "name": foil_hole,
-                        "x_location": fh.x_location,
-                        "y_location": fh.y_location,
-                        "x_stage_position": fh.x_stage_position,
-                        "y_stage_position": fh.y_stage_position,
-                        "readout_area_x": fh.readout_area_x,
-                        "readout_area_y": fh.readout_area_y,
-                        "thumbnail_size_x": fh.thumbnail_size_x,
-                        "thumbnail_size_y": fh.thumbnail_size_y,
-                        "pixel_size": fh.pixel_size,
-                        "diameter": fh.diameter,
-                        "tag": str(source),
-                        "image": str(image_path),
+                        str(foil_hole): {
+                            "name": foil_hole,
+                            "x_location": fh.x_location,
+                            "y_location": fh.y_location,
+                            "x_stage_position": fh.x_stage_position,
+                            "y_stage_position": fh.y_stage_position,
+                            "readout_area_x": fh.readout_area_x,
+                            "readout_area_y": fh.readout_area_y,
+                            "thumbnail_size_x": fh.thumbnail_size_x,
+                            "thumbnail_size_y": fh.thumbnail_size_y,
+                            "pixel_size": fh.pixel_size,
+                            "diameter": fh.diameter,
+                            "tag": str(source),
+                            "image": str(image_path),
+                        }
                     },
                 )
             else:
                 capture_post(
                     base_url=str(environment.url.geturl()),
                     router_name="session_control.spa_router",
-                    function_name="register_foil_hole",
+                    function_name="register_foil_holes",
                     token=self._token,
                     instrument_name=environment.instrument_name,
                     session_id=environment.murfey_session,
                     gs_name=grid_square,
                     data={
-                        "name": foil_hole,
-                        "tag": str(source),
+                        str(foil_hole): {
+                            "name": foil_hole,
+                            "tag": str(source),
+                        }
                     },
                 )
             self._foil_holes[grid_square].append(foil_hole)
