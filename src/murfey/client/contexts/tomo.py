@@ -93,6 +93,7 @@ class TomographyContext(Context):
         self._data_collection_stash: list = []
         self._processing_job_stash: dict = {}
         self._lock: RLock = RLock()
+        self._group_tag: str = str(self._basepath)
 
     def register_tomography_data_collections(
         self,
@@ -116,7 +117,13 @@ class TomographyContext(Context):
                 / self._basepath.name.split("_")[-1]
             )
             if not metadata_source.exists() and multigrid_metadata_source.exists():
+                # If the multigrid path exists, tags need to replace the last _ with /
                 metadata_source = multigrid_metadata_source
+                self._group_tag = str(
+                    self._basepath.parent
+                    / "_".join(self._basepath.name.split("_")[:-1])
+                    / self._basepath.name.split("_")[-1]
+                )
             ensure_dcg_exists(
                 collection_type="tomo",
                 metadata_source=metadata_source,
@@ -133,7 +140,7 @@ class TomographyContext(Context):
                         "acquisition_software": self._acquisition_software,
                         "image_directory": image_directory,
                         "data_collection_tag": tilt_series,
-                        "source": str(self._basepath),
+                        "source": self._group_tag,
                         "tag": tilt_series,
                     }
                     if (
@@ -186,7 +193,7 @@ class TomographyContext(Context):
                                 session_id=environment.murfey_session,
                                 data={
                                     "tag": tilt_series,
-                                    "source": str(self._basepath),
+                                    "source": self._group_tag,
                                     "recipe": recipe,
                                     "experiment_type": "tomography",
                                 },
@@ -398,7 +405,7 @@ class TomographyContext(Context):
                 "voltage": self.data_collection_parameters.get("voltage", 300),
                 "eer_fractionation_file": eer_fractionation_file,
                 "tag": tilt_series,
-                "group_tag": str(self._basepath),
+                "group_tag": self._group_tag,
             }
             capture_post(
                 base_url=str(environment.url.geturl()),
@@ -615,7 +622,7 @@ class TomographyContext(Context):
                 environment.dose_per_frame if environment else None
             )
             mdoc_metadata["source"] = str(self._basepath)
-            mdoc_metadata["tag"] = str(self._basepath)
+            mdoc_metadata["tag"] = self._group_tag
             mdoc_metadata["tilt_series_tag"] = metadata_file.stem
             mdoc_metadata["exposure_time"] = float(mdoc_data_block["ExposureTime"])
             slit_width = mdoc_data_block["FilterSlitAndLoss"][0]
