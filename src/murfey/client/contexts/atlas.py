@@ -162,7 +162,11 @@ class AtlasContext(Context):
 
         elif environment and transferred_file.name == "Atlas.dm":
             # Register all grid squares on this atlas
-            gs_pix_positions = get_grid_square_atlas_positions(transferred_file)
+            try:
+                gs_pix_positions = get_grid_square_atlas_positions(transferred_file)
+            except KeyError:
+                logger.info("Unable to read grid square locations from Atlas.dm")
+                return
             for gs, pos_data in gs_pix_positions.items():
                 if pos_data:
                     capture_post(
