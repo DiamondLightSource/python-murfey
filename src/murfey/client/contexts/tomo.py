@@ -116,7 +116,7 @@ class TomographyContext(Context):
                 / "_".join(self._basepath.name.split("_")[:-1])
                 / self._basepath.name.split("_")[-1]
             )
-            if not metadata_source.exists() and multigrid_metadata_source.exists():
+            if not metadata_source.is_dir() and multigrid_metadata_source.is_dir():
                 # If the multigrid path exists, tags need to replace the last _ with /
                 metadata_source = multigrid_metadata_source
                 self._group_tag = str(
