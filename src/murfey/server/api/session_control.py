@@ -3,6 +3,7 @@ from logging import getLogger
 from pathlib import Path
 from typing import Dict, List, Optional
 
+import requests
 from fastapi import APIRouter, Depends
 from fastapi.responses import FileResponse
 from ispyb.sqlalchemy import AutoProcProgram as ISPyBAutoProcProgram
@@ -417,24 +418,31 @@ def register_atlas(
 
 class SquareRegistration(BaseModel):
     tag: str
+    image_path: str | None = None
     count: int | None = None
+    serialem: bool = False
 
 
 @spa_router.post("/sessions/{session_id}/register_square/{gsid}")
 def register_square(
     session_id: MurfeySessionID,
-    gsid: int,
+    gsid: int | str,
     square_registration_data: SquareRegistration,
     db=murfey_db,
 ):
     if SMARTEM_ACTIVE:
-        gs = db.exec(
-            select(GridSquare)
-            .where(GridSquare.name == gsid)
-            .where(GridSquare.tag == square_registration_data.tag)
-            .where(GridSquare.session_id == session_id)
-        ).one_or_none()
-        if gs and gs.smartem_uuid:
+        logger.info(f"smartem active for square {gsid}")
+        if square_registration_data.serialem:
+            smartem_uuid: int | str | None = gsid
+        else:
+            gs = db.exec(
+                select(GridSquare)
+                .where(GridSquare.name == gsid)
+                .where(GridSquare.tag == square_registration_data.tag)
+                .where(GridSquare.session_id == session_id)
+            ).one_or_none()
+            smartem_uuid = gs.smartem_uuid if gs else None
+        if smartem_uuid is not None:
             session = db.exec(select(Session).where(Session.id == session_id)).one()
             machine_config = get_machine_config(session.instrument_name)[
                 session.instrument_name
@@ -444,8 +452,16 @@ def register_square(
                     base_url=machine_config.smartem_api_url, logger=logger
                 )
                 smartem_client.gridsquare_registered(
-                    gs.smartem_uuid, count=square_registration_data.count
+                    smartem_uuid, count=square_registration_data.count
                 )
+                result = requests.put(
+                    f"{machine_config.smartem_api_url}/gridsquares/{smartem_uuid}",
+                    json={"image_path": square_registration_data.image_path},
+                )
+                if not result.status_code == 200:
+                    logger.warning(
+                        f"Post to smartem gridsquares returned {result.status_code}"
+                    )
     else:
         logger.info("smartem deactivated so did not register square")
 
