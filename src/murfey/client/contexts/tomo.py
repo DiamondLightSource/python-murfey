@@ -109,6 +109,14 @@ class TomographyContext(Context):
             metadata_source = (
                 self._basepath.parent / environment.visit / self._basepath.name
             )
+            multigrid_metadata_source = (
+                self._basepath.parent
+                / environment.visit
+                / "_".join(self._basepath.name.split("_")[:-1])
+                / self._basepath.name.split("_")[-1]
+            )
+            if not metadata_source.exists() and multigrid_metadata_source.exists():
+                metadata_source = multigrid_metadata_source
             ensure_dcg_exists(
                 collection_type="tomo",
                 metadata_source=metadata_source,
