@@ -250,7 +250,7 @@ def register_search_map_in_database(
         try:
             for hook in search_map_hooks:
                 hook.load()(
-                    id=search_map.id,
+                    ispyb_id=search_map.id,
                     image=search_map_params.image,
                     pixel_size=search_map_params.pixel_size,
                     lamella=search_map_params.lamella,
