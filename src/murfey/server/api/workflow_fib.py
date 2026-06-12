@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 from pathlib import Path
@@ -7,7 +6,7 @@ import numpy as np
 import PIL.Image
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from sqlmodel import Session, select
+from sqlmodel import select
 
 import murfey.util.db as MurfeyDB
 from murfey.server import _transport_object
@@ -36,7 +35,7 @@ def register_fib_atlas(
     fib_atlas: FIBAtlasFile,
 ):
     if _transport_object is None:
-        logger.error("No Transport Manager object was set up")
+        logger.error("No TransportManager object was set up")
         return None
     _transport_object.send(
         _transport_object.feedback_queue,
@@ -52,11 +51,17 @@ def register_fib_atlas(
 def register_fib_milling_progress(
     session_id: int,
     site_info: LamellaSiteInfo,
-    db: Session = murfey_db,
 ):
-    logger.debug(
-        "Received the following FIB metadata for registration:\n"
-        f"{json.dumps(site_info.model_dump(exclude_none=True), indent=2, default=str)}"
+    if _transport_object is None:
+        logger.error("No TransportManager object was set up")
+        return None
+    _transport_object.send(
+        _transport_object.feedback_queue,
+        {
+            "register": "fib.register_milling_progress",
+            "session_id": session_id,
+            "site_info": site_info.model_dump(exclude_none=True),
+        },
     )
 
 

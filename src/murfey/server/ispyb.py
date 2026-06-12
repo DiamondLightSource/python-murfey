@@ -20,6 +20,8 @@ from ispyb.sqlalchemy import (
     DataCollectionGroup,
     FoilHole,
     GridSquare,
+    MillingStep,
+    MillingStepName,
     ProcessingJob,
     ProcessingJobParameter,
     Proposal,
@@ -709,6 +711,164 @@ class TransportManager:
                 exc_info=True,
             )
             return {"success": False, "return_value": None}
+
+    def do_insert_milling_step(
+        self,
+        # MillingStepName identifiers
+        recipe_name: str,
+        activity_name: str,
+        grid_square_id: int,
+        # Values
+        is_enabled: bool | None = None,
+        status: str | None = None,
+        execution_time: float | None = None,
+        stage_x: float | None = None,
+        stage_y: float | None = None,
+        stage_z: float | None = None,
+        rotation: float | None = None,
+        tilt_alpha: float | None = None,
+        beam_type: str | None = None,
+        beam_voltage: float | None = None,
+        beam_current: float | None = None,
+        milling_angle: float | None = None,
+        depth_correction: float | None = None,
+        lamella_offset: float | None = None,
+        trench_height_front: float | None = None,
+        trench_height_rear: float | None = None,
+        width_overlap_front_left: float | None = None,
+        width_overlap_front_right: float | None = None,
+        width_overlap_rear_left: float | None = None,
+        width_overlap_rear_right: float | None = None,
+    ):
+        try:
+            with ISPyBSession() as db:
+                # Find the ID of this MillingStep
+                milling_step_name = (
+                    db.query(MillingStepName)
+                    .filter(
+                        MillingStepName.recipe == recipe_name,
+                        MillingStepName.step == activity_name,
+                    )
+                    .one()
+                )
+                record = MillingStep(
+                    # IDs
+                    millingStepNameId=milling_step_name.millingStepNameId,
+                    gridSquareId=grid_square_id,
+                    # Values
+                    isEnabled=is_enabled,
+                    status=status,
+                    executionTime=execution_time,
+                    stageX=stage_x,
+                    stageY=stage_y,
+                    stageZ=stage_z,
+                    rotation=rotation,
+                    alphaTilt=tilt_alpha,
+                    beamType=beam_type,
+                    beamVoltage=beam_voltage,
+                    beamCurrent=beam_current,
+                    millingAngle=milling_angle,
+                    depthCorrection=depth_correction,
+                    lamellaOffset=lamella_offset,
+                    trenchHeightFront=trench_height_front,
+                    trenchHeightRear=trench_height_rear,
+                    widthOverlapFrontLeft=width_overlap_front_left,
+                    widthOverlapFrontRight=width_overlap_front_right,
+                    widthOverlapRearLeft=width_overlap_rear_left,
+                    widthOverlapRearRight=width_overlap_rear_right,
+                )
+                db.add(record)
+                db.commit()
+                log.info(f"Created MillingStep {record.millingStepId}")
+                return {"success": True, "return_value": record.millingStepId}
+        except ispyb.ISPyBException as e:
+            log.error(
+                "Insert MillingStep entry caused exception '%s'.",
+                e,
+                exc_info=True,
+            )
+        return {"success": False, "return_value": None}
+
+    def do_update_milling_step(
+        self,
+        milling_step_id: int,
+        is_enabled: bool | None = None,
+        status: str | None = None,
+        execution_time: float | None = None,
+        stage_x: float | None = None,
+        stage_y: float | None = None,
+        stage_z: float | None = None,
+        rotation: float | None = None,
+        tilt_alpha: float | None = None,
+        beam_type: str | None = None,
+        beam_voltage: float | None = None,
+        beam_current: float | None = None,
+        milling_angle: float | None = None,
+        depth_correction: float | None = None,
+        lamella_offset: float | None = None,
+        trench_height_front: float | None = None,
+        trench_height_rear: float | None = None,
+        width_overlap_front_left: float | None = None,
+        width_overlap_front_right: float | None = None,
+        width_overlap_rear_left: float | None = None,
+        width_overlap_rear_right: float | None = None,
+    ):
+        try:
+            with ISPyBSession() as db:
+                milling_step = (
+                    db.query(MillingStep)
+                    .filter(MillingStep.millingStepId == milling_step_id)
+                    .one()
+                )
+                milling_step.isEnabled = is_enabled or milling_step.isEnabled
+                milling_step.status = status or milling_step.status
+                milling_step.executionTime = (
+                    execution_time or milling_step.executionTime
+                )
+                milling_step.stageX = stage_x or milling_step.stageX
+                milling_step.stageY = stage_y or milling_step.stageY
+                milling_step.stageZ = stage_z or milling_step.stageZ
+                milling_step.rotation = rotation or milling_step.rotation
+                milling_step.alphaTilt = tilt_alpha or milling_step.alphaTilt
+                milling_step.beamType = beam_type or milling_step.beamType
+                milling_step.beamVoltage = beam_voltage or milling_step.beamVoltage
+                milling_step.beamCurrent = beam_current or milling_step.beamCurrent
+                milling_step.millingAngle = milling_angle or milling_step.millingAngle
+                milling_step.depthCorrection = (
+                    depth_correction or milling_step.depthCorrection
+                )
+                milling_step.lamellaOffset = (
+                    lamella_offset or milling_step.lamellaOffset
+                )
+                milling_step.trenchHeightFront = (
+                    trench_height_front or milling_step.trenchHeightFront
+                )
+                milling_step.trenchHeightRear = (
+                    trench_height_rear or milling_step.trenchHeightRear
+                )
+                milling_step.widthOverlapFrontLeft = (
+                    width_overlap_front_left or milling_step.widthOverlapFrontLeft
+                )
+                milling_step.widthOverlapFrontRight = (
+                    width_overlap_front_right or milling_step.widthOverlapFrontRight
+                )
+                milling_step.widthOverlapRearLeft = (
+                    width_overlap_rear_left or milling_step.widthOverlapRearLeft
+                )
+                milling_step.widthOverlapRearRight = (
+                    width_overlap_rear_right or milling_step.widthOverlapRearRight
+                )
+
+                db.add(milling_step)
+                db.commit()
+                return {"success": True, "return_value": milling_step.millingStepId}
+        except ispyb.ISPyBException as e:
+            log.error(
+                "Updating MillingStep entry caused exception '%s'.",
+                e,
+                exc_info=True,
+            )
+        return {"success": False, "return_value": None}
 
     def do_buffer_lookup(self, app_id: int, uuid: int) -> Optional[int]:
         with ISPyBSession() as db:
