@@ -1,4 +1,5 @@
 import logging
+from importlib.metadata import entry_points
 
 import numpy as np
 from sqlmodel import Session, select
@@ -40,6 +41,7 @@ def register_search_map_in_database(
     if search_map_query:
         # See if there is already a search map with this name and update if so
         search_map = search_map_query[0]
+        search_map.lamella = search_map_params.lamella or search_map.lamella
         search_map.x_stage_position = (
             search_map_params.x_stage_position or search_map.x_stage_position
         )
@@ -120,6 +122,7 @@ def register_search_map_in_database(
             name=search_map_name,
             session_id=session_id,
             tag=search_map_params.tag,
+            lamella=search_map_params.lamella,
             x_stage_position=search_map_params.x_stage_position,
             y_stage_position=search_map_params.y_stage_position,
             pixel_size=search_map_params.pixel_size,
@@ -242,6 +245,18 @@ def register_search_map_in_database(
     murfey_db.commit()
     if close_db:
         murfey_db.close()
+
+    if search_map_hooks := entry_points(group="murfey.hooks", name="search_map"):
+        try:
+            for hook in search_map_hooks:
+                hook.load()(
+                    ispyb_id=search_map.id,
+                    image=search_map_params.image,
+                    pixel_size=search_map_params.pixel_size,
+                    lamella=search_map_params.lamella,
+                )
+        except Exception as e:
+            logger.error(f"Call to search map hook failed with {e}", exc_info=True)
 
 
 def register_batch_position_in_database(
