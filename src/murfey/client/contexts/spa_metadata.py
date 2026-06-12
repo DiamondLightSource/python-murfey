@@ -138,6 +138,12 @@ class SPAMetadataContext(Context):
                 visitless_source = _get_visitless_source(
                     source, environment, skip_search=True
                 )
+                destination_file = _file_transferred_to(
+                    environment,
+                    source,
+                    transferred_file,
+                    Path(self._machine_config.get("rsync_basepath", "")),
+                )
                 capture_post(
                     base_url=str(environment.url.geturl()),
                     router_name="session_control.spa_router",
@@ -148,7 +154,9 @@ class SPAMetadataContext(Context):
                     gsid=transferred_file.stem,
                     data={
                         "tag": visitless_source,
+                        "image_path": str(destination_file),
                         "count": len(self._registered_squares_serialem) + 1,
+                        "serialem": self._acquisition_software == "serialem",
                     },
                 )
                 self._registered_squares_serialem.add(transferred_file.stem)

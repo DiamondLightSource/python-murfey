@@ -920,7 +920,7 @@ murfey.server.api.session_control.spa_router:
     function: register_square
     path_params:
       - name: gsid
-        type: int
+        type: int | str
       - name: session_id
         type: int
     methods:
