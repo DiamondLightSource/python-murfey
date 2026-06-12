@@ -431,7 +431,7 @@ def register_square(
     db=murfey_db,
 ):
     if SMARTEM_ACTIVE:
-        logger.info(f"smartem active for square {gsid}")
+        logger.info(f"smartem active for square {sanitise(str(gsid))}")
         if square_registration_data.serialem:
             smartem_uuid: int | str | None = gsid
         else:
