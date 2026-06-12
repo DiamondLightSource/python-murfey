@@ -816,6 +816,9 @@ class BFactorParameters(SQLModel, table=True):  # type: ignore
     class_number: int
     mask_file: str
     run: bool = True
+    processing_job: Optional[ProcessingJob] = Relationship(
+        back_populates="bfactor_parameters"
+    )
 
 
 class BFactors(SQLModel, table=True):  # type: ignore
@@ -823,6 +826,7 @@ class BFactors(SQLModel, table=True):  # type: ignore
     pj_id: int = Field(primary_key=True, foreign_key="processingjob.processingJobId")
     number_of_particles: int
     resolution: float
+    processing_job: Optional[ProcessingJob] = Relationship(back_populates="bfactors")
 
 
 class MotionCorrection(SQLModel, table=True):  # type: ignore
