@@ -7,7 +7,7 @@ import ispyb.sqlalchemy._auto_db_schema as ISPyBDB
 from sqlmodel import select
 from sqlmodel.orm.session import Session as SQLModelSession
 
-from murfey.server import _transport_object
+import murfey.server
 from murfey.server.ispyb import ISPyBSession, get_session_id
 from murfey.util.db import DataCollectionGroup
 
@@ -16,7 +16,7 @@ logger = logging.getLogger("murfey.workflows.register_data_collection_group")
 
 def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
     # Fail immediately if no transport wrapper is found
-    if _transport_object is None:
+    if murfey.server._transport_object is None:
         logger.error("Unable to find transport manager")
         return {"success": False, "requeue": False}
 
@@ -50,9 +50,9 @@ def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
                 experimentTypeId=message["experiment_type_id"],
             )
 
-            dcgid = _transport_object.do_insert_data_collection_group(record).get(
-                "return_value", None
-            )
+            dcgid = murfey.server._transport_object.do_insert_data_collection_group(
+                record
+            ).get("return_value", None)
 
             if dcgid is None:
                 time.sleep(2)
@@ -75,9 +75,9 @@ def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
             if color_flags := message.get("color_flags", {}):
                 for col_name, value in color_flags.items():
                     setattr(atlas_record, col_name, value)
-            atlas_id = _transport_object.do_insert_atlas(atlas_record).get(
-                "return_value", None
-            )
+            atlas_id = murfey.server._transport_object.do_insert_atlas(
+                atlas_record
+            ).get("return_value", None)
 
             murfey_dcg = DataCollectionGroup(
                 id=dcgid,

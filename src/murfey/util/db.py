@@ -767,7 +767,6 @@ class ClassificationFeedbackParameters(SQLModel, table=True):  # type: ignore
     star_combination_job: int
     initial_model: str
     next_job: int
-    picker_murfey_id: Optional[int] = Field(default=None, foreign_key="murfeyledger.id")
     processing_job: Optional[ProcessingJob] = Relationship(
         back_populates="classification_feedback_parameters"
     )
