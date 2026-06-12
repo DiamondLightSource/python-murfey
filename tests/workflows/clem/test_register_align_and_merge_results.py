@@ -74,9 +74,9 @@ def test_run(
         "result": {
             "series_name": incoming_series_name,
             "image_stacks": [],
-            "align_self": None,
-            "flatten": None,
-            "align_across": None,
+            "align_self": False,
+            "flatten": True,
+            "align_across": False,
             "output_file": tmp_path / "dummy",
             "thumbnail": None,
             "thumbnail_size": None,
