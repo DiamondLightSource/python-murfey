@@ -556,41 +556,42 @@ class SearchMap(SQLModel, table=True):  # type: ignore
     session_id: int = Field(foreign_key="session.id")
     name: str
     tag: str
-    x_location: Optional[float] = None
-    y_location: Optional[float] = None
-    x_stage_position: Optional[float] = None
-    y_stage_position: Optional[float] = None
-    pixel_size: Optional[float] = None
+    lamella: bool | None = None
+    x_location: float | None = None
+    y_location: float | None = None
+    x_stage_position: float | None = None
+    y_stage_position: float | None = None
+    pixel_size: float | None = None
     image: str = ""
-    binning: Optional[float] = None
-    reference_matrix_m11: Optional[float] = None
-    reference_matrix_m12: Optional[float] = None
-    reference_matrix_m21: Optional[float] = None
-    reference_matrix_m22: Optional[float] = None
-    stage_correction_m11: Optional[float] = None
-    stage_correction_m12: Optional[float] = None
-    stage_correction_m21: Optional[float] = None
-    stage_correction_m22: Optional[float] = None
-    image_shift_correction_m11: Optional[float] = None
-    image_shift_correction_m12: Optional[float] = None
-    image_shift_correction_m21: Optional[float] = None
-    image_shift_correction_m22: Optional[float] = None
-    width: Optional[int] = None
-    height: Optional[int] = None
+    binning: float | None = None
+    reference_matrix_m11: float | None = None
+    reference_matrix_m12: float | None = None
+    reference_matrix_m21: float | None = None
+    reference_matrix_m22: float | None = None
+    stage_correction_m11: float | None = None
+    stage_correction_m12: float | None = None
+    stage_correction_m21: float | None = None
+    stage_correction_m22: float | None = None
+    image_shift_correction_m11: float | None = None
+    image_shift_correction_m12: float | None = None
+    image_shift_correction_m21: float | None = None
+    image_shift_correction_m22: float | None = None
+    width: int | None = None
+    height: int | None = None
     session: Optional[Session] = Relationship(back_populates="search_maps")
     tilt_series: List["TiltSeries"] = Relationship(
         back_populates="search_map", sa_relationship_kwargs={"cascade": "delete"}
     )
-    atlas_id: Optional[int] = Field(
+    atlas_id: int | None = Field(
         foreign_key="datacollectiongroup.dataCollectionGroupId"
     )
-    scaled_pixel_size: Optional[float] = None
-    pixel_location_x: Optional[int] = None
-    pixel_location_y: Optional[int] = None
-    scaled_height: Optional[int] = None
-    scaled_width: Optional[int] = None
-    angle: Optional[float] = None
-    quality_indicator: Optional[float] = None
+    scaled_pixel_size: float | None = None
+    pixel_location_x: int | None = None
+    pixel_location_y: int | None = None
+    scaled_height: int | None = None
+    scaled_width: int | None = None
+    angle: float | None = None
+    quality_indicator: float | None = None
     data_collection_group: Optional["DataCollectionGroup"] = Relationship(
         back_populates="search_maps"
     )

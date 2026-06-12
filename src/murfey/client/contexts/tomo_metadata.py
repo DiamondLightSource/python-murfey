@@ -150,6 +150,19 @@ class TomographyMetadataContext(Context):
                 else ""
             )
 
+            # Read the session dm to find out if this is a lamella search map or not
+            lamella = None
+            if source and (source / "Session.dm").is_file():
+                with open(source / "Session.dm") as xml:
+                    session_xml = xmltodict.parse(xml.read())
+                lamella_workflow = session_xml.get("TomographySession", {}).get(
+                    "LamellaWorkflow", None
+                )
+                if lamella_workflow:
+                    lamella = lamella_workflow == "true"
+            else:
+                logger.warning("Cannot find tomography Session.dm file")
+
             capture_post(
                 base_url=str(environment.url.geturl()),
                 router_name="session_control.tomo_router",
@@ -168,6 +181,7 @@ class TomographyMetadataContext(Context):
                     "reference_matrix": ref_matrix,
                     "stage_correction": stage_matrix,
                     "image_shift_correction": image_matrix,
+                    "lamella": lamella,
                 },
             )
 
