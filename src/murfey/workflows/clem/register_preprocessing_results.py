@@ -14,7 +14,7 @@ from collections.abc import Collection
 from functools import cached_property
 from importlib.metadata import entry_points
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal, Optional, TypeAlias
 
 from pydantic import BaseModel, computed_field
 from sqlmodel import Session, select
@@ -29,24 +29,22 @@ from murfey.workflows.clem.align_and_merge import run as run_align_and_merge
 
 logger = logging.getLogger("murfey.workflows.clem.register_preprocessing_results")
 
+ColorChannels: TypeAlias = Literal[
+    "gray", "red", "green", "blue", "cyan", "magenta", "yellow"
+]
+
 
 class CLEMPreprocessingResult(BaseModel):
     series_name: str
     number_of_members: int
     is_stack: bool
     is_montage: bool
-    output_files: dict[
-        Literal["gray", "red", "green", "blue", "cyan", "magenta", "yellow"], Path
-    ]
-    thumbnails: dict[
-        Literal["gray", "red", "green", "blue", "cyan", "magenta", "yellow"], Path
-    ] = {}
+    output_files: dict[ColorChannels, Path]
+    thumbnails: dict[ColorChannels, Path] = {}
     thumbnail_size: Optional[tuple[int, int]] = None  # height, width
     metadata: Path
     parent_lif: Optional[Path] = None
-    parent_tiffs: dict[
-        Literal["gray", "red", "green", "blue", "cyan", "magenta", "yellow"], list[Path]
-    ] = {}
+    parent_tiffs: dict[ColorChannels, list[Path]] = {}
     pixels_x: int
     pixels_y: int
     units: str
