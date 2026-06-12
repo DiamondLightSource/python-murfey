@@ -14,7 +14,7 @@ from collections.abc import Collection
 from functools import cached_property
 from importlib.metadata import entry_points
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal, Optional, TypeAlias
 
 from pydantic import BaseModel, computed_field
 from sqlmodel import Session, select
@@ -29,24 +29,24 @@ from murfey.workflows.clem.align_and_merge import run as run_align_and_merge
 
 logger = logging.getLogger("murfey.workflows.clem.register_preprocessing_results")
 
+ColorChannels: TypeAlias = Literal[
+    "gray", "red", "green", "blue", "cyan", "magenta", "yellow"
+]
+
+DENOISING_MODES = ("_ICC", "_Lng_LVCC", "_Lng_SVCC")
+
 
 class CLEMPreprocessingResult(BaseModel):
     series_name: str
     number_of_members: int
     is_stack: bool
     is_montage: bool
-    output_files: dict[
-        Literal["gray", "red", "green", "blue", "cyan", "magenta", "yellow"], Path
-    ]
-    thumbnails: dict[
-        Literal["gray", "red", "green", "blue", "cyan", "magenta", "yellow"], Path
-    ] = {}
+    output_files: dict[ColorChannels, Path]
+    thumbnails: dict[ColorChannels, Path] = {}
     thumbnail_size: Optional[tuple[int, int]] = None  # height, width
     metadata: Path
     parent_lif: Optional[Path] = None
-    parent_tiffs: dict[
-        Literal["gray", "red", "green", "blue", "cyan", "magenta", "yellow"], list[Path]
-    ] = {}
+    parent_tiffs: dict[ColorChannels, list[Path]] = {}
     pixels_x: int
     pixels_y: int
     units: str
@@ -59,23 +59,35 @@ class CLEMPreprocessingResult(BaseModel):
     @cached_property
     def is_denoised(self) -> bool:
         """
-        The "_Lng_LVCC" and "_Lng_SVCC" suffixes appended to a CLEM dataset's position
-        name indicate that it's a denoised image set of the same position. They should
-        override or supersede the original ones if they're present
+        The "_ICC", "_Lng_LVCC", and "_Lng_SVCC" suffixes appended to a CLEM dataset's
+        position name indicate that it's a denoised image set of the same position.
+        They should override or supersede the original ones if they're present.
         """
-        return any(
-            pattern in self.series_name for pattern in ("_Lng_LVCC", "_Lng_SVCC")
-        )
+        return any(self.series_name.endswith(pattern) for pattern in DENOISING_MODES)
+
+    # Vallid Pydantic decorator not supported by MyPy
+    @computed_field  # type: ignore
+    @cached_property
+    def denoising_mode(self) -> str | None:
+        """
+        Store the denoising mode used as an attribute
+        """
+        for pattern in DENOISING_MODES:
+            if self.series_name.endswith(pattern):
+                return pattern[1:]
+        return None
 
     # Valid Pydantic decorator not supported by MyPy
     @computed_field  # type: ignore
     @cached_property
     def site_name(self) -> str:
         """
-        Extract just the name of the site by removing the "_Lng_LVCC" suffix from
+        Extract just the name of the site by removing the denoising mode suffix from
         the series name.
         """
-        return self.series_name.replace("_Lng_LVCC", "").replace("_Lng_SVCC", "")
+        if self.denoising_mode is not None:
+            return self.series_name[: -(len(self.denoising_mode) + 1)]
+        return self.series_name
 
     # Valid Pydantic decorator not supported by MyPy
     @computed_field  # type: ignore
