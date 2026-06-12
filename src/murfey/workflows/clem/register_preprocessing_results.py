@@ -33,6 +33,8 @@ ColorChannels: TypeAlias = Literal[
     "gray", "red", "green", "blue", "cyan", "magenta", "yellow"
 ]
 
+DENOISING_MODES = ("_ICC", "_Lng_LVCC", "_Lng_SVCC")
+
 
 class CLEMPreprocessingResult(BaseModel):
     series_name: str
@@ -57,23 +59,35 @@ class CLEMPreprocessingResult(BaseModel):
     @cached_property
     def is_denoised(self) -> bool:
         """
-        The "_Lng_LVCC" and "_Lng_SVCC" suffixes appended to a CLEM dataset's position
-        name indicate that it's a denoised image set of the same position. They should
-        override or supersede the original ones if they're present
+        The "_ICC", "_Lng_LVCC", and "_Lng_SVCC" suffixes appended to a CLEM dataset's
+        position name indicate that it's a denoised image set of the same position.
+        They should override or supersede the original ones if they're present.
         """
-        return any(
-            pattern in self.series_name for pattern in ("_Lng_LVCC", "_Lng_SVCC")
-        )
+        return any(self.series_name.endswith(pattern) for pattern in DENOISING_MODES)
+
+    # Vallid Pydantic decorator not supported by MyPy
+    @computed_field  # type: ignore
+    @cached_property
+    def denoising_mode(self) -> str | None:
+        """
+        Store the denoising mode used as an attribute
+        """
+        for pattern in DENOISING_MODES:
+            if self.series_name.endswith(pattern):
+                return pattern[1:]
+        return None
 
     # Valid Pydantic decorator not supported by MyPy
     @computed_field  # type: ignore
     @cached_property
     def site_name(self) -> str:
         """
-        Extract just the name of the site by removing the "_Lng_LVCC" suffix from
+        Extract just the name of the site by removing the denoising mode suffix from
         the series name.
         """
-        return self.series_name.replace("_Lng_LVCC", "").replace("_Lng_SVCC", "")
+        if self.denoising_mode is not None:
+            return self.series_name[: -(len(self.denoising_mode) + 1)]
+        return self.series_name
 
     # Valid Pydantic decorator not supported by MyPy
     @computed_field  # type: ignore
