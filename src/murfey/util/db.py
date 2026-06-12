@@ -379,7 +379,10 @@ class ProcessingJob(SQLModel, table=True):  # type: ignore
     refine3ds: List["Refine3D"] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
     )
-    bfactors: List["BFactorParameters"] = Relationship(
+    bfactor_parameters: List["BFactorParameters"] = Relationship(
+        back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    bfactors: List["BFactors"] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
     )
 
