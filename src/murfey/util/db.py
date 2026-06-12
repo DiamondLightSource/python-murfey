@@ -379,6 +379,9 @@ class ProcessingJob(SQLModel, table=True):  # type: ignore
     refine3ds: List["Refine3D"] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
     )
+    bfactors: List["BFactorParameters"] = Relationship(
+        back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
+    )
 
 
 class PreprocessStash(SQLModel, table=True):  # type: ignore
