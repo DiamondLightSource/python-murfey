@@ -93,7 +93,9 @@ class MultigridDirWatcher(Observer):
     def _process(self):
         while not self._stopping:
             for d in self._basepath.glob("*"):
-                if d.name in self._machine_config["create_directories"]:
+                if d.name == "New folder":
+                    self._seen_dirs.append(d)
+                elif d.name in self._machine_config["create_directories"]:
                     if d.is_dir() and d not in self._seen_dirs:
                         self.notify(
                             d,
