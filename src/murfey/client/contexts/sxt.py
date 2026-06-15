@@ -210,12 +210,15 @@ class SXTContext(Context):
                 logger.debug(f"Reference image {transferred_file} not processed")
                 return True
 
+            tilt_series_tag = "_".join(
+                transferred_file.stem.split("@")[0].split("_")[:-1]
+            )
             visit_index = transferred_file.parent.parts.index(environment.visit)
             destination_search_dir = "/".join(
                 transferred_file.parts[: visit_index + 2]
             ).replace("//", "/")
             self.register_sxt_data_collection(
-                tilt_series=transferred_file.stem,
+                tilt_series=tilt_series_tag,
                 data_collection_parameters=metadata,
                 file_extension=transferred_file.suffix,
                 image_directory=str(
@@ -247,7 +250,7 @@ class SXTContext(Context):
                 visit_name=environment.visit,
                 session_id=environment.murfey_session,
                 data={
-                    "tag": transferred_file.stem,
+                    "tag": tilt_series_tag,
                     "source": destination_search_dir,
                     "pixel_size": round(
                         metadata.get("pixel_size", 100), 2
