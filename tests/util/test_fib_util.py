@@ -14,6 +14,10 @@ from murfey.util.fib import number_from_name
         ("Electron Snapshot", 1),
         ("Electron Snapshot (3)", 3),
         ("Electron Snapshot (21)", 21),
+        # Waffle method examples
+        ("Site #1", 1),
+        ("Site #2", 2),
+        ("Site #32", 32),
     ),
 )
 def test_number_from_name(test_params: tuple[str, int]):
