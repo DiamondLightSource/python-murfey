@@ -33,7 +33,7 @@ ColorChannels: TypeAlias = Literal[
     "gray", "red", "green", "blue", "cyan", "magenta", "yellow"
 ]
 
-DENOISING_MODES = ("_ICC", "_Lng_LVCC", "_Lng_SVCC")
+CC_MODES = ("_ICC", "_Lng_LVCC", "_Lng_SVCC")
 
 
 class CLEMPreprocessingResult(BaseModel):
@@ -57,22 +57,22 @@ class CLEMPreprocessingResult(BaseModel):
     # Valid Pydantic decorator not supported by MyPy
     @computed_field  # type: ignore
     @cached_property
-    def is_denoised(self) -> bool:
+    def is_cc(self) -> bool:
         """
         The "_ICC", "_Lng_LVCC", and "_Lng_SVCC" suffixes appended to a CLEM dataset's
-        position name indicate that it's a denoised image set of the same position.
-        They should override or supersede the original ones if they're present.
+        position name indicate that it's a computationally cleared image set of the
+        same position. They should override or supersede the original ones if present.
         """
-        return any(self.series_name.endswith(pattern) for pattern in DENOISING_MODES)
+        return any(self.series_name.endswith(pattern) for pattern in CC_MODES)
 
-    # Vallid Pydantic decorator not supported by MyPy
+    # Valid Pydantic decorator not supported by MyPy
     @computed_field  # type: ignore
     @cached_property
-    def denoising_mode(self) -> str | None:
+    def cc_mode(self) -> str | None:
         """
-        Store the denoising mode used as an attribute
+        Store the computational clearing mode used as an attribute
         """
-        for pattern in DENOISING_MODES:
+        for pattern in CC_MODES:
             if self.series_name.endswith(pattern):
                 return pattern[1:]
         return None
@@ -82,11 +82,11 @@ class CLEMPreprocessingResult(BaseModel):
     @cached_property
     def site_name(self) -> str:
         """
-        Extract just the name of the site by removing the denoising mode suffix from
+        Extract just the name of the site by removing the clearing mode suffix from
         the series name.
         """
-        if self.denoising_mode is not None:
-            return self.series_name[: -(len(self.denoising_mode) + 1)]
+        if self.cc_mode is not None:
+            return self.series_name[: -(len(self.cc_mode) + 1)]
         return self.series_name
 
     # Valid Pydantic decorator not supported by MyPy
@@ -135,7 +135,7 @@ def _register_clem_imaging_site(
     """
     Creates an ImagingSite database entry for the current CLEM preprocessing result
     if one doesn't already exist, or modifies the existing one if it does. Each entry
-    corresponds to a unique site on the sample grid, and results containing denoised
+    corresponds to a unique site on the sample grid, and results containing cleared
     data will supersede existing rows for the same position that contain only raw
     data. Returns the created/queried entry.
     """
@@ -198,8 +198,8 @@ def _register_clem_imaging_site(
         )
         clem_img_site = _populate(clem_img_site, result)
 
-    # Prepare to overwrite existing entry if current result is a denoised dataset
-    if result.is_denoised:
+    # Prepare to overwrite existing entry if current result is a cleared dataset
+    if result.is_cc:
         # Proceed with overwrite if current result is different from existing entry
         output_file = list(result.output_files.values())[0]
         if str(output_file.parent / "*.tiff") != clem_img_site.image_path:
