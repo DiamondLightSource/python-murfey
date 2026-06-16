@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -13,9 +14,48 @@ from murfey.client.context import (
 )
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.util.client import capture_post
+from murfey.util.models import File
 from murfey.util.tomo import midpoint
 
 logger = logging.getLogger("murfey.client.contexts.sxt")
+
+
+def _find_reference(txrm_file: Path) -> Path | None:
+    """Find a suitable reference to apply to the given txrm file"""
+    # Look for xrm files in the txrm folder, reverse sorted by time
+    candidates = []
+    for gf in txrm_file.parent.glob("*.xrm"):
+        candidates.append(
+            File(
+                name=gf.name,
+                description="",
+                size=gf.stat().st_size / 1e6,
+                timestamp=datetime.fromtimestamp(gf.stat().st_mtime),
+                full_path=str(gf),
+            )
+        )
+    candidates.sort(key=lambda x: x.timestamp, reverse=True)
+    for ref_option in candidates:
+        mosaic_size = 1
+        with OleFileIO(str(ref_option)) as xrm_ole:
+            # Find images which are not mosaics (txrm spec typos this as mosiac)
+            if xrm_ole.exists("ImageInfo/MosiacRows") and xrm_ole.exists(
+                "ImageInfo/MosiacColumns"
+            ):
+                mosaic_size = int(
+                    np.frombuffer(
+                        xrm_ole.openstream("ImageInfo/MosiacRows").getvalue(), np.int32
+                    )[0]
+                    * np.frombuffer(
+                        xrm_ole.openstream("ImageInfo/MosiacColumns").getvalue(),
+                        np.int32,
+                    )[0]
+                )
+        if mosaic_size == 0:
+            logger.info(f"Found reference {ref_option}")
+            return ref_option
+    logger.warning(f"No reference found for {txrm_file}")
+    return None
 
 
 class SXTContext(Context):
@@ -206,9 +246,17 @@ class SXTContext(Context):
                         )
                         metadata["energy"] = int(round(axis_values[energy_index]))
 
-            if not metadata.get("has_reference", False):
+            if (
+                not metadata.get("has_reference", False)
+                and metadata.get("tilt_series_length", len(angles)) < 20
+            ):
+                # References are collected with only 10 frames
                 logger.debug(f"Reference image {transferred_file} not processed")
                 return True
+            elif not metadata.get("has_reference", False):
+                reference_file = _find_reference(transferred_file)
+            else:
+                reference_file = None
 
             tilt_series_tag = "_".join(
                 transferred_file.stem.split("@")[0].split("_")[:-1]
@@ -260,6 +308,7 @@ class SXTContext(Context):
                         "tilt_series_length", len(angles)
                     ),
                     "txrm": str(file_transferred_to),
+                    "xrm_reference": str(reference_file) if reference_file else None,
                 },
             )
         return True
