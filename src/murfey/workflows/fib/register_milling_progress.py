@@ -115,52 +115,8 @@ def _ensure_prerequisites(
     return grid_square_entry
 
 
-MILLING_STEP_LOOKUP = (
-    # Match the MillingStep key names to their ISPyB IDs
-    # Preparation stage
-    (
-        (
-            "eucentric_tilt",
-            "artificial_features",
-            "milling_angle",
-            "image_acquisition",
-            "lamella_placement",
-        ),
-        "preparation_site",
-    ),
-    # Milling stage
-    (
-        (
-            "delay_1",
-            "reference_definition",
-            "reference_definition_electron",
-            "stress_relief_cuts",
-            "reference_redefinition_1",
-            "rough_milling",
-            "rough_milling_electron",
-            "reference_redefinition_2",
-            "medium_milling",
-            "medium_milling_electron",
-            "fine_milling",
-            "fine_milling_electron",
-            "finer_milling",
-            "finer_milling_electron",
-        ),
-        "chunk_site",
-    ),
-    # Thinning stage
-    (
-        (
-            "delay_2",
-            "polishing_1",
-            "polishing_1_electron",
-            "polishing_2",
-            "polishing_2_ion",
-            "polishing_2_electron",
-        ),
-        "thinning_site",
-    ),
-)
+MILLING_STEP_NAMES = list(MillingSteps.model_fields.keys())
+STAGE_POSITION_NAMES = list(StagePositionInfo.model_fields.keys())
 
 
 def _register_milling_step(
@@ -181,160 +137,158 @@ def _register_milling_step(
         return None
 
     # Iteratively go through the LamellaSiteInfo model and insert for each step
-    for steps, stage_name in MILLING_STEP_LOOKUP:
-        for step_name in steps:
-            step_info: MillingStepInfo | None = milling_steps.__getattribute__(
-                step_name
+    for step_name in MILLING_STEP_NAMES:
+        step_info: MillingStepInfo | None = milling_steps.__getattribute__(step_name)
+        # Early continues if key information is missing
+        if step_info is None:
+            logger.debug(f"No step info found for {step_name}")
+            continue
+        if step_info.recipe_name is None:
+            logger.debug(f"No recipe name found for {step_name}")
+            continue
+        if step_info.step_name is None:
+            logger.debug(f"No step name found for {step_name}")
+            continue
+        # Use the latest available stage position value
+        stage_values: StagePositionValues | None = None
+        for stage_name in reversed(STAGE_POSITION_NAMES):
+            stage_values = stage_info.__getattribute__(stage_name)
+            if stage_values is not None:
+                break
+        # Use an empty 'StagePositionValues' placeholder if no stage values found
+        if stage_values is None:
+            stage_values = StagePositionValues()
+
+        # Check if the step has already been registered in Murfey
+        milling_step_entry = murfey_db.exec(
+            select(MurfeyDB.MillingStep)
+            .where(MurfeyDB.MillingStep.grid_square_id == grid_square.id)
+            .where(MurfeyDB.MillingStep.recipe_name == step_info.recipe_name)
+            .where(MurfeyDB.MillingStep.activity_name == step_info.step_name)
+        ).one_or_none()
+
+        if milling_step_entry is None:
+            # Create a new ISPyB entry if no Murfey one is found
+            result = transport_object.do_insert_milling_step(
+                # IDs
+                recipe_name=step_info.recipe_name,
+                activity_name=step_info.step_name,
+                grid_square_id=grid_square.id,
+                # Values
+                is_enabled=step_info.is_enabled,
+                status=step_info.status,
+                execution_time=step_info.execution_time,
+                stage_x=stage_values.x,
+                stage_y=stage_values.y,
+                stage_z=stage_values.z,
+                rotation=stage_values.rotation,
+                tilt_alpha=stage_values.tilt_alpha,
+                beam_type=step_info.beam_type,
+                beam_voltage=step_info.voltage,
+                beam_current=step_info.current,
+                milling_angle=step_info.milling_angle,
+                depth_correction=step_info.depth_correction,
+                lamella_offset=step_info.lamella_offset,
+                trench_height_front=step_info.trench_height_front,
+                trench_height_rear=step_info.trench_height_rear,
+                width_overlap_front_left=step_info.width_overlap_front_left,
+                width_overlap_front_right=step_info.width_overlap_front_right,
+                width_overlap_rear_left=step_info.width_overlap_rear_left,
+                width_overlap_rear_right=step_info.width_overlap_rear_right,
             )
-            # Early continues if key information is missing
-            if step_info is None:
-                logger.debug(f"No step info found for {step_name}")
-                continue
-            if step_info.recipe_name is None:
-                logger.debug(f"No recipe name found for {step_name}")
-                continue
-            if step_info.step_name is None:
-                logger.debug(f"No step name found for {step_name}")
+            if result.get("return_value") is None:
+                logger.error(f"No MillingStep entry created for {step_info.step_name}")
                 continue
 
-            stage_values: StagePositionValues | None = stage_info.__getattribute__(
-                stage_name
+            # Create a corresponding record in Murfey
+            milling_step_entry = MurfeyDB.MillingStep(
+                id=int(result["return_value"]),
+                grid_square_id=grid_square.id,
+                recipe_name=step_info.recipe_name,
+                activity_name=step_info.step_name,
+                is_enabled=step_info.is_enabled,
+                status=step_info.status,
+                execution_time=step_info.execution_time,
+                stage_x=stage_values.x,
+                stage_y=stage_values.y,
+                stage_z=stage_values.z,
+                rotation=stage_values.rotation,
+                tilt_alpha=stage_values.tilt_alpha,
+                beam_type=step_info.beam_type,
+                beam_voltage=step_info.voltage,
+                beam_current=step_info.current,
+                milling_angle=step_info.milling_angle,
+                depth_correction=step_info.depth_correction,
+                lamella_offset=step_info.lamella_offset,
+                trench_height_front=step_info.trench_height_front,
+                trench_height_rear=step_info.trench_height_rear,
+                width_overlap_front_left=step_info.width_overlap_front_left,
+                width_overlap_front_right=step_info.width_overlap_front_right,
+                width_overlap_rear_left=step_info.width_overlap_rear_left,
+                width_overlap_rear_right=step_info.width_overlap_rear_right,
             )
-            if stage_values is None:
-                stage_values = StagePositionValues()
+        else:
+            # Update the existing ISPyB one if it already exists
+            result = transport_object.do_update_milling_step(
+                milling_step_id=milling_step_entry.id,
+                is_enabled=step_info.is_enabled,
+                status=step_info.status,
+                execution_time=step_info.execution_time,
+                stage_x=stage_values.x,
+                stage_y=stage_values.y,
+                stage_z=stage_values.z,
+                rotation=stage_values.rotation,
+                tilt_alpha=stage_values.tilt_alpha,
+                beam_type=step_info.beam_type,
+                beam_voltage=step_info.voltage,
+                beam_current=step_info.current,
+                milling_angle=step_info.milling_angle,
+                depth_correction=step_info.depth_correction,
+                lamella_offset=step_info.lamella_offset,
+                trench_height_front=step_info.trench_height_front,
+                trench_height_rear=step_info.trench_height_rear,
+                width_overlap_front_left=step_info.width_overlap_front_left,
+                width_overlap_front_right=step_info.width_overlap_front_right,
+                width_overlap_rear_left=step_info.width_overlap_rear_left,
+                width_overlap_rear_right=step_info.width_overlap_rear_right,
+            )
+            if result.get("return_value", None) is None:
+                logger.error(
+                    f"Could not update MillingStep entry for {step_info.step_name}"
+                )
+                continue
 
-            # Check if the step has already been registered in Murfey
-            milling_step_entry = murfey_db.exec(
-                select(MurfeyDB.MillingStep)
-                .where(MurfeyDB.MillingStep.grid_square_id == grid_square.id)
-                .where(MurfeyDB.MillingStep.recipe_name == step_info.recipe_name)
-                .where(MurfeyDB.MillingStep.activity_name == step_info.step_name)
-            ).one_or_none()
-
-            if milling_step_entry is None:
-                # Create a new ISPyB entry if no Murfey one is found
-                result = transport_object.do_insert_milling_step(
-                    # IDs
-                    recipe_name=step_info.recipe_name,
-                    activity_name=step_info.step_name,
-                    grid_square_id=grid_square.id,
-                    # Values
-                    is_enabled=step_info.is_enabled,
-                    status=step_info.status,
-                    execution_time=step_info.execution_time,
-                    stage_x=stage_values.x,
-                    stage_y=stage_values.y,
-                    stage_z=stage_values.z,
-                    rotation=stage_values.rotation,
-                    tilt_alpha=stage_values.tilt_alpha,
-                    beam_type=step_info.beam_type,
-                    beam_voltage=step_info.voltage,
-                    beam_current=step_info.current,
-                    milling_angle=step_info.milling_angle,
-                    depth_correction=step_info.depth_correction,
-                    lamella_offset=step_info.lamella_offset,
-                    trench_height_front=step_info.trench_height_front,
-                    trench_height_rear=step_info.trench_height_rear,
-                    width_overlap_front_left=step_info.width_overlap_front_left,
-                    width_overlap_front_right=step_info.width_overlap_front_right,
-                    width_overlap_rear_left=step_info.width_overlap_rear_left,
-                    width_overlap_rear_right=step_info.width_overlap_rear_right,
-                )
-                if result.get("return_value") is None:
-                    logger.error(
-                        f"No MillingStep entry created for {step_info.step_name}"
-                    )
-                    continue
-
-                # Create a corresponding record in Murfey
-                milling_step_entry = MurfeyDB.MillingStep(
-                    id=int(result["return_value"]),
-                    grid_square_id=grid_square.id,
-                    recipe_name=step_info.recipe_name,
-                    activity_name=step_info.step_name,
-                    is_enabled=step_info.is_enabled,
-                    status=step_info.status,
-                    execution_time=step_info.execution_time,
-                    stage_x=stage_values.x,
-                    stage_y=stage_values.y,
-                    stage_z=stage_values.z,
-                    rotation=stage_values.rotation,
-                    tilt_alpha=stage_values.tilt_alpha,
-                    beam_type=step_info.beam_type,
-                    beam_voltage=step_info.voltage,
-                    beam_current=step_info.current,
-                    milling_angle=step_info.milling_angle,
-                    depth_correction=step_info.depth_correction,
-                    lamella_offset=step_info.lamella_offset,
-                    trench_height_front=step_info.trench_height_front,
-                    trench_height_rear=step_info.trench_height_rear,
-                    width_overlap_front_left=step_info.width_overlap_front_left,
-                    width_overlap_front_right=step_info.width_overlap_front_right,
-                    width_overlap_rear_left=step_info.width_overlap_rear_left,
-                    width_overlap_rear_right=step_info.width_overlap_rear_right,
-                )
-            else:
-                # Update the existing ISPyB one if it already exists
-                result = transport_object.do_update_milling_step(
-                    milling_step_id=milling_step_entry.id,
-                    is_enabled=step_info.is_enabled,
-                    status=step_info.status,
-                    execution_time=step_info.execution_time,
-                    stage_x=stage_values.x,
-                    stage_y=stage_values.y,
-                    stage_z=stage_values.z,
-                    rotation=stage_values.rotation,
-                    tilt_alpha=stage_values.tilt_alpha,
-                    beam_type=step_info.beam_type,
-                    beam_voltage=step_info.voltage,
-                    beam_current=step_info.current,
-                    milling_angle=step_info.milling_angle,
-                    depth_correction=step_info.depth_correction,
-                    lamella_offset=step_info.lamella_offset,
-                    trench_height_front=step_info.trench_height_front,
-                    trench_height_rear=step_info.trench_height_rear,
-                    width_overlap_front_left=step_info.width_overlap_front_left,
-                    width_overlap_front_right=step_info.width_overlap_front_right,
-                    width_overlap_rear_left=step_info.width_overlap_rear_left,
-                    width_overlap_rear_right=step_info.width_overlap_rear_right,
-                )
-                if result.get("return_value", None) is None:
-                    logger.error(
-                        f"Could not update MillingStep entry for {step_info.step_name}"
-                    )
-                    continue
-
-                # Update the existing Murfey one
-                milling_step_entry.is_enabled = step_info.is_enabled
-                milling_step_entry.status = step_info.status
-                milling_step_entry.execution_time = step_info.execution_time
-                milling_step_entry.stage_x = stage_values.x
-                milling_step_entry.stage_y = stage_values.y
-                milling_step_entry.stage_z = stage_values.z
-                milling_step_entry.rotation = stage_values.rotation
-                milling_step_entry.tilt_alpha = stage_values.tilt_alpha
-                milling_step_entry.beam_type = step_info.beam_type
-                milling_step_entry.beam_voltage = step_info.voltage
-                milling_step_entry.beam_current = step_info.current
-                milling_step_entry.milling_angle = step_info.milling_angle
-                milling_step_entry.depth_correction = step_info.depth_correction
-                milling_step_entry.lamella_offset = step_info.lamella_offset
-                milling_step_entry.trench_height_front = step_info.trench_height_front
-                milling_step_entry.trench_height_rear = step_info.trench_height_rear
-                milling_step_entry.width_overlap_front_left = (
-                    step_info.width_overlap_front_left
-                )
-                milling_step_entry.width_overlap_front_right = (
-                    step_info.width_overlap_front_right
-                )
-                milling_step_entry.width_overlap_rear_left = (
-                    step_info.width_overlap_rear_left
-                )
-                milling_step_entry.width_overlap_rear_right = (
-                    step_info.width_overlap_rear_right
-                )
-            # Mark entry for committing
-            murfey_db.add(milling_step_entry)
+            # Update the existing Murfey one
+            milling_step_entry.is_enabled = step_info.is_enabled
+            milling_step_entry.status = step_info.status
+            milling_step_entry.execution_time = step_info.execution_time
+            milling_step_entry.stage_x = stage_values.x
+            milling_step_entry.stage_y = stage_values.y
+            milling_step_entry.stage_z = stage_values.z
+            milling_step_entry.rotation = stage_values.rotation
+            milling_step_entry.tilt_alpha = stage_values.tilt_alpha
+            milling_step_entry.beam_type = step_info.beam_type
+            milling_step_entry.beam_voltage = step_info.voltage
+            milling_step_entry.beam_current = step_info.current
+            milling_step_entry.milling_angle = step_info.milling_angle
+            milling_step_entry.depth_correction = step_info.depth_correction
+            milling_step_entry.lamella_offset = step_info.lamella_offset
+            milling_step_entry.trench_height_front = step_info.trench_height_front
+            milling_step_entry.trench_height_rear = step_info.trench_height_rear
+            milling_step_entry.width_overlap_front_left = (
+                step_info.width_overlap_front_left
+            )
+            milling_step_entry.width_overlap_front_right = (
+                step_info.width_overlap_front_right
+            )
+            milling_step_entry.width_overlap_rear_left = (
+                step_info.width_overlap_rear_left
+            )
+            milling_step_entry.width_overlap_rear_right = (
+                step_info.width_overlap_rear_right
+            )
+        # Mark entry for committing
+        murfey_db.add(milling_step_entry)
 
     # Commit all changes at once
     murfey_db.commit()
@@ -379,14 +333,21 @@ def run(message: dict[str, Any], murfey_db: SQLModelSession):
         logger.error("Could not construct lookup tags; 'stage_info' is missing")
         return {"success": False, "requeue": False}
     stage_info = site_info.stage_info
-    if stage_info.preparation_site is None:
-        logger.error("Could not construct lookup tags; 'preparation_site' is missing")
+    # Use the latest available stage position value
+    latest_stage_position: StagePositionValues | None = None
+    for stage_name in reversed(STAGE_POSITION_NAMES):
+        latest_stage_position = stage_info.__getattribute__(stage_name)
+        if latest_stage_position is not None:
+            break
+    if latest_stage_position is None:
+        logger.error(
+            "Could not construct lookup tags; no stage position information found"
+        )
         return {"success": False, "requeue": False}
-    preparation_site = stage_info.preparation_site
-    if preparation_site.slot_number is None:
+    if latest_stage_position.slot_number is None:
         logger.error("Could not construct lookup tags; 'slot_number' is missing")
         return {"success": False, "requeue": False}
-    slot_number = preparation_site.slot_number
+    slot_number = latest_stage_position.slot_number
 
     # Milling step information
     if site_info.steps is None:
