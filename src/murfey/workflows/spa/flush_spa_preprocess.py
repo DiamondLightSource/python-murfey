@@ -65,10 +65,22 @@ def register_grid_square(
     if grid_square_params.width is not None:
         grid_square_params.width_scaled = int(grid_square_params.width / 7.8)
 
+    if grid_square_params.sample:
+        dcg = murfey_db.exec(
+            select(DataCollectionGroup)
+            .where(DataCollectionGroup.session_id == session_id)
+            .where(DataCollectionGroup.sample == grid_square_params.sample)
+        ).one()
+    else:
+        dcg = murfey_db.exec(
+            select(DataCollectionGroup)
+            .where(DataCollectionGroup.session_id == session_id)
+            .where(DataCollectionGroup.tag == grid_square_params.tag)
+        ).one()
     grid_square_query = murfey_db.exec(
         select(GridSquare)
         .where(GridSquare.name == gsid)
-        .where(GridSquare.tag == grid_square_params.tag)
+        .where(GridSquare.tag == dcg.tag)
         .where(GridSquare.session_id == session_id)
     ).all()
     if grid_square_query:
@@ -101,11 +113,6 @@ def register_grid_square(
     else:
         # No existing grid square in the murfey database
         if _transport_object:
-            dcg = murfey_db.exec(
-                select(DataCollectionGroup)
-                .where(DataCollectionGroup.session_id == session_id)
-                .where(DataCollectionGroup.tag == grid_square_params.tag)
-            ).one()
             gs_ispyb_response = _transport_object.do_insert_grid_square(
                 dcg.atlas_id, gsid, grid_square_params
             )
@@ -149,12 +156,7 @@ def register_grid_square(
                 instrument_name=murfey_session.instrument_name
             )[murfey_session.instrument_name]
             if machine_config.smartem_api_url:
-                dcg = murfey_db.exec(
-                    select(DataCollectionGroup)
-                    .where(DataCollectionGroup.session_id == session_id)
-                    .where(DataCollectionGroup.tag == grid_square_params.tag)
-                ).one_or_none()
-                if dcg and dcg.smartem_grid_uuid:
+                if dcg.smartem_grid_uuid:
                     secured_grid_square_image_path_full_res: Path | None = None
                     if grid_square_params.image:
                         secured_grid_square_image_path_full_res = secure_path(
