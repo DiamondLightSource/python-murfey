@@ -69,7 +69,7 @@ def test_register_grid_square_update_add_nothing(
     dcg = DataCollectionGroup(
         id=1,
         session_id=ExampleVisit.murfey_session_id,
-        tag="session_tag",
+        tag="processing_tag",
         atlas_id=90,
         sample=2,
     )
@@ -88,7 +88,7 @@ def test_register_grid_square_update_add_nothing(
     murfey_db_session.commit()
 
     # Parameters to update with
-    new_parameters = GridSquareParameters(tag="session_tag")
+    new_parameters = GridSquareParameters(tag="session_tag", sample=2)
 
     # Run the registration
     flush_spa_preprocess.register_grid_square(

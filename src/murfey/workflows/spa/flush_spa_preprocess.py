@@ -65,7 +65,7 @@ def register_grid_square(
     if grid_square_params.width is not None:
         grid_square_params.width_scaled = int(grid_square_params.width / 7.8)
 
-    if grid_square_params.sample:
+    if grid_square_params.sample is not None:
         dcg = murfey_db.exec(
             select(DataCollectionGroup)
             .where(DataCollectionGroup.session_id == session_id)
