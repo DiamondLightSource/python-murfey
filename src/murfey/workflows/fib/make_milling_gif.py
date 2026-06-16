@@ -57,20 +57,24 @@ def run(message: dict[str, Any], murfey_db: SQLModelSession):
                     continue
 
         # Load the images as PIL Image objects
-        arr: list[np.ndarray] = []
+        converted: list[PIL.Image.Image] = []
         for f in gif_params.images:
             with PIL.Image.open(f) as im:
                 im.thumbnail((512, 512))
                 frame = np.array(im, dtype=np.float32)
-                vmin, vmax = np.percentile(frame, (0.5, 99.5))
-                scale = 255 / ((vmax - vmin) or 1)
-                np.clip(frame, a_min=vmin, a_max=vmax, out=frame)
-                np.subtract(frame, vmin, out=frame)
-                np.multiply(frame, scale, out=frame)
-                arr.append(frame.astype(np.uint8))
-
-        # Convert back to PIL.Image objects and save as GIF
-        converted = [PIL.Image.fromarray(a, mode="L") for a in arr]
+            # Normalise to 8-bit
+            vmin, vmax = np.percentile(frame, (0.5, 99.5))
+            scale = 255 / ((vmax - vmin) or 1)
+            np.clip(frame, a_min=vmin, a_max=vmax, out=frame)
+            np.subtract(frame, vmin, out=frame)
+            np.multiply(frame, scale, out=frame)
+            # Convert back to PIL Image
+            converted.append(
+                PIL.Image.fromarray(frame.astype(np.uint8), mode="L").copy()
+            )
+        # Save stack as a GIF
+        if not converted:
+            raise ValueError("No images were provided or loaded")
         converted[0].save(
             output_file,
             format="GIF",
@@ -82,12 +86,7 @@ def run(message: dict[str, Any], murfey_db: SQLModelSession):
         logger.info(f"Created GIF file {output_file}")
         return {"success": True}
     except Exception:
-        logger.error("Error processing FIB milling GIF", exc_info=True)
+        logger.error("Error creating FIB milling GIF", exc_info=True)
         return {"success": False, "requeue": False}
     finally:
-        # Do memory cleanup immediately after function is done
-        for im in converted:
-            im.close()
-        del converted
-        del arr
         murfey_db.close()
