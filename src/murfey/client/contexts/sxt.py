@@ -37,7 +37,7 @@ def _find_reference(txrm_file: Path) -> Path | None:
     candidates.sort(key=lambda x: x.timestamp, reverse=True)
     for ref_option in candidates:
         mosaic_size = 1
-        with OleFileIO(str(ref_option)) as xrm_ole:
+        with OleFileIO(ref_option.full_path) as xrm_ole:
             # Find images which are not mosaics (txrm spec typos this as mosiac)
             if xrm_ole.exists("ImageInfo/MosiacRows") and xrm_ole.exists(
                 "ImageInfo/MosiacColumns"
@@ -53,7 +53,7 @@ def _find_reference(txrm_file: Path) -> Path | None:
                 )
         if mosaic_size == 0:
             logger.info(f"Found reference {ref_option}")
-            return ref_option
+            return Path(ref_option.full_path)
     logger.warning(f"No reference found for {txrm_file}")
     return None
 
@@ -258,9 +258,12 @@ class SXTContext(Context):
             else:
                 reference_file = None
 
-            tilt_series_tag = "_".join(
-                transferred_file.stem.split("@")[0].split("_")[:-1]
-            )
+            if "@" in transferred_file.stem:
+                tilt_series_tag = "_".join(
+                    transferred_file.stem.split("@")[0].split("_")[:-1]
+                )
+            else:
+                tilt_series_tag = transferred_file.stem
             visit_index = transferred_file.parent.parts.index(environment.visit)
             destination_search_dir = "/".join(
                 transferred_file.parts[: visit_index + 2]
@@ -289,6 +292,15 @@ class SXTContext(Context):
                 transferred_file,
                 Path(self._machine_config.get("rsync_basepath", "")),
             )
+            if reference_file:
+                reference_file_transferred_to = _file_transferred_to(
+                    environment,
+                    source,
+                    reference_file,
+                    Path(self._machine_config.get("rsync_basepath", "")),
+                )
+            else:
+                reference_file_transferred_to = None
             capture_post(
                 base_url=str(environment.url.geturl()),
                 router_name="workflow.sxt_router",
@@ -308,7 +320,9 @@ class SXTContext(Context):
                         "tilt_series_length", len(angles)
                     ),
                     "txrm": str(file_transferred_to),
-                    "xrm_reference": str(reference_file) if reference_file else None,
+                    "xrm_reference": str(reference_file_transferred_to)
+                    if reference_file_transferred_to
+                    else None,
                 },
             )
         return True

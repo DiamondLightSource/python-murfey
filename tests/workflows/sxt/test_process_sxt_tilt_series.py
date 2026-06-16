@@ -65,6 +65,7 @@ def test_process_new_sxt_tilt_series(
         tag="tomogram_tag",
         source="/path/to/tomogram_source",
         txrm=f"{tmp_path}/cm12345-6/raw/tomogram_tag.txrm",
+        xrm_reference=f"{tmp_path}/cm12345-6/raw/ref.xrm",
         tilt_series_length=5,
         pixel_size=100,
         tilt_offset=1,
@@ -84,6 +85,7 @@ def test_process_new_sxt_tilt_series(
         {
             "parameters": {
                 "txrm_file": f"{tmp_path}/cm12345-6/raw/tomogram_tag.txrm",
+                "xrm_reference": f"{tmp_path}/cm12345-6/raw/ref.xrm",
                 "dcid": dc_id,
                 "appid": app_id,
                 "stack_file": f"{tmp_path}/cm12345-6/processed/raw/Tomograms/tomogram_tag_stack.mrc",
