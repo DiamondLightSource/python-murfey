@@ -14,6 +14,14 @@ def test_register_grid_square_update_add_locations(
 ):
     """Test the updating of an existing grid square"""
     # Create a grid square to update
+    dcg = DataCollectionGroup(
+        id=1,
+        session_id=ExampleVisit.murfey_session_id,
+        tag="session_tag",
+        atlas_id=90,
+        sample=2,
+    )
+    murfey_db_session.add(dcg)
     grid_square = GridSquare(
         id=1,
         name=101,
@@ -58,6 +66,14 @@ def test_register_grid_square_update_add_nothing(
 ):
     """Test the updating of an existing grid square, but with nothing to update with"""
     # Create a grid square to update
+    dcg = DataCollectionGroup(
+        id=1,
+        session_id=ExampleVisit.murfey_session_id,
+        tag="session_tag",
+        atlas_id=90,
+        sample=2,
+    )
+    murfey_db_session.add(dcg)
     grid_square = GridSquare(
         id=1,
         name=101,
@@ -95,13 +111,14 @@ def test_register_grid_square_insert_with_ispyb(
     mock_transport, murfey_db_session: Session, tmp_path
 ):
     # Create a data collection group for lookups
-    grid_square = DataCollectionGroup(
+    dcg = DataCollectionGroup(
         id=1,
         session_id=ExampleVisit.murfey_session_id,
         tag="session_tag",
         atlas_id=90,
+        sample=2,
     )
-    murfey_db_session.add(grid_square)
+    murfey_db_session.add(dcg)
     murfey_db_session.commit()
 
     # Set the ispyb return

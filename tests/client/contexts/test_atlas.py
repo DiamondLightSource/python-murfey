@@ -139,7 +139,21 @@ def test_atlas_context_dm(mock_capture_post, tmp_path):
     context = AtlasContext("tomo", tmp_path, {}, "token")
     context.post_transfer(atlas_dm, environment=env)
 
-    assert mock_capture_post.call_count == 5
+    assert mock_capture_post.call_count == 6
+    mock_capture_post.assert_any_call(
+        base_url="http://localhost:8000",
+        router_name="workflow.router",
+        function_name="register_dc_group",
+        token="token",
+        instrument_name="m01",
+        visit_name="cm12345-6",
+        session_id=1,
+        data={
+            "experiment_type_id": 44,  # Atlas
+            "tag": str(atlas_dm.parent),
+            "sample": 2,
+        },
+    )
     mock_capture_post.assert_any_call(
         base_url="http://localhost:8000",
         router_name="session_control.spa_router",
@@ -150,6 +164,7 @@ def test_atlas_context_dm(mock_capture_post, tmp_path):
         gsid=101,
         data={
             "tag": str(atlas_dm.parent),
+            "sample": 2,
             "x_location": 1200,
             "y_location": 1500,
             "x_stage_position": 2e9,
