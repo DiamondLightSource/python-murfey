@@ -28,6 +28,7 @@ class SXTTiltSeriesInfo(BaseModel):
     tilt_series_length: int
     pixel_size: float
     tilt_offset: int
+    xrm_reference: str | None
 
 
 def process_sxt_tilt_series_workflow(
@@ -98,6 +99,7 @@ def process_sxt_tilt_series_workflow(
         "recipes": ["sxt-aretomo"],
         "parameters": {
             "txrm_file": tilt_series_info.txrm,
+            "xrm_reference": tilt_series_info.xrm_reference or "",
             "dcid": collected_ids[1].id,
             "appid": collected_ids[3].id,
             "stack_file": str(stack_file),
