@@ -233,6 +233,12 @@ class LamellaSiteInfo(BaseModel):
     steps: MillingSteps | None = None
 
 
+class FIBGIFParameters(BaseModel):
+    lamella_number: int
+    images: list[Path]
+    output_file: Path
+
+
 """
 =======================================================================================
 Single Particle Analysis
