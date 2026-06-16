@@ -168,6 +168,7 @@ class SXTContext(Context):
                 return False
 
             # Read the tilt angles and pixel size from the txrm
+            angles: list = []
             metadata: dict[str, Any] = {
                 "source": str(self._basepath),
                 "tilt_series_tag": transferred_file.stem,
