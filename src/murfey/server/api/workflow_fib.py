@@ -6,7 +6,6 @@ from pydantic import BaseModel
 
 from murfey.server import _transport_object
 from murfey.server.api.auth import validate_instrument_token
-from murfey.server.murfey_db import murfey_db
 from murfey.util.models import FIBGIFParameters, LamellaSiteInfo
 
 logger = logging.getLogger("murfey.server.api.workflow_fib")
@@ -62,7 +61,6 @@ def register_fib_milling_progress(
 async def make_gif(
     session_id: int,
     gif_params: FIBGIFParameters,
-    db=murfey_db,
 ):
     if _transport_object is None:
         logger.error("No TransportManager object was set up")
