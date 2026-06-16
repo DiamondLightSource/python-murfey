@@ -16,77 +16,79 @@ logger = logging.getLogger(__name__)
 
 
 def run(message: dict[str, Any], murfey_db: SQLModelSession):
+    # Outer try-finally block to close Murfey DB with
     try:
-        # Parse and unpack incoming message
-        session_id = int(message["session_id"])
-        gif_params = FIBGIFParameters(**message["gif_params"])
-    except Exception:
-        logger.error("Error parsing contents of message", exc_info=True)
-        return {"success": False, "requeue": False}
+        try:
+            # Parse and unpack incoming message
+            session_id = int(message["session_id"])
+            gif_params = FIBGIFParameters(**message["gif_params"])
+        except Exception:
+            logger.error("Error parsing contents of message", exc_info=True)
+            return {"success": False, "requeue": False}
 
-    # try-except-finally block to handle rest of the function and subsequent cleanup
-    try:
-        # Load machine config and session info
-        session_entry = murfey_db.exec(
-            select(MurfeyDB.Session).where(MurfeyDB.Session.id == session_id)
-        ).one()
-        instrument_name = session_entry.instrument_name
-        visit_name = session_entry.visit
-        machine_config = get_machine_config(instrument_name=instrument_name)[
-            instrument_name
-        ]
-        rsync_basepath = machine_config.rsync_basepath or Path(".").resolve()
+        try:
+            # Load machine config and session info
+            session_entry = murfey_db.exec(
+                select(MurfeyDB.Session).where(MurfeyDB.Session.id == session_id)
+            ).one()
+            instrument_name = session_entry.instrument_name
+            visit_name = session_entry.visit
+            machine_config = get_machine_config(instrument_name=instrument_name)[
+                instrument_name
+            ]
+            rsync_basepath = machine_config.rsync_basepath or Path(".").resolve()
 
-        # Sanitise and verify that the output directory is relative to rsync basepath
-        output_file = sanitise_path(gif_params.output_file)
-        if not output_file.is_relative_to(rsync_basepath):
-            raise ValueError("Output file path is not permitted")
+            # Sanitise and verify that the output directory is relative to rsync basepath
+            output_file = sanitise_path(gif_params.output_file)
+            if not output_file.is_relative_to(rsync_basepath):
+                raise ValueError("Output file path is not permitted")
 
-        # Create folders in the visit directory and onwards and change permissions
-        visit_index = output_file.parts.index(visit_name)
-        for current_path in list(reversed(output_file.parents))[visit_index + 1 :]:
-            if not current_path.exists():
-                current_path.mkdir(parents=True)
-                logger.debug(f"Created output directory {current_path}")
-                try:
-                    os.chmod(current_path, mode=machine_config.mkdir_chmod)
-                except PermissionError:
-                    logger.warning(
-                        f"Insufficient permissions to modify directory {current_path}"
-                    )
-                    continue
+            # Create folders in the visit directory and onwards and change permissions
+            visit_index = output_file.parts.index(visit_name)
+            for current_path in list(reversed(output_file.parents))[visit_index + 1 :]:
+                if not current_path.exists():
+                    current_path.mkdir(parents=True)
+                    logger.debug(f"Created output directory {current_path}")
+                    try:
+                        os.chmod(current_path, mode=machine_config.mkdir_chmod)
+                    except PermissionError:
+                        logger.warning(
+                            f"Insufficient permissions to modify directory {current_path}"
+                        )
+                        continue
 
-        # Load the images as PIL Image objects
-        converted: list[PIL.Image.Image] = []
-        for f in gif_params.images:
-            with PIL.Image.open(f) as im:
-                im.thumbnail((512, 512))
-                frame = np.array(im, dtype=np.float32)
-            # Normalise to 8-bit
-            vmin, vmax = np.percentile(frame, (0.5, 99.5))
-            scale = 255 / ((vmax - vmin) or 1)
-            np.clip(frame, a_min=vmin, a_max=vmax, out=frame)
-            np.subtract(frame, vmin, out=frame)
-            np.multiply(frame, scale, out=frame)
-            # Convert back to PIL Image
-            converted.append(
-                PIL.Image.fromarray(frame.astype(np.uint8), mode="L").copy()
+            # Load the images as PIL Image objects
+            converted: list[PIL.Image.Image] = []
+            for f in gif_params.images:
+                with PIL.Image.open(f) as im:
+                    im.thumbnail((512, 512))
+                    frame = np.array(im, dtype=np.float32)
+                # Normalise to 8-bit
+                vmin, vmax = np.percentile(frame, (0.5, 99.5))
+                scale = 255 / ((vmax - vmin) or 1)
+                np.clip(frame, a_min=vmin, a_max=vmax, out=frame)
+                np.subtract(frame, vmin, out=frame)
+                np.multiply(frame, scale, out=frame)
+                # Convert back to PIL Image
+                converted.append(
+                    PIL.Image.fromarray(frame.astype(np.uint8), mode="L").copy()
+                )
+                del frame  # Explicitly remove frame from memory
+            # Save stack as a GIF
+            if not converted:
+                raise ValueError("No images were provided or loaded")
+            converted[0].save(
+                output_file,
+                format="GIF",
+                append_images=converted[1:],
+                save_all=True,
+                duration=30,
+                loop=0,
             )
-        # Save stack as a GIF
-        if not converted:
-            raise ValueError("No images were provided or loaded")
-        converted[0].save(
-            output_file,
-            format="GIF",
-            append_images=converted[1:],
-            save_all=True,
-            duration=30,
-            loop=0,
-        )
-        logger.info(f"Created GIF file {output_file}")
-        return {"success": True}
-    except Exception:
-        logger.error("Error creating FIB milling GIF", exc_info=True)
-        return {"success": False, "requeue": False}
+            logger.info(f"Created GIF file {output_file}")
+            return {"success": True}
+        except Exception:
+            logger.error("Error creating FIB milling GIF", exc_info=True)
+            return {"success": False, "requeue": False}
     finally:
         murfey_db.close()
