@@ -167,6 +167,30 @@ class AtlasContext(Context):
             except KeyError:
                 logger.info("Unable to read grid square locations from Atlas.dm")
                 return
+            for p in transferred_file.parts:
+                if p.startswith("Sample"):
+                    sample = int(p.replace("Sample", ""))
+                    break
+            else:
+                logger.warning(f"Sample could not be identified for {transferred_file}")
+                return
+
+            # Make sure a dcg is requested before doing grid squares
+            capture_post(
+                base_url=str(environment.url.geturl()),
+                router_name="workflow.router",
+                function_name="register_dc_group",
+                token=self._token,
+                instrument_name=environment.instrument_name,
+                visit_name=environment.visit,
+                session_id=environment.murfey_session,
+                data={
+                    "experiment_type_id": 44,  # Atlas
+                    "tag": str(transferred_file.parent),
+                    "sample": sample,
+                },
+            )
+            # Register all grid squares on this atlas
             for gs, pos_data in gs_pix_positions.items():
                 if pos_data:
                     capture_post(
@@ -179,6 +203,7 @@ class AtlasContext(Context):
                         gsid=int(gs),
                         data={
                             "tag": str(transferred_file.parent),
+                            "sample": sample,
                             "x_location": pos_data[0],
                             "y_location": pos_data[1],
                             "x_stage_position": pos_data[2],
@@ -188,16 +213,8 @@ class AtlasContext(Context):
                             "angle": pos_data[6],
                         },
                     )
+            # Register atlas in smartem
             if gs_pix_positions:
-                for p in transferred_file.parts:
-                    if p.startswith("Sample"):
-                        sample = int(p.replace("Sample", ""))
-                        break
-                else:
-                    logger.warning(
-                        f"Sample could not be identified for {transferred_file}"
-                    )
-                    return
                 capture_post(
                     base_url=str(environment.url.geturl()),
                     router_name="session_control.spa_router",

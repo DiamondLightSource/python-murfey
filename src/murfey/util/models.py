@@ -272,6 +272,7 @@ class ProcessingParametersSPA(BaseModel):
 class GridSquareParameters(BaseModel):
     tag: str
     image: str = ""
+    sample: int | None = None
 
     # Actual coordinates for image centre in real space
     x_location: Optional[float] = None
