@@ -95,7 +95,7 @@ def test_sxt_context_txrm(mock_ole_file, mock_post, tmp_path):
         mock_ole_file().__enter__().exists.assert_any_call(field_name)
         mock_ole_file().__enter__().openstream.assert_any_call(field_name)
 
-    # assert mock_post.call_count == 5
+    assert mock_post.call_count == 5
     mock_post.assert_any_call(
         "http://localhost:8000/workflow/visits/cm12345-6/sessions/1/register_data_collection_group",
         json={
