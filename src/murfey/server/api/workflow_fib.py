@@ -72,6 +72,6 @@ async def make_gif(
         {
             "register": "fib.make_milling_gif",
             "session_id": session_id,
-            "gif_params": gif_params.model_dump(),
+            "gif_params": gif_params.model_dump(mode="json"),
         },
     )
