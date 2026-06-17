@@ -33,7 +33,7 @@ def set_up_db(murfey_db_session: Session):
             "dcg_id": dcg_entry.id,
         },
     )
-    processing_job_entry: ProcessingJob = get_or_create_db_entry(
+    aretomo_pj_entry: ProcessingJob = get_or_create_db_entry(
         murfey_db_session,
         ProcessingJob,
         lookup_kwargs={
@@ -42,15 +42,32 @@ def set_up_db(murfey_db_session: Session):
             "dc_id": dc_entry.id,
         },
     )
-    auto_proc_entry = get_or_create_db_entry(
+    imod_pj_entry: ProcessingJob = get_or_create_db_entry(
+        murfey_db_session,
+        ProcessingJob,
+        lookup_kwargs={
+            "id": 1,
+            "recipe": "sxt-imod-patch-wbp",
+            "dc_id": dc_entry.id,
+        },
+    )
+    aretomo_autoproc_entry = get_or_create_db_entry(
         murfey_db_session,
         AutoProcProgram,
         lookup_kwargs={
             "id": 0,
-            "pj_id": processing_job_entry.id,
+            "pj_id": aretomo_pj_entry.id,
         },
     )
-    return dcg_entry.id, dc_entry.id, processing_job_entry.id, auto_proc_entry.id
+    get_or_create_db_entry(
+        murfey_db_session,
+        AutoProcProgram,
+        lookup_kwargs={
+            "id": 0,
+            "pj_id": imod_pj_entry.id,
+        },
+    )
+    return dcg_entry.id, dc_entry.id, imod_pj_entry.id, aretomo_autoproc_entry.id
 
 
 @mock.patch("murfey.workflows.sxt.process_sxt_tilt_series._transport_object")
@@ -83,18 +100,36 @@ def test_process_new_sxt_tilt_series(
     mock_transport.send.assert_any_call(
         "processing_recipe",
         {
+            "recipes": ["sxt-aretomo"],
             "parameters": {
                 "txrm_file": f"{tmp_path}/cm12345-6/raw/tomogram_tag.txrm",
                 "xrm_reference": f"{tmp_path}/cm12345-6/raw/ref.xrm",
                 "dcid": dc_id,
                 "appid": app_id,
-                "stack_file": f"{tmp_path}/cm12345-6/processed/raw/Tomograms/tomogram_tag_stack.mrc",
+                "stack_file": f"{tmp_path}/cm12345-6/processed/tomogram_tag/sxt-aretomo/Tomograms/tomogram_tag_stack.mrc",
                 "tilt_axis": 0,
                 "pixel_size": 100,
                 "manual_tilt_offset": -1,
                 "node_creator_queue": "node_creator",
             },
-            "recipes": ["sxt-aretomo"],
+        },
+        new_connection=True,
+    )
+    mock_transport.send.assert_any_call(
+        "processing_recipe",
+        {
+            "recipes": ["sxt-imod-patch-wbp"],
+            "parameters": {
+                "txrm_file": f"{tmp_path}/cm12345-6/raw/tomogram_tag.txrm",
+                "xrm_reference": f"{tmp_path}/cm12345-6/raw/ref.xrm",
+                "dcid": dc_id,
+                "appid": app_id,
+                "stack_file": f"{tmp_path}/cm12345-6/processed/tomogram_tag/sxt-imod-patch-wbp/Tomograms/tomogram_tag_stack.mrc",
+                "tilt_axis": 0,
+                "pixel_size": 100,
+                "manual_tilt_offset": -1,
+                "node_creator_queue": "node_creator",
+            },
         },
         new_connection=True,
     )
