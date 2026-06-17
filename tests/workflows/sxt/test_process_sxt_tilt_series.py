@@ -72,7 +72,7 @@ def test_process_new_sxt_tilt_series(
     )
 
     # Run the registration
-    process_sxt_tilt_series.process_sxt_tilt_series_workflow(
+    process_sxt_tilt_series.process_sxt_tilt_series(
         "cm12345-6",
         ExampleVisit.murfey_session_id,
         new_parameters,
