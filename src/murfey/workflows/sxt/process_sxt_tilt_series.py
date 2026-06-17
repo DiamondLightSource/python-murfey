@@ -31,12 +31,12 @@ class SXTTiltSeriesInfo(BaseModel):
     xrm_reference: str | None
 
 
-def process_sxt_tilt_series_workflow(
+def process_sxt_tilt_series(
     visit_name: str,
     session_id: MurfeySessionID,
     tilt_series_info: SXTTiltSeriesInfo,
     murfey_db: Session,
-):
+) -> dict[str, bool]:
     tilt_series_query = murfey_db.exec(
         select(TiltSeries)
         .where(TiltSeries.session_id == session_id)
@@ -47,7 +47,7 @@ def process_sxt_tilt_series_workflow(
         tilt_series = tilt_series_query[0]
         if tilt_series.processing_requested:
             logger.info(f"Tilt series {tilt_series.tag} has already been processed")
-            return
+            return {"success": True}
     else:
         tilt_series = TiltSeries(
             session_id=session_id,
@@ -69,6 +69,10 @@ def process_sxt_tilt_series_workflow(
         .where(ProcessingJob.dc_id == DataCollection.id)
         .where(AutoProcProgram.pj_id == ProcessingJob.id)
     ).all()
+    if len(collected_ids) == 0:
+        logger.warning(f"No processing recipes found for {tilt_series.tag}")
+        return {"success": False, "requeue": False}
+
     instrument_name = (
         murfey_db.exec(select(Session).where(Session.id == session_id))
         .one()
@@ -96,8 +100,20 @@ def process_sxt_tilt_series_workflow(
     )
     stack_file.parent.mkdir(parents=True, exist_ok=True)
 
+    # Loop over all processing jobs, and send the alignment recipe for it
     for recipe_ids in collected_ids:
-        # Loop over all processing jobs, and send the alignment recipe for it
+        # Stack file path needs to contain both recipe name and tilt series anem
+        stack_file = (
+            core
+            / machine_config.processed_directory_name
+            / tilt_series.tag
+            / recipe_ids[2].recipe
+            / "Tomograms"
+            / f"{tilt_series.tag}_stack.mrc"
+        )
+        stack_file.parent.mkdir(parents=True, exist_ok=True)
+
+        # Send message to rabbitmq
         zocalo_message = {
             "recipes": recipe_ids[2].recipe,
             "parameters": {
@@ -126,3 +142,4 @@ def process_sxt_tilt_series_workflow(
     tilt_series.processing_requested = True
     murfey_db.add(tilt_series)
     murfey_db.commit()
+    return {"success": True}

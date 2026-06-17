@@ -125,10 +125,7 @@ class SXTContext(Context):
                 data=dc_data,
             )
 
-            recipes_to_assign_pjids = [
-                "sxt-aretomo",
-                "sxt-imod-patch",
-            ]
+            recipes_to_assign_pjids = self._machine_config.get("recipes", {}).values()
             for recipe in recipes_to_assign_pjids:
                 capture_post(
                     base_url=str(environment.url.geturl()),
