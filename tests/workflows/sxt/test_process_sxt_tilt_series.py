@@ -46,7 +46,7 @@ def set_up_db(murfey_db_session: Session):
         murfey_db_session,
         ProcessingJob,
         lookup_kwargs={
-            "id": 1,
+            "id": 2,
             "recipe": "sxt-imod-patch-wbp",
             "dc_id": dc_entry.id,
         },
@@ -63,7 +63,7 @@ def set_up_db(murfey_db_session: Session):
         murfey_db_session,
         AutoProcProgram,
         lookup_kwargs={
-            "id": 0,
+            "id": 1,
             "pj_id": imod_pj_entry.id,
         },
     )
