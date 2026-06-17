@@ -116,6 +116,7 @@ TomographyMetadataContext = "murfey.client.contexts.tomo_metadata:TomographyMeta
 "data_collection" = "murfey.workflows.register_data_collection:run"
 "data_collection_group" = "murfey.workflows.register_data_collection_group:run"
 "experiment_type_update" = "murfey.workflows.register_experiment_type_update:run"
+"fib.make_milling_gif" = "murfey.workflows.fib.make_milling_gif:run"
 "fib.register_atlas" = "murfey.workflows.fib.register_atlas:run"
 "fib.register_milling_progress" = "murfey.workflows.fib.register_milling_progress:run"
 "pato" = "murfey.workflows.notifications:notification_setup"
