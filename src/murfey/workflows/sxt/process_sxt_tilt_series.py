@@ -115,7 +115,7 @@ def process_sxt_tilt_series(
 
         # Send message to rabbitmq
         zocalo_message = {
-            "recipes": recipe_ids[2].recipe,
+            "recipes": [recipe_ids[2].recipe],
             "parameters": {
                 "txrm_file": tilt_series_info.txrm,
                 "xrm_reference": tilt_series_info.xrm_reference or "",
