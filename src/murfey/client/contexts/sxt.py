@@ -52,7 +52,7 @@ def _find_reference(txrm_file: Path) -> Path | None:
                     )[0]
                 )
         if mosaic_size == 0:
-            logger.info(f"Found reference {ref_option}")
+            logger.info(f"Found reference {ref_option.name}")
             return Path(ref_option.full_path)
     logger.warning(f"No reference found for {txrm_file}")
     return None

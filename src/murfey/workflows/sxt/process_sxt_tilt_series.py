@@ -3,6 +3,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 from sqlmodel import select
+from sqlmodel.orm.session import Session as SQLModelSession
 from werkzeug.utils import secure_filename
 
 from murfey.server import _transport_object
@@ -35,7 +36,7 @@ def process_sxt_tilt_series(
     visit_name: str,
     session_id: MurfeySessionID,
     tilt_series_info: SXTTiltSeriesInfo,
-    murfey_db: Session,
+    murfey_db: SQLModelSession,
 ) -> dict[str, bool]:
     tilt_series_query = murfey_db.exec(
         select(TiltSeries)
@@ -82,30 +83,22 @@ def process_sxt_tilt_series(
         instrument_name
     ]
 
+    # Find the visit folder and any subfolders needed
     parts = [secure_filename(p) for p in Path(tilt_series_info.txrm).parts]
     visit_idx = parts.index(visit_name)
     core = Path(*Path(tilt_series_info.txrm).parts[: visit_idx + 1])
     ppath = Path(
         "/".join(secure_filename(p) for p in Path(tilt_series_info.txrm).parts)
     )
-    sub_dataset = "/".join(ppath.relative_to(core).parts[:-1])
-    extra_path = machine_config.processed_extra_directory
-    stack_file = (
-        core
-        / machine_config.processed_directory_name
-        / sub_dataset
-        / extra_path
-        / "Tomograms"
-        / f"{tilt_series.tag}_stack.mrc"
-    )
-    stack_file.parent.mkdir(parents=True, exist_ok=True)
+    sub_dataset = "/".join(ppath.relative_to(core).parts[1:-1])
 
     # Loop over all processing jobs, and send the alignment recipe for it
     for recipe_ids in collected_ids:
-        # Stack file path needs to contain both recipe name and tilt series anem
+        # Stack file path needs to contain both recipe name and tilt series name
         stack_file = (
             core
             / machine_config.processed_directory_name
+            / sub_dataset
             / tilt_series.tag
             / recipe_ids[2].recipe
             / "Tomograms"
@@ -143,3 +136,12 @@ def process_sxt_tilt_series(
     murfey_db.add(tilt_series)
     murfey_db.commit()
     return {"success": True}
+
+
+def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
+    return process_sxt_tilt_series(
+        message["visit_name"],
+        message["session_id"],
+        SXTTiltSeriesInfo(**message["tilt_series_info"]),
+        murfey_db,
+    )
