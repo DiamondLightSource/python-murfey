@@ -98,6 +98,7 @@ def process_sxt_tilt_series(
         stack_file = (
             core
             / machine_config.processed_directory_name
+            / machine_config.processed_extra_directory
             / sub_dataset
             / tilt_series.tag
             / recipe_ids[2].recipe
