@@ -813,6 +813,10 @@ class TransportManager:
         width_overlap_rear_left: float | None = None,
         width_overlap_rear_right: float | None = None,
     ):
+        """
+        Overwrites all values in the existing ISPyB MillingStep entry with the
+        latest ones.
+        """
         try:
             with ISPyBSession() as db:
                 milling_step = (
@@ -820,44 +824,26 @@ class TransportManager:
                     .filter(MillingStep.millingStepId == milling_step_id)
                     .one()
                 )
-                milling_step.isEnabled = is_enabled or milling_step.isEnabled
-                milling_step.status = status or milling_step.status
-                milling_step.executionTime = (
-                    execution_time or milling_step.executionTime
-                )
-                milling_step.stageX = stage_x or milling_step.stageX
-                milling_step.stageY = stage_y or milling_step.stageY
-                milling_step.stageZ = stage_z or milling_step.stageZ
-                milling_step.rotation = rotation or milling_step.rotation
-                milling_step.alphaTilt = tilt_alpha or milling_step.alphaTilt
-                milling_step.beamType = beam_type or milling_step.beamType
-                milling_step.beamVoltage = beam_voltage or milling_step.beamVoltage
-                milling_step.beamCurrent = beam_current or milling_step.beamCurrent
-                milling_step.millingAngle = milling_angle or milling_step.millingAngle
-                milling_step.depthCorrection = (
-                    depth_correction or milling_step.depthCorrection
-                )
-                milling_step.lamellaOffset = (
-                    lamella_offset or milling_step.lamellaOffset
-                )
-                milling_step.trenchHeightFront = (
-                    trench_height_front or milling_step.trenchHeightFront
-                )
-                milling_step.trenchHeightRear = (
-                    trench_height_rear or milling_step.trenchHeightRear
-                )
-                milling_step.widthOverlapFrontLeft = (
-                    width_overlap_front_left or milling_step.widthOverlapFrontLeft
-                )
-                milling_step.widthOverlapFrontRight = (
-                    width_overlap_front_right or milling_step.widthOverlapFrontRight
-                )
-                milling_step.widthOverlapRearLeft = (
-                    width_overlap_rear_left or milling_step.widthOverlapRearLeft
-                )
-                milling_step.widthOverlapRearRight = (
-                    width_overlap_rear_right or milling_step.widthOverlapRearRight
-                )
+                milling_step.isEnabled = is_enabled
+                milling_step.status = status
+                milling_step.executionTime = execution_time
+                milling_step.stageX = stage_x
+                milling_step.stageY = stage_y
+                milling_step.stageZ = stage_z
+                milling_step.rotation = rotation
+                milling_step.alphaTilt = tilt_alpha
+                milling_step.beamType = beam_type
+                milling_step.beamVoltage = beam_voltage
+                milling_step.beamCurrent = beam_current
+                milling_step.millingAngle = milling_angle
+                milling_step.depthCorrection = depth_correction
+                milling_step.lamellaOffset = lamella_offset
+                milling_step.trenchHeightFront = trench_height_front
+                milling_step.trenchHeightRear = trench_height_rear
+                milling_step.widthOverlapFrontLeft = width_overlap_front_left
+                milling_step.widthOverlapFrontRight = width_overlap_front_right
+                milling_step.widthOverlapRearLeft = width_overlap_rear_left
+                milling_step.widthOverlapRearRight = width_overlap_rear_right
 
                 db.add(milling_step)
                 db.commit()
