@@ -69,7 +69,12 @@ def test_sxt_context_txrm(mock_ole_file, mock_post, tmp_path):
         visit="cm12345-6",
         murfey_session=1,
     )
-    context = SXTContext("zeiss", tmp_path / "cm12345-6/grid1", {}, "")
+    context = SXTContext(
+        "zeiss",
+        tmp_path / "cm12345-6/grid1",
+        {"recipes": {"aretomo": "sxt-aretomo"}},
+        "",
+    )
     context.post_transfer(
         tmp_path / "cm12345-6/grid1/example.txrm",
         required_position_files=[],
@@ -191,7 +196,12 @@ def test_sxt_context_txrm_external_ref(mock_ole_file, mock_post, tmp_path):
         visit="cm12345-6",
         murfey_session=1,
     )
-    context = SXTContext("zeiss", tmp_path / "cm12345-6/grid1", {}, "")
+    context = SXTContext(
+        "zeiss",
+        tmp_path / "cm12345-6/grid1",
+        {"recipes": {"aretomo": "sxt-aretomo", "imod": "sxt-imod-patch-wbp"}},
+        "",
+    )
     context.post_transfer(
         tmp_path / "cm12345-6/grid1/example_-60to60@0.5.txrm",
         required_position_files=[],
@@ -204,7 +214,7 @@ def test_sxt_context_txrm_external_ref(mock_ole_file, mock_post, tmp_path):
     )
     mock_ole_file.assert_any_call(str(tmp_path / "cm12345-6/grid1/ref.xrm"))
 
-    assert mock_post.call_count == 5
+    assert mock_post.call_count == 6
     mock_post.assert_any_call(
         "http://localhost:8000/workflow/visits/cm12345-6/sessions/1/register_data_collection_group",
         json={
@@ -241,6 +251,16 @@ def test_sxt_context_txrm_external_ref(mock_ole_file, mock_post, tmp_path):
             "tag": "example",
             "source": f"{tmp_path}/cm12345-6/grid1",
             "recipe": "sxt-aretomo",
+            "experiment_type": "sxt",
+        },
+        headers={"Authorization": "Bearer "},
+    )
+    mock_post.assert_any_call(
+        "http://localhost:8000/workflow/visits/cm12345-6/sessions/1/register_processing_job",
+        json={
+            "tag": "example",
+            "source": f"{tmp_path}/cm12345-6/grid1",
+            "recipe": "sxt-imod-patch-wbp",
             "experiment_type": "sxt",
         },
         headers={"Authorization": "Bearer "},

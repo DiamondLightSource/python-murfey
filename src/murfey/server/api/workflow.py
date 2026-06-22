@@ -80,7 +80,6 @@ from murfey.util.processing_params import (
 from murfey.util.tomo import midpoint
 from murfey.workflows.sxt.process_sxt_tilt_series import (
     SXTTiltSeriesInfo,
-    process_sxt_tilt_series_workflow,
 )
 from murfey.workflows.tomo.tomo_metadata import register_search_map_in_database
 
@@ -1086,9 +1085,16 @@ def process_sxt_tilt_series(
     tilt_series_info: SXTTiltSeriesInfo,
     db=murfey_db,
 ):
-    return process_sxt_tilt_series_workflow(
-        visit_name, session_id, tilt_series_info, db
-    )
+    if _transport_object:
+        _transport_object.send(
+            _transport_object.feedback_queue,
+            {
+                "register": "sxt.process_tilt_series",
+                "session_id": session_id,
+                "visit_name": visit_name,
+                "tilt_series_info": tilt_series_info.model_dump(mode="json"),
+            },
+        )
 
 
 correlative_router = APIRouter(
