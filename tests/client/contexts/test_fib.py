@@ -221,6 +221,7 @@ def _create_activity_node(
 
 
 def _create_site_node(
+    site_prefix: str,
     site_num: int,
     has_site_name: bool = True,
     has_recipes: bool = True,
@@ -233,9 +234,14 @@ def _create_site_node(
 
     if has_site_name:
         name_node = ET.Element("Name")
-        name_node.text = "Lamella"
-        if site_num > 1:
-            name_node.text += f" ({site_num})"
+        name_node.text = site_prefix
+        # If the site name starts with "Lamella"
+        if site_prefix == "Lamella":
+            if site_num > 1:
+                name_node.text += f" ({site_num})"
+        # If the site name starts with "Site"
+        else:
+            name_node.text += f" #{site_num}"
         site_node.append(name_node)
 
     # Create the stage position nodes
@@ -296,6 +302,8 @@ def _create_site_node(
 
 def create_fib_autotem_project_data(
     visit_dir: Path,
+    project_name: str,
+    site_prefix: str,
     has_project_name: bool = True,
     has_sites: bool = True,
     has_site_name: bool = True,
@@ -320,6 +328,7 @@ def create_fib_autotem_project_data(
             n += 1
             site_parent_node.append(
                 _create_site_node(
+                    site_prefix,
                     n,
                     has_site_name=has_site_name,
                     has_recipes=has_recipes,
@@ -466,7 +475,7 @@ def test_file_transferred_to(
         (False, True, True, True, True, True, True, True, False),  # No environment
     ),
 )
-def test_fib_autotem_context_projectdata(
+def test_fib_full_autotem_context_projectdata(
     mocker: MockerFixture,
     test_params: tuple[bool, bool, bool, bool, bool, bool, bool, bool, bool],
     tmp_path: Path,
@@ -530,6 +539,8 @@ def test_fib_autotem_context_projectdata(
     # Create the mock metadata file to parse
     mock_projectdata = create_fib_autotem_project_data(
         visit_dir=visit_dir,
+        project_name=project_name,
+        site_prefix="Lamella",
         has_project_name=has_project_name,
         has_sites=has_sites,
         has_site_name=has_site_name,
@@ -677,7 +688,7 @@ def test_fib_autotem_context_projectdata(
         (True, True, True, True, True, True, True),
     ),
 )
-def test_fib_autotem_context_drift_correction_images(
+def test_fib_full_autotem_context_drift_correction_images(
     mocker: MockerFixture,
     test_params: tuple[bool, bool, bool, bool, bool, bool, bool],
     tmp_path: Path,
@@ -813,6 +824,42 @@ def test_fib_autotem_context_drift_correction_images(
             )
         # 'capture_post' should be called for every image
         assert mock_capture_post.call_count == len(destination_files)
+
+
+def test_fib_manual_autotem_context_projectdata(
+    mocker: MockerFixture,
+    visit_dir: Path,
+):
+    # Mock the ProjectData.dat file
+    mock_projectdata = create_fib_autotem_project_data(
+        visit_dir=visit_dir,
+        project_name=f"AutoTEM_200101-1200_{project_name}",
+        site_prefix="Site",
+    )
+
+    # Mock the Murfey environment
+    mock_environment = MagicMock()
+    mock_environment.visit = visit_name
+
+    # Patch the '_parse_autotem_metadata' class function
+    mock_parse = mocker.patch.object(FIBContext, "_parse_autotem_metadata")
+
+    # Mock the functions used in 'post_transfer'
+    mock_capture_post = mocker.patch("murfey.client.contexts.fib.capture_post")
+
+    # Initialise the FIBContext
+    basepath = visit_dir
+    context = FIBContext(
+        acquisition_software="autotem",
+        basepath=basepath,
+        machine_config={},
+        token="",
+    )
+
+    # Pass file to FIBContext and check that it behaves as expected
+    context.post_transfer(mock_projectdata, environment=mock_environment)
+    mock_parse.assert_not_called()
+    mock_capture_post.assert_not_called()
 
 
 def test_fib_maps_context(
