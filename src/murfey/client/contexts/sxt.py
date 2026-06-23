@@ -161,7 +161,152 @@ class SXTContext(Context):
 
         data_suffixes = [".txrm"]
 
-        if transferred_file.suffix in data_suffixes and environment:
+        if transferred_file.suffix == ".xrm" and environment:
+            # Make sure we have a dcg for this grid
+            dcg_tag = ensure_dcg_exists(
+                collection_type="sxt",
+                metadata_source=self._basepath,
+                environment=environment,
+                machine_config=self._machine_config,
+                token=self._token,
+            )
+
+            metadata: dict[str, Any] = {}
+            with OleFileIO(str(transferred_file)) as xrm_ole:
+                if xrm_ole.exists("ImageInfo/XPosition") and xrm_ole.exists(
+                    "ImageInfo/YPosition"
+                ):
+                    x_tiles = np.frombuffer(
+                        xrm_ole.openstream("ImageInfo/XPosition").getvalue(), np.float32
+                    ).tolist()
+                    y_tiles = np.frombuffer(
+                        xrm_ole.openstream("ImageInfo/YPosition").getvalue(), np.float32
+                    ).tolist()
+                    metadata["x_position"] = x_tiles[int(len(x_tiles) / 2)]
+                    metadata["y_position"] = y_tiles[int(len(y_tiles) / 2)]
+
+                if xrm_ole.exists("ImageInfo/PixelSize"):
+                    metadata["pixel_size"] = np.frombuffer(
+                        xrm_ole.openstream("ImageInfo/PixelSize").getvalue(), np.float32
+                    ).tolist()
+
+                if xrm_ole.exists("ImageInfo/ImageHeight"):
+                    metadata["height"] = np.frombuffer(
+                        xrm_ole.openstream("ImageInfo/ImageHeight").getvalue(), np.int32
+                    ).tolist()
+
+                if xrm_ole.exists("ImageInfo/ImageWidth"):
+                    metadata["width"] = np.frombuffer(
+                        xrm_ole.openstream("ImageInfo/ImageWidth").getvalue(), np.intt32
+                    ).tolist()
+
+                # Find images which are not mosaics (txrm spec typos this as mosiac)
+                if xrm_ole.exists("ImageInfo/MosiacRows") and xrm_ole.exists(
+                    "ImageInfo/MosiacColumns"
+                ):
+                    metadata["mosaic_rows"] = np.frombuffer(
+                        xrm_ole.openstream("ImageInfo/MosiacRows").getvalue(), np.int32
+                    )[0]
+                    metadata["mosiac_columns"] = np.frombuffer(
+                        xrm_ole.openstream("ImageInfo/MosiacColumns").getvalue(),
+                        np.int32,
+                    )[0]
+                    metadata["mosaic_size"] = int(
+                        metadata["mosaic_rows"] * metadata["mosiac_columns"]
+                    )
+
+            source = _get_source(transferred_file, environment=environment)
+            if source:
+                image_path = _file_transferred_to(
+                    environment,
+                    source,
+                    transferred_file,
+                    Path(self._machine_config.get("rsync_basepath", "")),
+                )
+                converted_file_path = (
+                    Path(self._machine_config.get("rsync_basepath", ""))
+                    / (
+                        environment.visit
+                        if environment.visit
+                        not in environment.default_destinations[source]
+                        else ""
+                    )
+                    / self._machine_config.get("processed_directory_name", "")
+                    / self._machine_config.get("processed_extra_directory", "")
+                    / f"{transferred_file.relative_to(source).stem}_Annotated.tiff"
+                )
+
+                capture_post(
+                    base_url=str(environment.url.geturl()),
+                    router_name="workflow.sxt_router",
+                    function_name="convert_xrm_to_tiff",
+                    token=self._token,
+                    instrument_name=environment.instrument_name,
+                    visit_name=environment.visit,
+                    session_id=environment.murfey_session,
+                    data={
+                        "txrm_file": image_path,
+                        "converted_destination": str(converted_file_path),
+                        "annotate": True,
+                    },
+                )
+
+                if (
+                    metadata.get("mosaic_size", 1) > 0
+                    and metadata.get("pixel_size", 0) > 0.1
+                ):
+                    # Large pixel size, this is an atlas
+                    dcg_data = {
+                        "experiment_type_id": 44,  # Atlas
+                        "tag": dcg_tag,
+                        "atlas": str(converted_file_path),
+                        "atlas_pixel_size": metadata.get("pixel_size", None),
+                        "atlas_x_stage_position": metadata.get("x_position", None),
+                        "atlas_y_stage_position": metadata.get("y_position", None),
+                        "atlas_height": int(
+                            metadata.get("height", 0) * metadata["mosaic_rows"]
+                        ),
+                        "atlas_width": int(
+                            metadata.get("width", 0) * metadata["mosaic_columns"]
+                        ),
+                    }
+                    capture_post(
+                        base_url=str(environment.url.geturl()),
+                        router_name="workflow.router",
+                        function_name="register_dc_group",
+                        token=self._token,
+                        instrument_name=environment.instrument_name,
+                        visit_name=environment.visit,
+                        session_id=environment.murfey_session,
+                        data=dcg_data,
+                    )
+                elif metadata.get("mosaic_size", 1) > 0:
+                    # Other mosaic images are of grid squares
+                    capture_post(
+                        base_url=str(environment.url.geturl()),
+                        router_name="workflow.sxt_router",
+                        function_name="register_sxt_roi",
+                        token=self._token,
+                        instrument_name=environment.instrument_name,
+                        session_id=environment.murfey_session,
+                        sm_name=transferred_file.parent.name,
+                        data={
+                            "tag": dcg_tag,
+                            "name": transferred_file.stem,
+                            "x_stage_position": metadata.get("x_position", None),
+                            "y_stage_position": metadata.get("y_position", None),
+                            "pixel_size": metadata.get("pixel_size", None),
+                            "height": int(
+                                metadata.get("height", 0) * metadata["mosaic_rows"]
+                            ),
+                            "width": int(
+                                metadata.get("width", 0) * metadata["mosaic_columns"]
+                            ),
+                            "image": str(converted_file_path),
+                        },
+                    )
+
+        elif transferred_file.suffix in data_suffixes and environment:
             source = _get_source(transferred_file, environment)
             if not source:
                 logger.warning(f"No source found for file {transferred_file}")
@@ -169,7 +314,7 @@ class SXTContext(Context):
 
             # Read the tilt angles and pixel size from the txrm
             angles: list = []
-            metadata: dict[str, Any] = {
+            metadata = {
                 "source": str(self._basepath),
                 "tilt_series_tag": transferred_file.stem,
             }
