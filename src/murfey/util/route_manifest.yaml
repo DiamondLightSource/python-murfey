@@ -1460,3 +1460,12 @@ murfey.server.api.workflow_sxt.router:
     path_params: []
     methods:
       - POST
+  - path: /workflow/sxt/visits/{visit_name}/sessions/{session_id}/register_sxt_roi
+    function: register_sxt_roi
+    path_params:
+      - name: visit_name
+        type: str
+      - name: session_id
+        type: int
+    methods:
+      - POST

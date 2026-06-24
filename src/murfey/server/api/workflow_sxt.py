@@ -43,18 +43,38 @@ class XrmFile(BaseModel):
 
 
 @router.post("/convert_xrm_to_tiff")
-def convert_xrm_to_tiff(
-    xrm_file: XrmFile,
-    db=murfey_db,
-):
+def convert_xrm_to_tiff(xrm_file: XrmFile, db=murfey_db):
     if _transport_object:
         logger.info("Sending xrm conversion to images service")
         _transport_object.send(
             "images",
             {
-                "txrm_file": str(xrm_file.xrm_path),
-                "converted_destination": str(xrm_file.tiff_path),
+                "image_command": "xrm_to_jpeg",
+                "xrm_file": str(xrm_file.xrm_path),
+                "tiff_destination": str(xrm_file.tiff_path),
                 "annotate": True,
             },
             new_connection=True,
         )
+
+
+class SxtRoiInfo(BaseModel):
+    tag: str
+    name: str
+    x_stage_position: float
+    y_stage_position: float
+    pixel_size: float
+    height: int
+    width: int
+    image: Path
+
+
+@router.post("/visits/{visit_name}/sessions/{session_id}/register_sxt_roi")
+def register_sxt_roi(
+    visit_name: str,
+    session_id: MurfeySessionID,
+    tilt_series_info: SXTTiltSeriesInfo,
+    db=murfey_db,
+):
+    # TODO
+    return
