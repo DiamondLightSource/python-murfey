@@ -476,6 +476,7 @@ class UpstreamFileDownloadInfo(BaseModel):
     download_dir: Path
     upstream_instrument: str
     upstream_visit_path: Path
+    search_strings: list[str] | None = None
 
 
 @router.post("/visits/{visit_name}/sessions/{session_id}/upstream_file_data_request")
@@ -518,6 +519,7 @@ def gather_upstream_files(
         json={
             "upstream_instrument": upstream_instrument,
             "upstream_visit_path": str(upstream_visit_path),
+            "search_strings": upstream_file_download.search_strings,
         },
     ).json()
 

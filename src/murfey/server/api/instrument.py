@@ -488,6 +488,7 @@ async def request_upstream_file_data_download(
                 "download_dir": download_dir,
                 "upstream_instrument": upstream_file_request.upstream_instrument,
                 "upstream_visit_path": str(upstream_file_request.upstream_visit_path),
+                "search_strings": upstream_file_request.search_strings,
             },
         ) as resp:
             data = await resp.json()
