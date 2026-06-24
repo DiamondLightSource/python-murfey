@@ -3,6 +3,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 from sqlmodel import select
+from sqlmodel.orm.session import Session as SQLModelSession
 from werkzeug.utils import secure_filename
 
 from murfey.server import _transport_object
@@ -31,12 +32,12 @@ class SXTTiltSeriesInfo(BaseModel):
     xrm_reference: str | None
 
 
-def process_sxt_tilt_series_workflow(
+def process_sxt_tilt_series(
     visit_name: str,
     session_id: MurfeySessionID,
     tilt_series_info: SXTTiltSeriesInfo,
-    murfey_db: Session,
-):
+    murfey_db: SQLModelSession,
+) -> dict[str, bool]:
     tilt_series_query = murfey_db.exec(
         select(TiltSeries)
         .where(TiltSeries.session_id == session_id)
@@ -47,7 +48,7 @@ def process_sxt_tilt_series_workflow(
         tilt_series = tilt_series_query[0]
         if tilt_series.processing_requested:
             logger.info(f"Tilt series {tilt_series.tag} has already been processed")
-            return
+            return {"success": True}
     else:
         tilt_series = TiltSeries(
             session_id=session_id,
@@ -59,6 +60,7 @@ def process_sxt_tilt_series_workflow(
         murfey_db.add(tilt_series)
         murfey_db.commit()
 
+    # Find all processing jobs registered for this tilt series
     collected_ids = murfey_db.exec(
         select(DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram)
         .where(DataCollectionGroup.session_id == session_id)
@@ -67,8 +69,11 @@ def process_sxt_tilt_series_workflow(
         .where(DataCollection.dcg_id == DataCollectionGroup.id)
         .where(ProcessingJob.dc_id == DataCollection.id)
         .where(AutoProcProgram.pj_id == ProcessingJob.id)
-        .where(ProcessingJob.recipe == "sxt-aretomo")
-    ).one()
+    ).all()
+    if len(collected_ids) == 0:
+        logger.warning(f"No processing recipes found for {tilt_series.tag}")
+        return {"success": False, "requeue": False}
+
     instrument_name = (
         murfey_db.exec(select(Session).where(Session.id == session_id))
         .one()
@@ -78,46 +83,66 @@ def process_sxt_tilt_series_workflow(
         instrument_name
     ]
 
+    # Find the visit folder and any subfolders needed
     parts = [secure_filename(p) for p in Path(tilt_series_info.txrm).parts]
     visit_idx = parts.index(visit_name)
     core = Path(*Path(tilt_series_info.txrm).parts[: visit_idx + 1])
     ppath = Path(
         "/".join(secure_filename(p) for p in Path(tilt_series_info.txrm).parts)
     )
-    sub_dataset = "/".join(ppath.relative_to(core).parts[:-1])
-    extra_path = machine_config.processed_extra_directory
-    stack_file = (
-        core
-        / machine_config.processed_directory_name
-        / sub_dataset
-        / extra_path
-        / "Tomograms"
-        / f"{tilt_series.tag}_stack.mrc"
-    )
-    stack_file.parent.mkdir(parents=True, exist_ok=True)
-    zocalo_message = {
-        "recipes": ["sxt-aretomo"],
-        "parameters": {
-            "txrm_file": tilt_series_info.txrm,
-            "xrm_reference": tilt_series_info.xrm_reference or "",
-            "dcid": collected_ids[1].id,
-            "appid": collected_ids[3].id,
-            "stack_file": str(stack_file),
-            "tilt_axis": 0,
-            "pixel_size": tilt_series_info.pixel_size,
-            "manual_tilt_offset": -tilt_series_info.tilt_offset,
-            "node_creator_queue": machine_config.node_creator_queue,
-        },
-    }
-    if _transport_object:
-        logger.info(
-            f"Sending Zocalo message for processing: {sanitise(str(zocalo_message))}"
+    sub_dataset = "/".join(ppath.relative_to(core).parts[1:-1])
+
+    # Loop over all processing jobs, and send the alignment recipe for it
+    for recipe_ids in collected_ids:
+        # Stack file path needs to contain both recipe name and tilt series name
+        stack_file = (
+            core
+            / machine_config.processed_directory_name
+            / machine_config.processed_extra_directory
+            / sub_dataset
+            / tilt_series.tag
+            / recipe_ids[2].recipe
+            / "Tomograms"
+            / f"{tilt_series.tag}_stack.mrc"
         )
-        _transport_object.send("processing_recipe", zocalo_message, new_connection=True)
-    else:
-        logger.info(
-            f"No transport object found. Zocalo message would be {sanitise(str(zocalo_message))}"
-        )
+        stack_file.parent.mkdir(parents=True, exist_ok=True)
+
+        # Send message to rabbitmq
+        zocalo_message = {
+            "recipes": [recipe_ids[2].recipe],
+            "parameters": {
+                "txrm_file": tilt_series_info.txrm,
+                "xrm_reference": tilt_series_info.xrm_reference or "",
+                "dcid": recipe_ids[1].id,
+                "appid": recipe_ids[3].id,
+                "stack_file": str(stack_file),
+                "tilt_axis": 0,
+                "pixel_size": tilt_series_info.pixel_size,
+                "manual_tilt_offset": -tilt_series_info.tilt_offset,
+                "node_creator_queue": machine_config.node_creator_queue,
+            },
+        }
+        if _transport_object:
+            logger.info(
+                f"Sending Zocalo message for processing: {sanitise(str(zocalo_message))}"
+            )
+            _transport_object.send(
+                "processing_recipe", zocalo_message, new_connection=True
+            )
+        else:
+            logger.info(
+                f"No transport object found. Zocalo message would be {sanitise(str(zocalo_message))}"
+            )
     tilt_series.processing_requested = True
     murfey_db.add(tilt_series)
     murfey_db.commit()
+    return {"success": True}
+
+
+def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
+    return process_sxt_tilt_series(
+        message["visit_name"],
+        message["session_id"],
+        SXTTiltSeriesInfo(**message["tilt_series_info"]),
+        murfey_db,
+    )

@@ -33,7 +33,7 @@ def set_up_db(murfey_db_session: Session):
             "dcg_id": dcg_entry.id,
         },
     )
-    processing_job_entry: ProcessingJob = get_or_create_db_entry(
+    aretomo_pj_entry: ProcessingJob = get_or_create_db_entry(
         murfey_db_session,
         ProcessingJob,
         lookup_kwargs={
@@ -42,15 +42,32 @@ def set_up_db(murfey_db_session: Session):
             "dc_id": dc_entry.id,
         },
     )
-    auto_proc_entry = get_or_create_db_entry(
+    imod_pj_entry: ProcessingJob = get_or_create_db_entry(
+        murfey_db_session,
+        ProcessingJob,
+        lookup_kwargs={
+            "id": 2,
+            "recipe": "sxt-imod-patch-wbp",
+            "dc_id": dc_entry.id,
+        },
+    )
+    aretomo_autoproc_entry = get_or_create_db_entry(
         murfey_db_session,
         AutoProcProgram,
         lookup_kwargs={
             "id": 0,
-            "pj_id": processing_job_entry.id,
+            "pj_id": aretomo_pj_entry.id,
         },
     )
-    return dcg_entry.id, dc_entry.id, processing_job_entry.id, auto_proc_entry.id
+    imod_autoproc_entry = get_or_create_db_entry(
+        murfey_db_session,
+        AutoProcProgram,
+        lookup_kwargs={
+            "id": 1,
+            "pj_id": imod_pj_entry.id,
+        },
+    )
+    return dcg_entry.id, dc_entry.id, aretomo_autoproc_entry.id, imod_autoproc_entry.id
 
 
 @mock.patch("murfey.workflows.sxt.process_sxt_tilt_series._transport_object")
@@ -58,7 +75,7 @@ def test_process_new_sxt_tilt_series(
     mock_transport, murfey_db_session: Session, tmp_path
 ):
     """Run the picker feedback with less particles than needed for classification"""
-    dcg_id, dc_id, pj_id, app_id = set_up_db(murfey_db_session)
+    dcg_id, dc_id, app_id_aretomo, app_id_imod = set_up_db(murfey_db_session)
 
     new_parameters = process_sxt_tilt_series.SXTTiltSeriesInfo(
         session_id=ExampleVisit.murfey_session_id,
@@ -72,7 +89,7 @@ def test_process_new_sxt_tilt_series(
     )
 
     # Run the registration
-    process_sxt_tilt_series.process_sxt_tilt_series_workflow(
+    process_sxt_tilt_series.process_sxt_tilt_series(
         "cm12345-6",
         ExampleVisit.murfey_session_id,
         new_parameters,
@@ -83,18 +100,36 @@ def test_process_new_sxt_tilt_series(
     mock_transport.send.assert_any_call(
         "processing_recipe",
         {
+            "recipes": ["sxt-aretomo"],
             "parameters": {
                 "txrm_file": f"{tmp_path}/cm12345-6/raw/tomogram_tag.txrm",
                 "xrm_reference": f"{tmp_path}/cm12345-6/raw/ref.xrm",
                 "dcid": dc_id,
-                "appid": app_id,
-                "stack_file": f"{tmp_path}/cm12345-6/processed/raw/Tomograms/tomogram_tag_stack.mrc",
+                "appid": app_id_aretomo,
+                "stack_file": f"{tmp_path}/cm12345-6/processed/tomogram_tag/sxt-aretomo/Tomograms/tomogram_tag_stack.mrc",
                 "tilt_axis": 0,
                 "pixel_size": 100,
                 "manual_tilt_offset": -1,
                 "node_creator_queue": "node_creator",
             },
-            "recipes": ["sxt-aretomo"],
+        },
+        new_connection=True,
+    )
+    mock_transport.send.assert_any_call(
+        "processing_recipe",
+        {
+            "recipes": ["sxt-imod-patch-wbp"],
+            "parameters": {
+                "txrm_file": f"{tmp_path}/cm12345-6/raw/tomogram_tag.txrm",
+                "xrm_reference": f"{tmp_path}/cm12345-6/raw/ref.xrm",
+                "dcid": dc_id,
+                "appid": app_id_imod,
+                "stack_file": f"{tmp_path}/cm12345-6/processed/tomogram_tag/sxt-imod-patch-wbp/Tomograms/tomogram_tag_stack.mrc",
+                "tilt_axis": 0,
+                "pixel_size": 100,
+                "manual_tilt_offset": -1,
+                "node_creator_queue": "node_creator",
+            },
         },
         new_connection=True,
     )

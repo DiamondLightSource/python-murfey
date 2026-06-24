@@ -52,7 +52,7 @@ def _find_reference(txrm_file: Path) -> Path | None:
                     )[0]
                 )
         if mosaic_size == 0:
-            logger.info(f"Found reference {ref_option}")
+            logger.info(f"Found reference {ref_option.name}")
             return Path(ref_option.full_path)
     logger.warning(f"No reference found for {txrm_file}")
     return None
@@ -125,9 +125,7 @@ class SXTContext(Context):
                 data=dc_data,
             )
 
-            recipes_to_assign_pjids = [
-                "sxt-aretomo",
-            ]
+            recipes_to_assign_pjids = self._machine_config.get("recipes", {}).values()
             for recipe in recipes_to_assign_pjids:
                 capture_post(
                     base_url=str(environment.url.geturl()),

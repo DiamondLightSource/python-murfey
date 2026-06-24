@@ -243,8 +243,6 @@ def register_search_map_in_database(
         )
     murfey_db.add(search_map)
     murfey_db.commit()
-    if close_db:
-        murfey_db.close()
 
     if search_map_hooks := entry_points(group="murfey.hooks", name="search_map"):
         try:
@@ -257,6 +255,8 @@ def register_search_map_in_database(
                 )
         except Exception as e:
             logger.error(f"Call to search map hook failed with {e}", exc_info=True)
+    if close_db:
+        murfey_db.close()
 
 
 def register_batch_position_in_database(
