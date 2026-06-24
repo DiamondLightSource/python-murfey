@@ -89,6 +89,7 @@ class UpstreamFileRequestInfo(BaseModel):
     # Used in backend server for cross-instrument file download requests
     upstream_instrument: str
     upstream_visit_path: Path
+    search_strings: list[str] | None = None
 
 
 """
