@@ -159,8 +159,6 @@ class SXTContext(Context):
             **kwargs,
         )
 
-        data_suffixes = [".txrm"]
-
         if transferred_file.suffix == ".xrm" and environment:
             # Make sure we have a dcg for this grid
             dcg_tag = ensure_dcg_exists(
@@ -238,17 +236,11 @@ class SXTContext(Context):
 
                 capture_post(
                     base_url=str(environment.url.geturl()),
-                    router_name="workflow.sxt_router",
+                    router_name="workflow_sxt.router",
                     function_name="convert_xrm_to_tiff",
                     token=self._token,
                     instrument_name=environment.instrument_name,
-                    visit_name=environment.visit,
-                    session_id=environment.murfey_session,
-                    data={
-                        "txrm_file": image_path,
-                        "converted_destination": str(converted_file_path),
-                        "annotate": True,
-                    },
+                    data={"xrm_path": image_path, "tiff_path": converted_file_path},
                 )
 
                 if (
@@ -284,7 +276,7 @@ class SXTContext(Context):
                     # Other mosaic images are of grid squares
                     capture_post(
                         base_url=str(environment.url.geturl()),
-                        router_name="workflow.sxt_router",
+                        router_name="workflow_sxt.router",
                         function_name="register_sxt_roi",
                         token=self._token,
                         instrument_name=environment.instrument_name,
@@ -306,7 +298,7 @@ class SXTContext(Context):
                         },
                     )
 
-        elif transferred_file.suffix in data_suffixes and environment:
+        elif transferred_file.suffix == ".txrm" and environment:
             source = _get_source(transferred_file, environment)
             if not source:
                 logger.warning(f"No source found for file {transferred_file}")
@@ -449,7 +441,7 @@ class SXTContext(Context):
                 reference_file_transferred_to = None
             capture_post(
                 base_url=str(environment.url.geturl()),
-                router_name="workflow.sxt_router",
+                router_name="workflow_sxt.router",
                 function_name="process_sxt_tilt_series",
                 token=self._token,
                 instrument_name=environment.instrument_name,

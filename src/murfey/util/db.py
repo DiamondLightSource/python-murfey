@@ -186,6 +186,10 @@ class DataCollectionGroup(SQLModel, table=True):  # type: ignore
     atlas_id: Optional[int] = None
     atlas_pixel_size: Optional[float] = None
     atlas: str = ""
+    atlas_x_stage_position: float | None = None
+    atlas_y_stage_position: float | None = None
+    atlas_height: int | None = None
+    atlas_width: int | None = None
     sample: Optional[int] = None
     smartem_grid_uuid: Optional[str] = None
 
@@ -1135,6 +1139,41 @@ class CryoemInitialModel(SQLModel, table=True):  # type: ignore
     numberOfParticles: Optional[int] = None
     particle_classification: List["ParticleClassification"] = Relationship(
         back_populates="cryoem_initial_model"
+    )
+
+
+"""
+=======================================================================================
+SXT WORKFLOW
+=======================================================================================
+"""
+
+
+class SxtRoi(SQLModel, table=True):  # type: ignore
+    id: Optional[int] = Field(primary_key=True, default=None)
+    session_id: int = Field(foreign_key="session.id")
+    name: str
+    tag: str
+    x_stage_position: Optional[float]
+    y_stage_position: Optional[float]
+    thumbnail_size_x: Optional[int]
+    thumbnail_size_y: Optional[int]
+    pixel_size: Optional[float] = None
+    image: str = ""
+    atlas_id: Optional[int] = Field(
+        foreign_key="datacollectiongroup.dataCollectionGroupId"
+    )
+    x_location: Optional[int] = None
+    y_location: Optional[int] = None
+    height: Optional[int] = None
+    width: Optional[int] = None
+
+    # -------------
+    # Relationships
+    # -------------
+    session: Optional[Session] = Relationship(back_populates="sxt_rois")
+    data_collection_group: Optional["DataCollectionGroup"] = Relationship(
+        back_populates="sxt_rois"
     )
 
 

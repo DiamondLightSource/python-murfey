@@ -64,6 +64,7 @@ from murfey.util.db import (
     Session,
     SessionProcessingParameters,
     SPARelionParameters,
+    SxtRoi,
     Tilt,
     TiltSeries,
 )
@@ -78,10 +79,6 @@ from murfey.util.processing_params import (
     motion_corrected_mrc,
 )
 from murfey.util.tomo import midpoint
-from murfey.workflows.sxt.process_sxt_tilt_series import (
-    SXTTiltSeriesInfo,
-    process_sxt_tilt_series_workflow,
-)
 from murfey.workflows.tomo.tomo_metadata import register_search_map_in_database
 
 logger = getLogger("murfey.server.api.workflow")
@@ -101,6 +98,8 @@ class DCGroupParameters(BaseModel):
     atlas: str = ""
     sample: Optional[int] = None
     atlas_pixel_size: float = 0
+    atlas_x_stage_position: float | None = None
+    atlas_y_stage_position: float | None = None
     create_smartem_grid: bool = False
     acquisition_uuid: Optional[str] = None
 
@@ -175,6 +174,18 @@ def register_dc_group(
             dcg_instance.atlas_pixel_size = (
                 dcg_params.atlas_pixel_size or dcg_instance.atlas_pixel_size
             )
+            dcg_instance.atlas_x_stage_position = (
+                dcg_params.atlas_x_stage_position or dcg_instance.atlas_x_stage_position
+            )
+            dcg_instance.atlas_y_stage_position = (
+                dcg_params.atlas_y_stage_position or dcg_instance.atlas_y_stage_position
+            )
+            dcg_instance.atlas_height = (
+                dcg_params.atlas_height or dcg_instance.atlas_height
+            )
+            dcg_instance.atlas_width = (
+                dcg_params.atlas_width or dcg_instance.atlas_width
+            )
             if smartem_grid_uuid:
                 dcg_instance.smartem_grid_uuid = smartem_grid_uuid
 
@@ -216,6 +227,22 @@ def register_dc_group(
             register_search_map_in_database(
                 session_id, sm.name, search_map_params, db, close_db=False
             )
+
+        sxt_rois = db.exec(
+            select(SxtRoi)
+            .where(SxtRoi.session_id == session_id)
+            .where(SxtRoi.tag == dcg_params.tag)
+        ).all()
+        for roi in sxt_rois:
+            if _transport_object:
+                _transport_object.send(
+                    _transport_object.feedback_queue,
+                    {
+                        "register": "register_sxt_roi",
+                        "session_id": session_id,
+                        **roi.model_dump(),
+                    },
+                )
         db.close()
     elif dcg_murfey := db.exec(
         select(DataCollectionGroup)
@@ -255,6 +282,8 @@ def register_dc_group(
             "atlas": dcg_params.atlas,
             "sample": dcg_params.sample,
             "atlas_pixel_size": dcg_params.atlas_pixel_size,
+            "atlas_x_stage_position": dcg_params.atlas_x_stage_position,
+            "atlas_y_stage_position": dcg_params.atlas_y_stage_position,
         }
 
         if _transport_object:
@@ -1070,25 +1099,6 @@ async def register_tilt(
     except OperationalError:
         await asyncio.sleep(30)
         _add_tilt()
-
-
-sxt_router = APIRouter(
-    prefix="/workflow/sxt",
-    dependencies=[Depends(validate_instrument_token)],
-    tags=["Workflows: Soft x-ray tomography"],
-)
-
-
-@sxt_router.post("/visits/{visit_name}/sessions/{session_id}/sxt_tilt_series")
-def process_sxt_tilt_series(
-    visit_name: str,
-    session_id: MurfeySessionID,
-    tilt_series_info: SXTTiltSeriesInfo,
-    db=murfey_db,
-):
-    return process_sxt_tilt_series_workflow(
-        visit_name, session_id, tilt_series_info, db
-    )
 
 
 correlative_router = APIRouter(
