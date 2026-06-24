@@ -84,8 +84,6 @@ def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
                 atlas_id=atlas_id,
                 atlas=message.get("atlas", ""),
                 atlas_pixel_size=message.get("atlas_pixel_size"),
-                atlas_x_stage_position=message.get("atlas_x_stage_position"),
-                atlas_y_stage_position=message.get("atlas_y_stage_position"),
                 sample=message.get("sample"),
                 session_id=message["session_id"],
                 tag=message.get("tag"),
