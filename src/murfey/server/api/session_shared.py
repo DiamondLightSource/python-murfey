@@ -211,31 +211,40 @@ def gather_upstream_files(
     session_id: int,
     upstream_instrument: str,
     upstream_visit_path: Path,
+    search_strings: list[str] | None,
     db: SQLModelSession,
 ):
     """
     Searches the specified upstream instrument for files based on the search strings
     set in the MachineConfig and returns them as a list of file paths.
     """
-    # Load the current instrument's machine config
-    murfey_session = db.exec(
-        select(MurfeySession).where(MurfeySession.id == session_id)
-    ).one()
-    instrument_name = murfey_session.instrument_name
-    machine_config = get_machine_config(instrument_name=instrument_name)[
-        instrument_name
-    ]
-
-    # Search for files using the configured strings for that upstream instrument
     file_list: list[Path] = []
     logger.info(f"Searching for files in {sanitise(str(upstream_visit_path))!r}")
-    if (
-        machine_config.upstream_data_search_strings.get(upstream_instrument, None)
-        is not None
-    ):
-        for search_string in machine_config.upstream_data_search_strings[
-            upstream_instrument
-        ]:
+
+    # If search strings weren't provided, read them from the machine config
+    if search_strings is None:
+        # Load the current instrument's machine config
+        murfey_session = db.exec(
+            select(MurfeySession).where(MurfeySession.id == session_id)
+        ).one()
+        instrument_name = murfey_session.instrument_name
+        machine_config = get_machine_config(instrument_name=instrument_name)[
+            instrument_name
+        ]
+        search_strings = machine_config.upstream_data_search_strings.get(
+            upstream_instrument, None
+        )
+        if search_strings is None:
+            logger.warning(
+                "Upstream file searching has not been configured for "
+                f"{sanitise(upstream_instrument)} on {sanitise(instrument_name)}"
+            )
+    elif not search_strings:
+        logger.warning(
+            "No search strings were included as part of the file download request"
+        )
+    else:
+        for search_string in search_strings:
             logger.info(f"Using search string {search_string}")
             for file in upstream_visit_path.glob(search_string):
                 if file.is_file():
@@ -243,11 +252,6 @@ def gather_upstream_files(
         logger.info(
             f"Found {len(file_list)} files for download "
             f"from {sanitise(upstream_instrument)}"
-        )
-    else:
-        logger.warning(
-            "Upstream file searching has not been configured for "
-            f"{sanitise(upstream_instrument)} on {sanitise(instrument_name)}"
         )
     return file_list
 
