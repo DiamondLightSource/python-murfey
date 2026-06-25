@@ -249,7 +249,7 @@ def gather_upstream_files(
         return file_list
     # Search for files matching the provided search strings
     for search_string in search_strings:
-        logger.info(f"Using search string {search_string}")
+        logger.info(f"Using search string {sanitise(search_string)}")
         for file in upstream_visit_path.glob(search_string):
             if file.is_file():
                 file_list.append(file)
