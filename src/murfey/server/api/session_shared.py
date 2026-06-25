@@ -234,25 +234,29 @@ def gather_upstream_files(
         search_strings = machine_config.upstream_data_search_strings.get(
             upstream_instrument, None
         )
+        # Return empty list if no search strings for the instrument were found
         if search_strings is None:
             logger.warning(
                 "Upstream file searching has not been configured for "
                 f"{sanitise(upstream_instrument)} on {sanitise(instrument_name)}"
             )
+            return file_list
     elif not search_strings:
+        # Return empty list if no search strings were provided to begin with
         logger.warning(
             "No search strings were included as part of the file download request"
         )
-    else:
-        for search_string in search_strings:
-            logger.info(f"Using search string {search_string}")
-            for file in upstream_visit_path.glob(search_string):
-                if file.is_file():
-                    file_list.append(file)
-        logger.info(
-            f"Found {len(file_list)} files for download "
-            f"from {sanitise(upstream_instrument)}"
-        )
+        return file_list
+    # Search for files matching the provided search strings
+    for search_string in search_strings:
+        logger.info(f"Using search string {search_string}")
+        for file in upstream_visit_path.glob(search_string):
+            if file.is_file():
+                file_list.append(file)
+    logger.info(
+        f"Found {len(file_list)} files for download "
+        f"from {sanitise(upstream_instrument)}"
+    )
     return file_list
 
 
