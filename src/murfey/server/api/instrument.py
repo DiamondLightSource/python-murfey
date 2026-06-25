@@ -437,7 +437,7 @@ async def request_upstream_tiff_data_download(
 
 
 @router.post("/visits/{visit_name}/sessions/{session_id}/upstream_file_data_request")
-async def request_upstream_file_data_download(
+async def request_upstream_file_download(
     visit_name: str,
     session_id: MurfeySessionID,
     upstream_file_request: UpstreamFileRequestInfo,

@@ -569,7 +569,7 @@ murfey.server.api.instrument.router:
     methods:
       - POST
   - path: /instrument_server/visits/{visit_name}/sessions/{session_id}/upstream_file_data_request
-    function: request_upstream_file_data_download
+    function: request_upstream_file_download
     path_params:
       - name: visit_name
         type: str
