@@ -20,7 +20,7 @@ from murfey.util.db import (
     Session as MurfeySession,
 )
 
-logger = logging.getLogger("murfey.server.api.shared")
+logger = logging.getLogger("murfey.server.api.session_shared")
 
 
 def remove_session_by_id(session_id: int, db):
