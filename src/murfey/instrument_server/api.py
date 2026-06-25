@@ -480,14 +480,18 @@ class UpstreamFileDownloadInfo(BaseModel):
 
 
 @router.post("/visits/{visit_name}/sessions/{session_id}/upstream_file_data_request")
-def gather_upstream_files(
+def run_upstream_file_download_request(
     visit_name: str,
     session_id: MurfeySessionID,
     upstream_file_download: UpstreamFileDownloadInfo,
 ):
     """
-    Instrument server endpoint that will query the backend for files in the chosen
-    visit directory
+    Instrument server endpoint that will receive an order from the backend server
+    to trigger an upstream file download request.
+
+    It will get the list of files matching the provided list of search strings,
+    then iteratively request for those files, saving them locally at the specified
+    download directory.
     """
     # Check for forbidden characters
     if any(c in visit_name for c in ("/", "\\", ":", ";")):

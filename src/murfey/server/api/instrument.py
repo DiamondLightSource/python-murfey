@@ -475,7 +475,7 @@ async def request_upstream_file_data_download(
     async with aiohttp.ClientSession() as clientsession:
         url_path = url_path_for(
             "api.router",
-            "gather_upstream_files",
+            "run_upstream_file_download_request",
             visit_name=secure_filename(visit_name),
             session_id=session_id,
         )
