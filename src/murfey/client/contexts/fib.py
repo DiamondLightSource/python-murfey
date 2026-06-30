@@ -182,18 +182,19 @@ ACTIVITY_FIELD_MAP = (
 )
 
 
-def _is_manual_autotem(file_path: Path):
+def _get_project_name(file_path: Path):
     """
-    Checks if the file being analysed belongs to a manual AutoTEM project.
-    Manual AutoTEM projects are stored in project folders that start with 'AutoTEM_'.
+    Get the project name from the file path. This is used in manual AutoTEM
+    workflows to identify the folder containing the images and site metadata
+    to register.
     """
     try:
         autotem_idx = file_path.parts.index("autotem")
         project_dir = file_path.parents[-(autotem_idx + 2)]
-        return project_dir.stem.startswith("AutoTEM_")
+        return project_dir.stem
     except Exception:
         logger.error(
-            f"Error checking if file {file_path} belongs to a manual AutoTEM project:",
+            f"Error extracting project name from file path {file_path}:",
             exc_info=True,
         )
         return None
@@ -263,12 +264,16 @@ class FIBContext(Context):
         # AutoTEM
         # -----------------------------------------------------------------------------
         if self._acquisition_software == "autotem":
-            # Apply different logic depending of whether it's auto/manual AutoTEM
-            if (is_manual_autotem := _is_manual_autotem(transferred_file)) is None:
+            # Extract project name from file path
+            project_name = _get_project_name(transferred_file)
+
+            # Handle file based on extracted project name
+            if project_name is None:
                 # Skip processing file if the check fails
                 return None
-            elif is_manual_autotem:
-                # Logic for handling manual AutotTEM will evenutlaly go here
+            # Manual AutoTEM folders start with
+            elif project_name.startswith("AutoTEM_"):
+                # Logic for handling manual AutoTEM will eventually go here
                 return None
             else:
                 # Extract metadata from fully automated AutoTEM projects
