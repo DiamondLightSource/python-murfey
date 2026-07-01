@@ -462,28 +462,26 @@ def test_file_transferred_to(
     "test_params",
     (
         # Pass cases
-        (True, True, True, True, True, True, True, True, True),  # DC images
-        (True, True, True, True, True, True, True, True, False),  # No DC images
+        (True, True, True, True, True, True, True, True),  # DC images
+        (True, True, True, True, True, True, True, False),  # No DC images
         # Only one of these, and the last one, should be False at a given time
-        (True, True, True, True, True, True, True, False, False),  # No activity name
-        (True, True, True, True, True, True, False, True, False),  # No activity
-        (True, True, True, True, True, False, True, True, False),  # No recipe name
-        (True, True, True, True, False, True, True, True, False),  # No recipe
-        (True, True, True, False, True, True, True, True, False),  # No site name
-        (True, True, False, True, True, True, True, True, False),  # No sites
-        (True, False, True, True, True, True, True, True, False),  # No project name
-        (False, True, True, True, True, True, True, True, False),  # No environment
+        (True, True, True, True, True, True, False, False),  # No activity name
+        (True, True, True, True, True, False, True, False),  # No activity content
+        (True, True, True, True, False, True, True, False),  # No recipe name
+        (True, True, True, False, True, True, True, False),  # No recipe content
+        (True, True, False, True, True, True, True, False),  # No site name
+        (True, False, True, True, True, True, True, False),  # No site contents
+        (False, True, True, True, True, True, True, False),  # No project name
     ),
 )
-def test_fib_full_autotem_context_projectdata(
+def test_handle_autotem_metadata(
     mocker: MockerFixture,
-    test_params: tuple[bool, bool, bool, bool, bool, bool, bool, bool, bool],
+    test_params: tuple[bool, bool, bool, bool, bool, bool, bool, bool],
     tmp_path: Path,
     visit_dir: Path,
 ):
     # Unpack test params
     (
-        has_environment,
         has_project_name,
         has_sites,
         has_site_name,
@@ -495,10 +493,8 @@ def test_fib_full_autotem_context_projectdata(
     ) = test_params
 
     # Mock the environment
-    mock_environment = None
-    if has_environment:
-        mock_environment = MagicMock()
-        mock_environment.visit = visit_name
+    mock_environment = MagicMock()
+    mock_environment.visit = visit_name
 
     # Mock the logger to check that specific logs are called
     mock_logger = mocker.patch("murfey.client.contexts.fib.logger")
@@ -568,12 +564,11 @@ def test_fib_full_autotem_context_projectdata(
             )
 
     # Run 'post_transfer' and check for expected calls and outputs
-    context.post_transfer(mock_projectdata, environment=mock_environment)
+    context._handle_autotem_metadata(mock_projectdata, environment=mock_environment)
 
     # Check the success case
     if all(
         (
-            has_environment,
             has_project_name,
             has_sites,
             has_site_name,
@@ -623,11 +618,10 @@ def test_fib_full_autotem_context_projectdata(
                     },
                     session_id=mock.ANY,
                 )
+
+    # These test parameters are related, with one being False at a time
     # These fail cases will return an empty dict and not call "post_transfer"
-    if not has_environment:
-        mock_logger.warning.assert_called_with("No environment passed in")
-        mock_capture_post.assert_not_called()
-    elif not has_project_name:
+    if not has_project_name:
         mock_logger.warning.assert_called_with("Metadata file has no project name")
         mock_capture_post.assert_not_called()
     elif not has_sites:
@@ -669,35 +663,32 @@ def test_fib_full_autotem_context_projectdata(
 @pytest.mark.parametrize(
     "test_params",
     (
-        # Early exits
-        # No MurfeyInstanceEnvironment
-        (False, True, True, True, True, True, True),
-        # No source
-        (True, False, True, True, True, True, True),
-        # No destination
-        (True, True, False, True, True, True, True),
-        # No site info
-        (True, True, True, False, True, True, True),
-        # No project name
-        (True, True, True, True, False, True, True),
-        # No stage position
-        (True, True, True, True, True, False, True),
-        # No stage position values
-        (True, True, True, True, True, True, False),
         # Successful case
-        (True, True, True, True, True, True, True),
+        (True, True, True, True, True, True),
+        # Early exits
+        # No source
+        (False, True, True, True, True, True),
+        # No destination
+        (True, False, True, True, True, True),
+        # No site info
+        (True, True, False, True, True, True),
+        # No project name
+        (True, True, True, False, True, True),
+        # No stage position
+        (True, True, True, True, False, True),
+        # No stage position values
+        (True, True, True, True, True, False),
     ),
 )
-def test_fib_full_autotem_context_drift_correction_images(
+def test_make_drift_correction_gif(
     mocker: MockerFixture,
-    test_params: tuple[bool, bool, bool, bool, bool, bool, bool],
+    test_params: tuple[bool, bool, bool, bool, bool, bool],
     tmp_path: Path,
     visit_dir: Path,
     fib_autotem_dc_images: list[Path],
 ):
     # Unpack test params
     (
-        use_env,
         find_source,
         find_dst,
         has_site_info,
@@ -707,10 +698,8 @@ def test_fib_full_autotem_context_drift_correction_images(
     ) = test_params
 
     # Mock the environment
-    mock_environment = None
-    if use_env:
-        mock_environment = MagicMock()
-        mock_environment.visit = visit_name
+    mock_environment = MagicMock()
+    mock_environment.visit = visit_name
 
     # Mock the logger to check if specific logs are triggered
     mock_logger = mocker.patch("murfey.client.contexts.fib.logger")
@@ -763,31 +752,37 @@ def test_fib_full_autotem_context_drift_correction_images(
 
     # Parse images one-by-one and check that expected calls were made
     for file in fib_autotem_dc_images:
-        context.post_transfer(file, environment=mock_environment)
-    if not use_env:
-        mock_logger.warning.assert_called_with("No environment passed in")
-    elif not find_source:
+        context._make_drift_correction_gif(file, mock_environment)
+
+    # For the fail cases, check that the correct log was called
+    if not find_source:
         mock_logger.warning.assert_called_with(f"No source found for file {file}")
+        mock_capture_post.assert_not_called()
     elif not find_dst:
         mock_logger.warning.assert_called_with(
             f"Could not find destination file path for {file.name!r}"
         )
+        mock_capture_post.assert_not_called()
     elif not has_site_info:
         mock_logger.debug.assert_called_with(
             f"No metadata found for site {lamella_num} yet"
         )
+        mock_capture_post.assert_not_called()
     elif not has_project_name:
         mock_logger.warning.assert_any_call(
             f"No project name associated with site {lamella_num}"
         )
+        mock_capture_post.assert_not_called()
     elif not has_stage_position:
         mock_logger.warning.assert_any_call(
             f"No stage position information associated with site {lamella_num}"
         )
+        mock_capture_post.assert_not_called()
     elif not has_stage_values:
         mock_logger.warning.assert_any_call(
             f"Could not determine slot number of site {lamella_num}"
         )
+        mock_capture_post.assert_not_called()
     else:
         mock_get_source.assert_called_with(file, mock_environment)
         mock_file_transferred_to.assert_called_with(
