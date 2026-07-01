@@ -246,6 +246,8 @@ class FIBContext(Context):
         super().__init__("FIBContext", acquisition_software, token)
         self._basepath = basepath
         self._machine_config = machine_config
+        self._project_data: dict[str, Path] = {}
+        self._target_projects: list[str] = []
         self._site_info: dict[int, LamellaSiteInfo] = {}
         self._drift_correction_images: dict[int, FIBImage] = {}
 
@@ -264,24 +266,58 @@ class FIBContext(Context):
         # AutoTEM
         # -----------------------------------------------------------------------------
         if self._acquisition_software == "autotem":
-            # Extract project name from file path
+            # Extract current project name from file path
             project_name = _get_project_name(transferred_file)
-
-            # Handle file based on extracted project name
             if project_name is None:
-                # Skip processing file if the check fails
+                # Early exit if the check fails
                 return None
-            # Manual AutoTEM folders start with
-            elif project_name.startswith("AutoTEM_"):
-                # Logic for handling manual AutoTEM will eventually go here
-                return None
-            else:
-                # Extract metadata from fully automated AutoTEM projects
-                if transferred_file.name == "ProjectData.dat":
-                    logger.info(f"Found metadata file {transferred_file} for parsing")
+
+            # Store incoming ProjectData.dat files in memory
+            if (
+                transferred_file.name == "ProjectData.dat"
+                and self._project_data.get(project_name) is None
+            ):
+                self._project_data[project_name] = transferred_file
+
+            # Identify if the current file's project is to be registered
+            if project_name not in self._target_projects:
+                if not any(
+                    pattern in str(transferred_file)
+                    for pattern in (
+                        "/DCImages/",
+                        "/LamellaEvaluationImages/",
+                        "/Sites/Lamella",
+                    )
+                ):
+                    return None
+                self._target_projects.append(project_name)
+                logger.info(
+                    f"AutoTEM project {project_name!r} identified for registration"
+                )
+
+            # Analyse file and trigger processing if it passes the check
+            if project_name in self._target_projects:
+                # Extract metadata from valid AutoTEM projects
+                if transferred_file.name == "ProjectData.dat" or (
+                    self._project_data.get(project_name) and not self._site_info
+                ):
+                    # Extract directly from incoming file
+                    if transferred_file.name == "ProjectData.dat":
+                        logger.info(
+                            f"Found metadata file {transferred_file} for parsing"
+                        )
+                        all_site_info_new = self._parse_autotem_metadata(
+                            transferred_file
+                        )
+                    # Extract for the first time from stored file path
+                    else:
+                        project_data = self._project_data[project_name]
+                        logger.info(
+                            f"Performing initial metadata extraction from {project_data}"
+                        )
+                        all_site_info_new = self._parse_autotem_metadata(project_data)
 
                     # Parse the metadata file
-                    all_site_info_new = self._parse_autotem_metadata(transferred_file)
                     for site_num, site_info_new in all_site_info_new.items():
                         # Post the data to the backend if it's been changed
                         if (
