@@ -289,113 +289,29 @@ class FIBContext(Context):
                         "/Sites/Lamella",
                     )
                 ):
+                    # Early exit if the file is not from a relevant project
                     return None
+                # Mark project folder for analysis
                 self._target_projects.append(project_name)
                 logger.info(
                     f"AutoTEM project {project_name!r} identified for registration"
                 )
 
-            # Analyse file and trigger processing if it passes the check
+            # Analyse file and trigger processing only from target projects
             if project_name in self._target_projects:
-                # Extract metadata from valid AutoTEM projects
-                if transferred_file.name == "ProjectData.dat" or (
-                    self._project_data.get(project_name) and not self._site_info
-                ):
-                    # Extract directly from incoming file
-                    if transferred_file.name == "ProjectData.dat":
-                        logger.info(
-                            f"Found metadata file {transferred_file} for parsing"
-                        )
-                        all_site_info_new = self._parse_autotem_metadata(
-                            transferred_file
-                        )
-                    # Extract for the first time from stored file path
-                    else:
-                        project_data = self._project_data[project_name]
-                        logger.info(
-                            f"Performing initial metadata extraction from {project_data}"
-                        )
-                        all_site_info_new = self._parse_autotem_metadata(project_data)
-
-                    # Parse the metadata file
-                    for site_num, site_info_new in all_site_info_new.items():
-                        # Post the data to the backend if it's been changed
-                        if (
-                            data := site_info_new.model_dump(exclude_none=True)
-                        ) != self._site_info.get(
-                            site_num, LamellaSiteInfo()
-                        ).model_dump(exclude_none=True):
-                            capture_post(
-                                base_url=str(environment.url.geturl()),
-                                router_name="workflow_fib.router",
-                                function_name="register_fib_milling_progress",
-                                token=self._token,
-                                instrument_name=environment.instrument_name,
-                                data=data,
-                                # Endpoint kwargs
-                                session_id=environment.murfey_session,
-                            )
-
-                            # Update existing dict
-                            self._site_info[site_num] = site_info_new
-                            logger.info(f"Updating metadata for site {site_num}")
-
-                        # Post drift correction GIF request if it hasn't already been done
-                        fib_image = self._drift_correction_images.get(site_num, None)
-                        if fib_image is not None and not fib_image.is_submitted:
-                            # Construct the output file name if it doesn't already exist
-                            if (output_file := fib_image.output_file) is None:
-                                source = _get_source(transferred_file, environment)
-                                if source is None:
-                                    logger.warning(
-                                        f"No source found for file {transferred_file}"
-                                    )
-                                    continue
-                                destination_file = _file_transferred_to(
-                                    environment=environment,
-                                    source=source,
-                                    file_path=transferred_file,
-                                    rsync_basepath=Path(
-                                        self._machine_config.get("rsync_basepath", "")
-                                    ),
-                                )
-                                if destination_file is None:
-                                    logger.warning(
-                                        f"Could not find destination file path for {transferred_file.name!r}"
-                                    )
-                                    continue
-                                output_dir = self._determine_output_dir(
-                                    site_num, destination_file, environment
-                                )
-                                if output_dir is None:
-                                    logger.warning(
-                                        f"Could not determine output directory for lamella {site_num}"
-                                    )
-                                    continue
-                                output_file = (
-                                    output_dir
-                                    / "drift_correction"
-                                    / f"lamella_{site_num}.gif"
-                                )
-                                with lock:
-                                    self._drift_correction_images[
-                                        site_num
-                                    ].output_file = output_file
-                                # Reload the new object
-                                fib_image = self._drift_correction_images[site_num]
-
-                            if self._make_gif(
-                                environment=environment,
-                                lamella_number=site_num,
-                                images=sorted(fib_image.images),
-                                output_file=output_file,
-                            ):
-                                with lock:
-                                    self._drift_correction_images[
-                                        site_num
-                                    ].is_submitted = True
+                # Perform first-time metadata extraction using stored "ProjectData.dat" file
+                if self._project_data.get(project_name) and not self._site_info:
+                    project_data = self._project_data[project_name]
+                    logger.info(
+                        f"Performing initial metadata extraction from {project_data}"
+                    )
+                    self._handle_autotem_metadata(project_data, environment)
+                # Extract metadata directly from "ProjectData.dat" on subsequent runs
+                if transferred_file.name == "ProjectData.dat" and self._site_info:
+                    logger.info(f"Found metadata file {transferred_file} for parsing")
+                    self._handle_autotem_metadata(transferred_file, environment)
                     return None
-
+                # Compile and register drift correction images
                 elif (
                     "DCImages" in transferred_file.parts
                     and transferred_file.suffix == ".png"
@@ -594,6 +510,90 @@ class FIBContext(Context):
                 f"Could not construct output directory path for site {lamella_number}"
             )
             return None
+
+    def _handle_autotem_metadata(
+        self, file: Path, environment: MurfeyInstanceEnvironment
+    ):
+        """
+        Helper function to extract the AutoTEM metadata, update the stored FIB lamella
+        site info, and trigger relevant processing.
+        """
+
+        # Extract all site info
+        all_site_info_new = self._parse_autotem_metadata(file)
+
+        # Parse the metadata file
+        for site_num, site_info_new in all_site_info_new.items():
+            # Post the data to the backend if it's been changed
+            if (
+                data := site_info_new.model_dump(exclude_none=True)
+            ) != self._site_info.get(site_num, LamellaSiteInfo()).model_dump(
+                exclude_none=True
+            ):
+                capture_post(
+                    base_url=str(environment.url.geturl()),
+                    router_name="workflow_fib.router",
+                    function_name="register_fib_milling_progress",
+                    token=self._token,
+                    instrument_name=environment.instrument_name,
+                    data=data,
+                    # Endpoint kwargs
+                    session_id=environment.murfey_session,
+                )
+
+                # Update existing dict
+                self._site_info[site_num] = site_info_new
+                logger.info(f"Updating metadata for site {site_num}")
+
+            # Post drift correction GIF request if it hasn't already been done
+            fib_image = self._drift_correction_images.get(site_num, None)
+            if fib_image is not None and not fib_image.is_submitted:
+                # Construct the output file name if it doesn't already exist
+                if (output_file := fib_image.output_file) is None:
+                    source = _get_source(file, environment)
+                    if source is None:
+                        logger.warning(f"No source found for file {file}")
+                        continue
+                    destination_file = _file_transferred_to(
+                        environment=environment,
+                        source=source,
+                        file_path=file,
+                        rsync_basepath=Path(
+                            self._machine_config.get("rsync_basepath", "")
+                        ),
+                    )
+                    if destination_file is None:
+                        logger.warning(
+                            f"Could not find destination file path for {file.name!r}"
+                        )
+                        continue
+                    output_dir = self._determine_output_dir(
+                        site_num, destination_file, environment
+                    )
+                    if output_dir is None:
+                        logger.warning(
+                            f"Could not determine output directory for lamella {site_num}"
+                        )
+                        continue
+                    output_file = (
+                        output_dir / "drift_correction" / f"lamella_{site_num}.gif"
+                    )
+                    with lock:
+                        self._drift_correction_images[
+                            site_num
+                        ].output_file = output_file
+                    # Reload the new object
+                    fib_image = self._drift_correction_images[site_num]
+
+                if self._make_gif(
+                    environment=environment,
+                    lamella_number=site_num,
+                    images=sorted(fib_image.images),
+                    output_file=output_file,
+                ):
+                    with lock:
+                        self._drift_correction_images[site_num].is_submitted = True
+        return None
 
     def _make_drift_correction_gif(
         self,
