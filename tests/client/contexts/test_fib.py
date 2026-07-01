@@ -462,27 +462,38 @@ def test_file_transferred_to(
     "test_params",
     (
         # Pass cases
-        (True, True, True, True, True, True, True, True, True),  # DC images
-        (True, True, True, True, True, True, True, True, False),  # No DC images
+        (True, True, True, True, True, True, True, True, True, True),  # DC images
+        (True, True, True, True, True, True, True, True, True, False),  # No DC images
         # Only one of these, and the last one, should be False at a given time
-        (True, True, True, True, True, True, True, False, False),  # No activity name
-        (True, True, True, True, True, True, False, True, False),  # No activity
-        (True, True, True, True, True, False, True, True, False),  # No recipe name
-        (True, True, True, True, False, True, True, True, False),  # No recipe
-        (True, True, True, False, True, True, True, True, False),  # No site name
-        (True, True, False, True, True, True, True, True, False),  # No sites
-        (True, False, True, True, True, True, True, True, False),  # No project name
-        (False, True, True, True, True, True, True, True, False),  # No environment
+        # No activity name
+        (True, True, True, True, True, True, True, True, False, False),
+        # No activity content
+        (True, True, True, True, True, True, True, False, True, False),
+        # No recipe name
+        (True, True, True, True, True, True, False, True, True, False),
+        # No recipe content
+        (True, True, True, True, True, False, True, True, True, False),
+        # No site name
+        (True, True, True, True, False, True, True, True, True, False),
+        # No site contents
+        (True, True, True, False, True, True, True, True, True, False),
+        # No project name
+        (True, True, False, True, True, True, True, True, True, False),
+        # No Murfey environment
+        (True, False, True, True, True, True, True, True, True, False),
+        # Not a target project
+        (False, True, True, True, True, True, True, True, True, False),
     ),
 )
 def test_fib_full_autotem_context_projectdata(
     mocker: MockerFixture,
-    test_params: tuple[bool, bool, bool, bool, bool, bool, bool, bool, bool],
+    test_params: tuple[bool, bool, bool, bool, bool, bool, bool, bool, bool, bool],
     tmp_path: Path,
     visit_dir: Path,
 ):
     # Unpack test params
     (
+        is_target_project,
         has_environment,
         has_project_name,
         has_sites,
@@ -558,6 +569,8 @@ def test_fib_full_autotem_context_projectdata(
         machine_config={},
         token="",
     )
+    if is_target_project:
+        context._target_projects.append(project_name)
     if has_drift_correction_images:
         # Add drift correction images
         for i in range(num_lamellae):
@@ -570,9 +583,14 @@ def test_fib_full_autotem_context_projectdata(
     # Run 'post_transfer' and check for expected calls and outputs
     context.post_transfer(mock_projectdata, environment=mock_environment)
 
+    # Check that the metadata file was added to the dictionary
+    if has_environment:
+        assert context._project_data[project_name] == mock_projectdata
+
     # Check the success case
     if all(
         (
+            is_target_project,
             has_environment,
             has_project_name,
             has_sites,
@@ -623,6 +641,12 @@ def test_fib_full_autotem_context_projectdata(
                     },
                     session_id=mock.ANY,
                 )
+
+    # If the project name is not in the list, 'capture_post' won't be called
+    if not is_target_project:
+        mock_capture_post.assert_not_called()
+
+    # These test parameters are related, with one being False at a time
     # These fail cases will return an empty dict and not call "post_transfer"
     if not has_environment:
         mock_logger.warning.assert_called_with("No environment passed in")
