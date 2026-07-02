@@ -13,6 +13,7 @@ from murfey.client.contexts.fib import (
     FIBContext,
     FIBImage,
     _file_transferred_to,
+    _get_project_name,
     _get_source,
     _parse_boolean,
 )
@@ -848,26 +849,60 @@ def test_make_drift_correction_gif(
             assert mock_capture_post.call_count == len(destination_files)
 
 
-def test_fib_manual_autotem_context_projectdata(
+@pytest.mark.parametrize(
+    "test_params",
+    (  # Manual or automated? | Identifier
+        (True, "Sites/Site #1/DCImages/dummy.png"),
+        (True, "Sites/Site #1/LamellaEvaluationImages/dummy.png"),
+        (False, "Sites/Lamella/DCImages/dummy.png"),
+    ),
+)
+def test_fib_autotem_context(
     mocker: MockerFixture,
     visit_dir: Path,
+    test_params: tuple[bool, str],
 ):
-    # Mock the ProjectData.dat file
-    mock_projectdata = create_fib_autotem_project_data(
-        visit_dir=visit_dir,
-        project_name=f"AutoTEM_200101-1200_{project_name}",
-        site_prefix="Site",
-    )
+    # Unpack test params
+    is_manual, trigger = test_params
+
+    # Create list of files to pass through to FIBContext
+    if is_manual:
+        projects = [
+            visit_dir / path
+            for path in (  # ProjectData.dat will be recorded and stored
+                f"autotem/AutoTEM_201231-1230_{visit_name}_waffle1/ProjectData.dat",
+                f"autotem/AutoTEM_201231-1230_{visit_name}_waffle2/ProjectData.dat",
+                f"autotem/AutoTEM_201231-1230_{visit_name}_waffle3/ProjectData.dat",
+                f"autotem/AutoTEM_201231-1230_{visit_name}_waffle4/ProjectData.dat",
+            )
+        ]
+        target_project = (
+            visit_dir
+            / f"autotem/AutoTEM_201231-1230_{visit_name}_waffle5/ProjectData.dat"
+        )
+        trigger_file = (
+            visit_dir / f"autotem/AutoTEM_201231-1230_{visit_name}_waffle5/{trigger}"
+        )
+    else:
+        projects = []
+        target_project = visit_dir / f"autotem/{visit_name}/ProjectData.dat"
+        trigger_file = visit_dir / f"autotem/{visit_name}/{trigger}"
+    files_to_pass: list[Path] = [
+        *projects,
+        target_project,
+        trigger_file,
+        *projects,
+        target_project,
+    ]
 
     # Mock the Murfey environment
     mock_environment = MagicMock()
-    mock_environment.visit = visit_name
-
-    # Patch the '_parse_autotem_metadata' class function
-    mock_parse = mocker.patch.object(FIBContext, "_parse_autotem_metadata")
 
     # Mock the functions used in 'post_transfer'
-    mock_capture_post = mocker.patch("murfey.client.contexts.fib.capture_post")
+    mock_handle_metadata = mocker.patch.object(FIBContext, "_handle_autotem_metadata")
+    mock_drift_correction_gif = mocker.patch.object(
+        FIBContext, "_make_drift_correction_gif"
+    )
 
     # Initialise the FIBContext
     basepath = visit_dir
@@ -878,10 +913,23 @@ def test_fib_manual_autotem_context_projectdata(
         token="",
     )
 
-    # Pass file to FIBContext and check that it behaves as expected
-    context.post_transfer(mock_projectdata, environment=mock_environment)
-    mock_parse.assert_not_called()
-    mock_capture_post.assert_not_called()
+    # Pass files to FIBContext and check that it behaves as expected
+    for file in files_to_pass:
+        if not file.exists():
+            file.parent.mkdir(parents=True)
+            file.touch()
+        context.post_transfer(file, environment=mock_environment)
+        # If a DCImage was used, '_make_drift_correction_gif' should be called
+        if "DCImages" in file.parts:
+            mock_drift_correction_gif.assert_called_with(file, mock_environment)
+    # All the ProjectData files should have been noted
+    assert len(context._project_data) == len(projects) + 1
+
+    # Target project will have been identified
+    assert _get_project_name(target_project) in context._target_projects
+
+    # '_handle_metadata' will have been called
+    mock_handle_metadata.assert_called_with(target_project, mock_environment)
 
 
 def test_fib_maps_context(
