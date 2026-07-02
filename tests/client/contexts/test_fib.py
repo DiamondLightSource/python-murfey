@@ -887,13 +887,6 @@ def test_fib_autotem_context(
         projects = []
         target_project = visit_dir / f"autotem/{visit_name}/ProjectData.dat"
         trigger_file = visit_dir / f"autotem/{visit_name}/{trigger}"
-    files_to_pass: list[Path] = [
-        *projects,
-        target_project,
-        trigger_file,
-        *projects,
-        target_project,
-    ]
 
     # Mock the Murfey environment
     mock_environment = MagicMock()
@@ -914,21 +907,28 @@ def test_fib_autotem_context(
     )
 
     # Pass files to FIBContext and check that it behaves as expected
-    for file in files_to_pass:
+    for file in [*projects, target_project]:
         if not file.exists():
             file.parent.mkdir(parents=True)
             file.touch()
         context.post_transfer(file, environment=mock_environment)
-        # If a DCImage was used, '_make_drift_correction_gif' should be called
-        if "DCImages" in file.parts:
-            mock_drift_correction_gif.assert_called_with(file, mock_environment)
     # All the ProjectData files should have been noted
     assert len(context._project_data) == len(projects) + 1
 
+    # Pass the trigger file in
+    context.post_transfer(trigger_file, mock_environment)
+    # If a DCImage was used, '_make_drift_correction_gif' should be called
+    if "DCImages" in trigger_file.parts:
+        mock_drift_correction_gif.assert_called_with(trigger_file, mock_environment)
     # Target project will have been identified
     assert _get_project_name(target_project) in context._target_projects
-
     # '_handle_metadata' will have been called
+    mock_handle_metadata.assert_called_with(target_project, mock_environment)
+
+    # Create a dummy 'site_info' entry and parse "ProjectData.dat"
+    context._site_info[1] = LamellaSiteInfo()
+    context.post_transfer(target_project, mock_environment)
+    # '_handle_metadata' should now be called normally
     mock_handle_metadata.assert_called_with(target_project, mock_environment)
 
 
