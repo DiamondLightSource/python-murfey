@@ -548,61 +548,22 @@ class FIBContext(Context):
             # Post drift correction GIF request if it hasn't already been done
             fib_image = self._drift_correction_images.get(site_num, None)
             if fib_image is not None and not fib_image.is_submitted:
-                # Construct the output file name if it doesn't already exist
-                if (output_file := fib_image.output_file) is None:
-                    source = _get_source(file, environment)
-                    if source is None:
-                        logger.warning(f"No source found for file {file}")
-                        continue
-                    destination_file = _file_transferred_to(
-                        environment=environment,
-                        source=source,
-                        file_path=file,
-                        rsync_basepath=Path(
-                            self._machine_config.get("rsync_basepath", "")
-                        ),
-                    )
-                    if destination_file is None:
-                        logger.warning(
-                            f"Could not find destination file path for {file.name!r}"
-                        )
-                        continue
-                    output_dir = self._determine_output_dir(
-                        site_num, destination_file, environment
-                    )
-                    if output_dir is None:
-                        logger.warning(
-                            f"Could not determine output directory for lamella {site_num}"
-                        )
-                        continue
-                    output_file = (
-                        output_dir / "drift_correction" / f"lamella_{site_num}.gif"
-                    )
-                    with lock:
-                        self._drift_correction_images[
-                            site_num
-                        ].output_file = output_file
-                    # Reload the new object
-                    fib_image = self._drift_correction_images[site_num]
-
-                if self._make_gif(
-                    environment=environment,
-                    lamella_number=site_num,
-                    images=sorted(fib_image.images),
-                    output_file=output_file,
-                ):
-                    with lock:
-                        self._drift_correction_images[site_num].is_submitted = True
+                self._make_drift_correction_gif(
+                    fib_image.images[-1],
+                    environment,
+                    is_destination_file=True,
+                )
         return None
 
     def _make_drift_correction_gif(
         self,
         file: Path,
         environment: MurfeyInstanceEnvironment,
+        is_destination_file: bool = False,
     ):
         """
         Helper function to create GIFs using the drift correction images seen by the
-        FIBContext class. The function uses the metadata returned
+        FIBContext class. The function uses the metadata extracted from the
         """
         parts = file.parts
         try:
@@ -613,19 +574,26 @@ class FIBContext(Context):
                 f"Could not extract metadata from file {file}", exc_info=True
             )
             return None
-        source = _get_source(file, environment)
-        if source is None:
-            logger.warning(f"No source found for file {file}")
-            return
-        destination_file = _file_transferred_to(
-            environment=environment,
-            source=source,
-            file_path=file,
-            rsync_basepath=Path(self._machine_config.get("rsync_basepath", "")),
-        )
-        if destination_file is None:
-            logger.warning(f"Could not find destination file path for {file.name!r}")
-            return
+
+        # If the file provided is client-side, construct the destination file path
+        if not is_destination_file:
+            source = _get_source(file, environment)
+            if source is None:
+                logger.warning(f"No source found for file {file}")
+                return
+            destination_file = _file_transferred_to(
+                environment=environment,
+                source=source,
+                file_path=file,
+                rsync_basepath=Path(self._machine_config.get("rsync_basepath", "")),
+            )
+            if destination_file is None:
+                logger.warning(
+                    f"Could not find destination file path for {file.name!r}"
+                )
+                return
+        else:
+            destination_file = file
 
         # Create FIBImage instance for this lamella site, or update existing one
         if not self._drift_correction_images.get(lamella_number):
@@ -633,26 +601,35 @@ class FIBContext(Context):
                 self._drift_correction_images[lamella_number] = FIBImage(
                     images=[destination_file]
                 )
-        else:
+        # Only update list if the file is not already in it
+        elif (
+            destination_file not in self._drift_correction_images[lamella_number].images
+        ):
             with lock:
                 self._drift_correction_images[lamella_number].images.append(
                     destination_file
                 )
                 self._drift_correction_images[lamella_number].is_submitted = False
-        if (
-            output_dir := self._determine_output_dir(
-                lamella_number,
-                destination_file,
-                environment,
+
+        # If output GIF file path has not already been determined, construct it
+        output_file = self._drift_correction_images[lamella_number].output_file
+        if output_file is None:
+            if (
+                output_dir := self._determine_output_dir(
+                    lamella_number,
+                    destination_file,
+                    environment,
+                )
+            ) is None:
+                logger.warning(
+                    f"Could not determine output directory for lamella {lamella_number}"
+                )
+                return None
+            output_file = (
+                output_dir / "drift_correction" / f"lamella_{lamella_number}.gif"
             )
-        ) is None:
-            logger.warning(
-                f"Could not determine output directory for lamella {lamella_number}"
-            )
-            return None
-        output_file = output_dir / "drift_correction" / f"lamella_{lamella_number}.gif"
-        with lock:
-            self._drift_correction_images[lamella_number].output_file = output_file
+            with lock:
+                self._drift_correction_images[lamella_number].output_file = output_file
 
         # Submit job to backend to construct a GIF
         if self._make_gif(
