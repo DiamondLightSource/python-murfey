@@ -58,6 +58,10 @@ def _find_reference(txrm_file: Path) -> Path | None:
     return None
 
 
+def _get_ole_header_value(ole_file, title: str, dtype: np.dtype):
+    return np.frombuffer(ole_file.openstream(title).getvalue(), dtype)
+
+
 class SXTContext(Context):
     def __init__(
         self,
@@ -156,6 +160,7 @@ class SXTContext(Context):
             environment=environment,
             **kwargs,
         )
+        metadata: dict[str, Any] = {}
 
         if transferred_file.suffix == ".xrm" and environment:
             # Make sure we have a dcg for this grid
@@ -167,45 +172,43 @@ class SXTContext(Context):
                 token=self._token,
             )
 
-            metadata: dict[str, Any] = {}
             with OleFileIO(str(transferred_file)) as xrm_ole:
                 if xrm_ole.exists("ImageInfo/XPosition") and xrm_ole.exists(
                     "ImageInfo/YPosition"
                 ):
-                    x_tiles = np.frombuffer(
-                        xrm_ole.openstream("ImageInfo/XPosition").getvalue(), np.float32
-                    ).tolist()
-                    y_tiles = np.frombuffer(
-                        xrm_ole.openstream("ImageInfo/YPosition").getvalue(), np.float32
-                    ).tolist()
+                    x_tiles = _get_ole_header_value(
+                        xrm_ole, "ImageInfo/XPosition", np.float32
+                    ).tolist()[0]
+                    y_tiles = _get_ole_header_value(
+                        xrm_ole, "ImageInfo/YPosition", np.float32
+                    ).tolist()[0]
                     metadata["x_position"] = x_tiles[int(len(x_tiles) / 2)]
                     metadata["y_position"] = y_tiles[int(len(y_tiles) / 2)]
 
                 if xrm_ole.exists("ImageInfo/PixelSize"):
-                    metadata["pixel_size"] = np.frombuffer(
-                        xrm_ole.openstream("ImageInfo/PixelSize").getvalue(), np.float32
+                    metadata["pixel_size"] = _get_ole_header_value(
+                        xrm_ole, "ImageInfo/PixelSize", np.float32
                     ).tolist()[0]
 
                 if xrm_ole.exists("ImageInfo/ImageHeight"):
-                    metadata["height"] = np.frombuffer(
-                        xrm_ole.openstream("ImageInfo/ImageHeight").getvalue(), np.int32
+                    metadata["height"] = _get_ole_header_value(
+                        xrm_ole, "ImageInfo/ImageHeight", np.int32
                     ).tolist()[0]
 
                 if xrm_ole.exists("ImageInfo/ImageWidth"):
-                    metadata["width"] = np.frombuffer(
-                        xrm_ole.openstream("ImageInfo/ImageWidth").getvalue(), np.int32
+                    metadata["width"] = _get_ole_header_value(
+                        xrm_ole, "ImageInfo/ImageWidth", np.int32
                     ).tolist()[0]
 
                 # Find images which are not mosaics (txrm spec typos this as mosiac)
                 if xrm_ole.exists("ImageInfo/MosiacRows") and xrm_ole.exists(
                     "ImageInfo/MosiacColumns"
                 ):
-                    metadata["mosaic_rows"] = np.frombuffer(
-                        xrm_ole.openstream("ImageInfo/MosiacRows").getvalue(), np.int32
+                    metadata["mosaic_rows"] = _get_ole_header_value(
+                        xrm_ole, "ImageInfo/MosiacRows", np.int32
                     )[0]
-                    metadata["mosaic_columns"] = np.frombuffer(
-                        xrm_ole.openstream("ImageInfo/MosiacColumns").getvalue(),
-                        np.int32,
+                    metadata["mosaic_columns"] = _get_ole_header_value(
+                        xrm_ole, "ImageInfo/MosiacColumns", np.int32
                     )[0]
                     metadata["mosaic_size"] = int(
                         metadata["mosaic_rows"] * metadata["mosaic_columns"]
@@ -326,58 +329,52 @@ class SXTContext(Context):
 
             # Read the tilt angles and pixel size from the txrm
             angles: list = []
-            metadata = {
-                "source": str(self._basepath),
-                "tilt_series_tag": transferred_file.stem,
-            }
+            metadata["source"] = str(self._basepath)
+            metadata["tilt_series_tag"] = transferred_file.stem
             with OleFileIO(str(transferred_file)) as txrm_ole:
                 if txrm_ole.exists("ReferenceData/Image"):
                     metadata["has_reference"] = True
 
                 if txrm_ole.exists("ImageInfo/Angles"):
-                    angles = np.frombuffer(
-                        txrm_ole.openstream("ImageInfo/Angles").getvalue(), np.float32
+                    angles = _get_ole_header_value(
+                        txrm_ole, "ImageInfo/Angles", np.float32
                     ).tolist()
                     metadata["minimum_angle"] = min(angles)
                     metadata["maximum_angle"] = max(angles)
 
                 if txrm_ole.exists("ImageInfo/PixelSize"):
-                    pixel_size_txrm = np.frombuffer(
-                        txrm_ole.openstream("ImageInfo/PixelSize").getvalue(),
-                        np.float32,
+                    pixel_size_txrm = _get_ole_header_value(
+                        txrm_ole, "ImageInfo/PixelSize", np.float32
                     ).tolist()
                     metadata["pixel_size"] = pixel_size_txrm[0] * 1e4
 
                 if txrm_ole.exists("ImageInfo/ImageWidth"):
-                    image_width_txrm = np.frombuffer(
-                        txrm_ole.openstream("ImageInfo/ImageWidth").getvalue(), np.int32
+                    image_width_txrm = _get_ole_header_value(
+                        txrm_ole, "ImageInfo/ImageWidth", np.int32
                     ).tolist()
                     metadata["image_size_x"] = image_width_txrm[0]
 
                 if txrm_ole.exists("ImageInfo/ImageHeight"):
-                    image_height_txrm = np.frombuffer(
-                        txrm_ole.openstream("ImageInfo/ImageHeight").getvalue(),
-                        np.int32,
+                    image_height_txrm = _get_ole_header_value(
+                        txrm_ole, "ImageInfo/ImageHeight", np.int32
                     ).tolist()
                     metadata["image_size_y"] = image_height_txrm[0]
 
                 if txrm_ole.exists("ImageInfo/ExpTimes"):
-                    exposure_time_txrm = np.frombuffer(
-                        txrm_ole.openstream("ImageInfo/ExpTimes").getvalue(), np.float32
+                    exposure_time_txrm = _get_ole_header_value(
+                        txrm_ole, "ImageInfo/ExpTimes", np.float32
                     ).tolist()
                     metadata["exposure_time"] = exposure_time_txrm[0]
 
                 if txrm_ole.exists("ImageInfo/XrayMagnification"):
-                    magnification_txrm = np.frombuffer(
-                        txrm_ole.openstream("ImageInfo/XrayMagnification").getvalue(),
-                        np.float32,
+                    magnification_txrm = _get_ole_header_value(
+                        txrm_ole, "ImageInfo/XrayMagnification", np.float32
                     ).tolist()
                     metadata["magnification"] = magnification_txrm[0]
 
                 if txrm_ole.exists("ImageInfo/ImagesTaken"):
-                    tilt_count_txrm = np.frombuffer(
-                        txrm_ole.openstream("ImageInfo/ImagesTaken").getvalue(),
-                        np.int32,
+                    tilt_count_txrm = _get_ole_header_value(
+                        txrm_ole, "ImageInfo/ImagesTaken", np.int32
                     ).tolist()
                     metadata["tilt_series_length"] = tilt_count_txrm[0]
 
@@ -394,9 +391,8 @@ class SXTContext(Context):
                         .split("\x00")
                         if i
                     ]
-                    axis_values = np.frombuffer(
-                        txrm_ole.openstream("PositionInfo/MotorPositions").getvalue(),
-                        np.float32,
+                    axis_values = _get_ole_header_value(
+                        txrm_ole, "PositionInfo/MotorPositions", np.float32
                     )
                     if "Energy" in axis_names:
                         energy_index = list(np.array(axis_names) == "Energy").index(
