@@ -307,7 +307,7 @@ class SXTContext(Context):
                             "name": transferred_file.stem,
                             "x_stage_position": metadata.get("x_position", None),
                             "y_stage_position": metadata.get("y_position", None),
-                            "pixel_size": metadata.get("pixel_size", None),
+                            "pixel_size": round(metadata.get("pixel_size", 0), 2),
                             "height": int(
                                 metadata.get("height", 0) * metadata["mosaic_rows"]
                             ),
