@@ -178,10 +178,10 @@ class SXTContext(Context):
                 ):
                     x_tiles = _get_ole_header_value(
                         xrm_ole, "ImageInfo/XPosition", np.float32
-                    ).tolist()[0]
+                    ).tolist()
                     y_tiles = _get_ole_header_value(
                         xrm_ole, "ImageInfo/YPosition", np.float32
-                    ).tolist()[0]
+                    ).tolist()
                     metadata["x_position"] = x_tiles[int(len(x_tiles) / 2)]
                     metadata["y_position"] = y_tiles[int(len(y_tiles) / 2)]
 
