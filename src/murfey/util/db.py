@@ -472,11 +472,6 @@ class MurfeyLedger(SQLModel, table=True):  # type: ignore
     refine_parameters: Optional["RefineParameters"] = Relationship(
         back_populates="murfey_ledger", sa_relationship_kwargs={"cascade": "delete"}
     )
-    classification_feedback_parameters: Optional["ClassificationFeedbackParameters"] = (
-        Relationship(
-            back_populates="murfey_ledger", sa_relationship_kwargs={"cascade": "delete"}
-        )
-    )
     movies: Optional["Movie"] = Relationship(
         back_populates="murfey_ledger", sa_relationship_kwargs={"cascade": "delete"}
     )
@@ -709,9 +704,6 @@ class ClassificationFeedbackParameters(SQLModel, table=True):  # type: ignore
     initial_model: str
     next_job: int
     processing_job: Optional[ProcessingJob] = Relationship(
-        back_populates="classification_feedback_parameters"
-    )
-    murfey_ledger: Optional[MurfeyLedger] = Relationship(
         back_populates="classification_feedback_parameters"
     )
 

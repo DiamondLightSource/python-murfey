@@ -524,11 +524,17 @@ async def request_spa_preprocessing(
             .where(AutoProcProgram.pj_id == ProcessingJob.id)
             .where(ProcessingJob.recipe == "em-spa-preprocess")
         ).one()
-        proc_params = db.exec(
-            select(SPARelionParameters).where(
-                SPARelionParameters.pj_id == collected_ids[2].id
-            )
-        ).one()
+        # SPARelionParameters is an ORM row, but the recipe parameters below are
+        # read by key, so convert to a dict. (April refactor dropped this
+        # dict() wrap and left the dict-style access, raising "'SPARelionParameters'
+        # object is not subscriptable" on every micrograph.)
+        proc_params: Optional[dict] = dict(
+            db.exec(
+                select(SPARelionParameters).where(
+                    SPARelionParameters.pj_id == collected_ids[2].id
+                )
+            ).one()
+        )
     except sqlalchemy.exc.NoResultFound:
         proc_params = None
     try:
