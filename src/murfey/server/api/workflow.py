@@ -78,9 +78,6 @@ from murfey.util.processing_params import (
     motion_corrected_mrc,
 )
 from murfey.util.tomo import midpoint
-from murfey.workflows.sxt.process_sxt_tilt_series import (
-    SXTTiltSeriesInfo,
-)
 from murfey.workflows.tomo.tomo_metadata import register_search_map_in_database
 
 logger = getLogger("murfey.server.api.workflow")
@@ -100,6 +97,10 @@ class DCGroupParameters(BaseModel):
     atlas: str = ""
     sample: Optional[int] = None
     atlas_pixel_size: float = 0
+    atlas_x_stage_position: float | None = None
+    atlas_y_stage_position: float | None = None
+    atlas_width: int | None = None
+    atlas_height: int | None = None
     create_smartem_grid: bool = False
     acquisition_uuid: Optional[str] = None
 
@@ -1069,32 +1070,6 @@ async def register_tilt(
     except OperationalError:
         await asyncio.sleep(30)
         _add_tilt()
-
-
-sxt_router = APIRouter(
-    prefix="/workflow/sxt",
-    dependencies=[Depends(validate_instrument_token)],
-    tags=["Workflows: Soft x-ray tomography"],
-)
-
-
-@sxt_router.post("/visits/{visit_name}/sessions/{session_id}/sxt_tilt_series")
-def process_sxt_tilt_series(
-    visit_name: str,
-    session_id: MurfeySessionID,
-    tilt_series_info: SXTTiltSeriesInfo,
-    db=murfey_db,
-):
-    if _transport_object:
-        _transport_object.send(
-            _transport_object.feedback_queue,
-            {
-                "register": "sxt.process_tilt_series",
-                "session_id": session_id,
-                "visit_name": visit_name,
-                "tilt_series_info": tilt_series_info.model_dump(mode="json"),
-            },
-        )
 
 
 correlative_router = APIRouter(

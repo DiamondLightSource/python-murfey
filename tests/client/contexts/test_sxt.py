@@ -15,26 +15,162 @@ def test_sxt_context_initialisation(tmp_path):
 
 
 @patch("requests.post")
-def test_sxt_context_xrm(mock_post, tmp_path):
-    """Currently nothing happens with an xrm file"""
+@patch("murfey.client.contexts.sxt.OleFileIO")
+def test_sxt_context_xrm_atlas(mock_ole_file, mock_post, tmp_path):
+    """xrm files contain metadata, test atlas-mag case"""
+    mock_post().status_code = 200
+    mock_ole_file().__enter__().exists.return_value = True
+    # Motor position names
+    mock_ole_file().__enter__().openstream().read.return_value = (
+        "\x00Val1\x00\x00Energy\x00".encode()
+    )
+    # Metadata encoded arrays
+    mock_ole_file().__enter__().openstream().getvalue.side_effect = [
+        np.array([-1, 0, 1, 2, 3], dtype=np.float32).tobytes(),  # x tile positions
+        np.array([-3, -2, -1, 0, 1], dtype=np.float32).tobytes(),  # y tile positions
+        np.array([0.3], dtype=np.float32).tobytes(),  # Pixel size
+        np.array([1000], dtype=np.int32).tobytes(),  # Image Height
+        np.array([900], dtype=np.int32).tobytes(),  # Image Width
+        np.array([6], dtype=np.int32).tobytes(),  # Mosaic size
+        np.array([5], dtype=np.int32).tobytes(),  # Mosaic size
+    ]
+
     env = MurfeyInstanceEnvironment(
         url=urlparse("http://localhost:8000"),
         client_id=0,
-        sources=[tmp_path],
-        default_destinations={tmp_path: str(tmp_path)},
+        sources=[tmp_path / "cm12345-6/grid1"],
+        default_destinations={f"{tmp_path}/cm12345-6/grid1": "cm12345-6/raw/grid1"},
         instrument_name="",
-        visit="test",
+        visit="cm12345-6",
         murfey_session=1,
     )
-    context = SXTContext("zeiss", tmp_path, {}, "")
+    context = SXTContext(
+        "zeiss",
+        tmp_path / "cm12345-6/grid1",
+        {"rsync_basepath": "/path/to/dest", "processed_directory_name": "processed"},
+        "",
+    )
     return_value = context.post_transfer(
-        tmp_path / "example.xrm",
+        tmp_path / "cm12345-6/grid1/example_atlas.xrm",
         required_position_files=[],
         required_strings=["fractions"],
         environment=env,
     )
     assert return_value
-    mock_post.assert_not_called()
+
+    mock_ole_file.assert_any_call(str(tmp_path / "cm12345-6/grid1/example_atlas.xrm"))
+
+    # assert mock_post.call_count == 4
+    mock_post.assert_any_call(
+        "http://localhost:8000/workflow/visits/cm12345-6/sessions/1/register_data_collection_group",
+        json={
+            "experiment_type_id": 47,
+            "tag": f"{tmp_path}/cm12345-6/grid1",
+        },
+        headers={"Authorization": "Bearer "},
+    )
+    mock_post.assert_any_call(
+        "http://localhost:8000/workflow/sxt/convert_xrm_to_tiff",
+        json={
+            "xrm_path": "/path/to/dest/cm12345-6/raw/grid1/example_atlas.xrm",
+            "tiff_path": "/path/to/dest/cm12345-6/processed/grid1/example_atlas_Annotated.tiff",
+        },
+        headers={"Authorization": "Bearer "},
+    )
+    mock_post.assert_any_call(
+        "http://localhost:8000/workflow/visits/cm12345-6/sessions/1/register_data_collection_group",
+        json={
+            "experiment_type_id": 44,
+            "tag": f"{tmp_path}/cm12345-6/grid1",
+            "atlas": "/path/to/dest/cm12345-6/processed/grid1/example_atlas_Annotated.tiff",
+            "atlas_pixel_size": 0.3,
+            "atlas_x_stage_position": 1,
+            "atlas_y_stage_position": -1,
+            "atlas_height": 6000,
+            "atlas_width": 4500,
+        },
+        headers={"Authorization": "Bearer "},
+    )
+
+
+@patch("requests.post")
+@patch("murfey.client.contexts.sxt.OleFileIO")
+def test_sxt_context_xrm_roi(mock_ole_file, mock_post, tmp_path):
+    """xrm files contain metadata, test roi-mag case"""
+    mock_post().status_code = 200
+    mock_ole_file().__enter__().exists.return_value = True
+    # Motor position names
+    mock_ole_file().__enter__().openstream().read.return_value = (
+        "\x00Val1\x00\x00Energy\x00".encode()
+    )
+    # Metadata encoded arrays
+    mock_ole_file().__enter__().openstream().getvalue.side_effect = [
+        np.array([-1, 0, 1, 2, 3], dtype=np.float32).tobytes(),  # x tile positions
+        np.array([-3, -2, -1, 0, 1], dtype=np.float32).tobytes(),
+        # y tile positions
+        np.array([0.03], dtype=np.float32).tobytes(),  # Pixel size, smaller than atlas
+        np.array([1000], dtype=np.int32).tobytes(),  # Image Height
+        np.array([900], dtype=np.int32).tobytes(),  # Image Width
+        np.array([6], dtype=np.int32).tobytes(),  # Mosaic size
+        np.array([5], dtype=np.int32).tobytes(),  # Mosaic size
+    ]
+
+    env = MurfeyInstanceEnvironment(
+        url=urlparse("http://localhost:8000"),
+        client_id=0,
+        sources=[tmp_path / "cm12345-6/grid1"],
+        default_destinations={f"{tmp_path}/cm12345-6/grid1": "cm12345-6/raw/grid1"},
+        instrument_name="",
+        visit="cm12345-6",
+        murfey_session=1,
+    )
+    context = SXTContext(
+        "zeiss",
+        tmp_path / "cm12345-6/grid1",
+        {"rsync_basepath": "/path/to/dest", "processed_directory_name": "processed"},
+        "",
+    )
+    return_value = context.post_transfer(
+        tmp_path / "cm12345-6/grid1/example_roi.xrm",
+        required_position_files=[],
+        required_strings=["fractions"],
+        environment=env,
+    )
+    assert return_value
+
+    mock_ole_file.assert_any_call(str(tmp_path / "cm12345-6/grid1/example_roi.xrm"))
+
+    # assert mock_post.call_count == 4
+    mock_post.assert_any_call(
+        "http://localhost:8000/workflow/visits/cm12345-6/sessions/1/register_data_collection_group",
+        json={
+            "experiment_type_id": 47,
+            "tag": f"{tmp_path}/cm12345-6/grid1",
+        },
+        headers={"Authorization": "Bearer "},
+    )
+    mock_post.assert_any_call(
+        "http://localhost:8000/workflow/sxt/convert_xrm_to_tiff",
+        json={
+            "xrm_path": "/path/to/dest/cm12345-6/raw/grid1/example_roi.xrm",
+            "tiff_path": "/path/to/dest/cm12345-6/processed/grid1/example_roi_Annotated.tiff",
+        },
+        headers={"Authorization": "Bearer "},
+    )
+    mock_post.assert_any_call(
+        "http://localhost:8000/workflow/sxt/visits/cm12345-6/sessions/1/register_sxt_roi",
+        json={
+            "tag": f"{tmp_path}/cm12345-6/grid1",
+            "name": "example_roi",
+            "x_stage_position": 1,
+            "y_stage_position": -1,
+            "pixel_size": 0.03,
+            "height": 6000,
+            "width": 4500,
+            "image": "/path/to/dest/cm12345-6/processed/grid1/example_roi_Annotated.tiff",
+        },
+        headers={"Authorization": "Bearer "},
+    )
 
 
 @patch("requests.post")
