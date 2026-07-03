@@ -27,6 +27,7 @@ import murfey.server.api.websocket
 import murfey.server.api.workflow
 import murfey.server.api.workflow_clem
 import murfey.server.api.workflow_fib
+import murfey.server.api.workflow_sxt
 from murfey.server import template_files
 from murfey.util.config import get_security_config
 
@@ -96,10 +97,10 @@ app.include_router(murfey.server.api.session_info.tomo_router)
 app.include_router(murfey.server.api.workflow.router)
 app.include_router(murfey.server.api.workflow.correlative_router)
 app.include_router(murfey.server.api.workflow.spa_router)
-app.include_router(murfey.server.api.workflow.sxt_router)
 app.include_router(murfey.server.api.workflow.tomo_router)
 app.include_router(murfey.server.api.workflow_clem.router)
 app.include_router(murfey.server.api.workflow_fib.router)
+app.include_router(murfey.server.api.workflow_sxt.router)
 
 app.include_router(murfey.server.api.prometheus.router)
 
