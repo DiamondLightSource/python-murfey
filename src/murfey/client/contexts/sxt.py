@@ -184,17 +184,17 @@ class SXTContext(Context):
                 if xrm_ole.exists("ImageInfo/PixelSize"):
                     metadata["pixel_size"] = np.frombuffer(
                         xrm_ole.openstream("ImageInfo/PixelSize").getvalue(), np.float32
-                    ).tolist()
+                    ).tolist()[0]
 
                 if xrm_ole.exists("ImageInfo/ImageHeight"):
                     metadata["height"] = np.frombuffer(
                         xrm_ole.openstream("ImageInfo/ImageHeight").getvalue(), np.int32
-                    ).tolist()
+                    ).tolist()[0]
 
                 if xrm_ole.exists("ImageInfo/ImageWidth"):
                     metadata["width"] = np.frombuffer(
-                        xrm_ole.openstream("ImageInfo/ImageWidth").getvalue(), np.intt32
-                    ).tolist()
+                        xrm_ole.openstream("ImageInfo/ImageWidth").getvalue(), np.int32
+                    ).tolist()[0]
 
                 # Find images which are not mosaics (txrm spec typos this as mosiac)
                 if xrm_ole.exists("ImageInfo/MosiacRows") and xrm_ole.exists(
@@ -203,12 +203,12 @@ class SXTContext(Context):
                     metadata["mosaic_rows"] = np.frombuffer(
                         xrm_ole.openstream("ImageInfo/MosiacRows").getvalue(), np.int32
                     )[0]
-                    metadata["mosiac_columns"] = np.frombuffer(
+                    metadata["mosaic_columns"] = np.frombuffer(
                         xrm_ole.openstream("ImageInfo/MosiacColumns").getvalue(),
                         np.int32,
                     )[0]
                     metadata["mosaic_size"] = int(
-                        metadata["mosaic_rows"] * metadata["mosiac_columns"]
+                        metadata["mosaic_rows"] * metadata["mosaic_columns"]
                     )
 
             source = _get_source(transferred_file, environment=environment)
@@ -219,26 +219,48 @@ class SXTContext(Context):
                     transferred_file,
                     Path(self._machine_config.get("rsync_basepath", "")),
                 )
+                if (
+                    environment.visit
+                    in Path(environment.default_destinations[source]).parts
+                ):
+                    # Split either side of the raw directory
+                    visit_idx = Path(
+                        environment.default_destinations[source]
+                    ).parts.index(environment.visit)
+                    destination_base = "/".join(
+                        Path(environment.default_destinations[source]).parts[
+                            : visit_idx + 1
+                        ]
+                    )
+                    destination_extra = "/".join(
+                        Path(environment.default_destinations[source]).parts[
+                            visit_idx + 2 :
+                        ]
+                    )
+                else:
+                    destination_base = str(
+                        Path(environment.default_destinations[source])
+                        / environment.visit
+                    )
+                    destination_extra = ""
                 converted_file_path = (
                     Path(self._machine_config.get("rsync_basepath", ""))
-                    / (
-                        environment.visit
-                        if environment.visit
-                        not in environment.default_destinations[source]
-                        else ""
-                    )
+                    / destination_base
                     / self._machine_config.get("processed_directory_name", "")
                     / self._machine_config.get("processed_extra_directory", "")
+                    / destination_extra
                     / f"{transferred_file.relative_to(source).stem}_Annotated.tiff"
                 )
-
                 capture_post(
                     base_url=str(environment.url.geturl()),
                     router_name="workflow_sxt.router",
                     function_name="convert_xrm_to_tiff",
                     token=self._token,
                     instrument_name=environment.instrument_name,
-                    data={"xrm_path": image_path, "tiff_path": converted_file_path},
+                    data={
+                        "xrm_path": str(image_path),
+                        "tiff_path": str(converted_file_path),
+                    },
                 )
 
                 if (
@@ -250,7 +272,7 @@ class SXTContext(Context):
                         "experiment_type_id": 44,  # Atlas
                         "tag": dcg_tag,
                         "atlas": str(converted_file_path),
-                        "atlas_pixel_size": metadata.get("pixel_size", None),
+                        "atlas_pixel_size": round(metadata.get("pixel_size", 0), 2),
                         "atlas_x_stage_position": metadata.get("x_position", None),
                         "atlas_y_stage_position": metadata.get("y_position", None),
                         "atlas_height": int(
@@ -278,8 +300,8 @@ class SXTContext(Context):
                         function_name="register_sxt_roi",
                         token=self._token,
                         instrument_name=environment.instrument_name,
+                        visit_name=environment.visit,
                         session_id=environment.murfey_session,
-                        sm_name=transferred_file.parent.name,
                         data={
                             "tag": dcg_tag,
                             "name": transferred_file.stem,
