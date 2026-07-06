@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from logging import getLogger
 from pathlib import Path
@@ -13,10 +14,15 @@ from sqlmodel import select
 
 try:
     from smartem_backend.api_client import SmartEMAPIClient
+    from smartem_backend.keycloak_client import KeycloakClient, load_keycloak_config
     from smartem_common.schemas import AtlasData
 
+    keycloak_client = KeycloakClient(
+        load_keycloak_config(Path(os.getenv("SMARTEM_KEYCLOAK_CONFIGURATION") or ""))
+    )
     SMARTEM_ACTIVE = True
 except ImportError:
+    keycloak_client = None
     SMARTEM_ACTIVE = False
 
 import murfey.server.prometheus as prom
@@ -379,7 +385,9 @@ def register_atlas(
         ]
         if machine_config.smartem_api_url:
             smartem_client = SmartEMAPIClient(
-                base_url=machine_config.smartem_api_url, logger=logger
+                base_url=machine_config.smartem_api_url,
+                logger=logger,
+                keycloak_client=keycloak_client,
             )
             grid_uuid = None
             if atlas_registration_data.tag:
@@ -449,7 +457,9 @@ def register_square(
             ]
             if machine_config.smartem_api_url:
                 smartem_client = SmartEMAPIClient(
-                    base_url=machine_config.smartem_api_url, logger=logger
+                    base_url=machine_config.smartem_api_url,
+                    logger=logger,
+                    keycloak_client=keycloak_client,
                 )
                 smartem_client.gridsquare_registered(
                     smartem_uuid, count=square_registration_data.count
