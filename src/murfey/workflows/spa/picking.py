@@ -1,4 +1,6 @@
+import os
 from logging import getLogger
+from pathlib import Path
 from typing import List
 
 import numpy as np
@@ -31,12 +33,17 @@ logger = getLogger("murfey.workflows.spa.picking")
 
 try:
     from smartem_backend.api_client import SmartEMAPIClient
+    from smartem_backend.keycloak_client import KeycloakClient, load_keycloak_config
     from smartem_backend.model.http_request import MicrographUpdateRequest
     from smartem_backend.model.http_response import MicrographResponse
     from smartem_common.entity_status import MicrographStatus
 
+    keycloak_client = KeycloakClient(
+        load_keycloak_config(Path(os.getenv("SMARTEM_KEYCLOAK_CONFIGURATION") or ""))
+    )
     SMARTEM_ACTIVE = True
 except ImportError:
+    keycloak_client = None
     SMARTEM_ACTIVE = False
 
 
@@ -390,7 +397,9 @@ def particles_picked(message: dict, murfey_db: Session) -> dict[str, bool]:
             )[session.instrument_name]
             if machine_config.smartem_api_url:
                 smartem_client = SmartEMAPIClient(
-                    base_url=machine_config.smartem_api_url, logger=logger
+                    base_url=machine_config.smartem_api_url,
+                    logger=logger,
+                    keycloak_client=keycloak_client,
                 )
                 update = MicrographUpdateRequest(
                     status=MicrographStatus.PARTICLE_PICKING_COMPLETED

@@ -1,4 +1,5 @@
 import logging
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -8,14 +9,19 @@ from sqlmodel import Session, select
 
 try:
     from smartem_backend.api_client import SmartEMAPIClient
+    from smartem_backend.keycloak_client import KeycloakClient, load_keycloak_config
     from smartem_common.schemas import (
         FoilHoleData as SmartEMFoilHoleData,
         GridSquareData as SmartEMGridSquareData,
         GridSquareMetadata as SmartEMGridSquareMetadata,
     )
 
+    keycloak_client = KeycloakClient(
+        load_keycloak_config(Path(os.getenv("SMARTEM_KEYCLOAK_CONFIGURATION") or ""))
+    )
     SMARTEM_ACTIVE = True
 except ImportError:
+    keycloak_client = None
     SMARTEM_ACTIVE = False
 
 from murfey.server import _transport_object
@@ -177,7 +183,9 @@ def register_grid_square(
                                 )
                             )
                     smartem_client = SmartEMAPIClient(
-                        base_url=machine_config.smartem_api_url, logger=logger
+                        base_url=machine_config.smartem_api_url,
+                        logger=logger,
+                        keycloak_client=keycloak_client,
                     )
                     gs_data = SmartEMGridSquareData(
                         gridsquare_id=str(gsid),
@@ -324,7 +332,9 @@ def register_foil_hole(
             )[murfey_session.instrument_name]
             if machine_config.smartem_api_url:
                 smartem_client = SmartEMAPIClient(
-                    base_url=machine_config.smartem_api_url, logger=logger
+                    base_url=machine_config.smartem_api_url,
+                    logger=logger,
+                    keycloak_client=keycloak_client,
                 )
                 fh_data = SmartEMFoilHoleData(
                     id=str(foil_hole_params.name),
