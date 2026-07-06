@@ -89,6 +89,7 @@ class UpstreamFileRequestInfo(BaseModel):
     # Used in backend server for cross-instrument file download requests
     upstream_instrument: str
     upstream_visit_path: Path
+    search_strings: list[str] | None = None
 
 
 """
@@ -231,6 +232,12 @@ class LamellaSiteInfo(BaseModel):
     site_number: int | None = None
     stage_info: StagePositionInfo | None = None
     steps: MillingSteps | None = None
+
+
+class FIBGIFParameters(BaseModel):
+    lamella_number: int
+    images: list[Path]
+    output_file: Path
 
 
 """

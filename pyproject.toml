@@ -7,7 +7,7 @@ requires = [
 
 [project]
 name = "murfey"
-version = "0.26.1"
+version = "0.26.2"
 description = "Client-Server architecture hauling Cryo-EM data"
 readme = "README.md"
 keywords = [
@@ -116,6 +116,7 @@ TomographyMetadataContext = "murfey.client.contexts.tomo_metadata:TomographyMeta
 "data_collection" = "murfey.workflows.register_data_collection:run"
 "data_collection_group" = "murfey.workflows.register_data_collection_group:run"
 "experiment_type_update" = "murfey.workflows.register_experiment_type_update:run"
+"fib.make_milling_gif" = "murfey.workflows.fib.make_milling_gif:run"
 "fib.register_atlas" = "murfey.workflows.fib.register_atlas:run"
 "fib.register_milling_progress" = "murfey.workflows.fib.register_milling_progress:run"
 "pato" = "murfey.workflows.notifications:notification_setup"
@@ -125,6 +126,7 @@ TomographyMetadataContext = "murfey.client.contexts.tomo_metadata:TomographyMeta
 "spa.ctf_estimated" = "murfey.workflows.spa.ctf_estimation:ctf_estimated"
 "spa.flush_spa_preprocess" = "murfey.workflows.spa.flush_spa_preprocess:flush_spa_preprocess"
 "spa.motion_corrected" = "murfey.workflows.spa.motion_correction:motion_corrected"
+"sxt.process_tilt_series" = "murfey.workflows.sxt.process_sxt_tilt_series:run"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

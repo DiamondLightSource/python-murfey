@@ -554,6 +554,7 @@ async def gather_upstream_files(
         session_id=session_id,
         upstream_instrument=upstream_file_request.upstream_instrument,
         upstream_visit_path=upstream_file_request.upstream_visit_path,
+        search_strings=upstream_file_request.search_strings,
         db=db,
     )
 
