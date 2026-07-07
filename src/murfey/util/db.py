@@ -1144,41 +1144,6 @@ class CryoemInitialModel(SQLModel, table=True):  # type: ignore
 
 """
 =======================================================================================
-SXT WORKFLOW
-=======================================================================================
-"""
-
-
-class SxtRoi(SQLModel, table=True):  # type: ignore
-    id: Optional[int] = Field(primary_key=True, default=None)
-    session_id: int = Field(foreign_key="session.id")
-    name: str
-    tag: str
-    x_stage_position: Optional[float]
-    y_stage_position: Optional[float]
-    thumbnail_size_x: Optional[int]
-    thumbnail_size_y: Optional[int]
-    pixel_size: Optional[float] = None
-    image: str = ""
-    atlas_id: Optional[int] = Field(
-        foreign_key="datacollectiongroup.dataCollectionGroupId"
-    )
-    x_location: Optional[int] = None
-    y_location: Optional[int] = None
-    height: Optional[int] = None
-    width: Optional[int] = None
-
-    # -------------
-    # Relationships
-    # -------------
-    session: Optional[Session] = Relationship(back_populates="sxt_rois")
-    data_collection_group: Optional["DataCollectionGroup"] = Relationship(
-        back_populates="sxt_rois"
-    )
-
-
-"""
-=======================================================================================
 FUNCTIONS
 =======================================================================================
 """

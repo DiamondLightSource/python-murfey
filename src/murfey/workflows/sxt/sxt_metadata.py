@@ -6,7 +6,7 @@ from murfey.server import _transport_object
 from murfey.util import sanitise
 from murfey.util.db import (
     DataCollectionGroup,
-    SxtRoi,
+    SearchMap,
 )
 from murfey.util.models import SearchMapParameters
 
@@ -25,10 +25,10 @@ def register_sxt_roi(
         .where(DataCollectionGroup.tag == roi_parameters.tag)
     ).one()
     roi_query = murfey_db.exec(
-        select(SxtRoi)
-        .where(SxtRoi.name == roi_name)
-        .where(SxtRoi.tag == roi_parameters.tag)
-        .where(SxtRoi.session_id == SxtRoi)
+        select(SearchMap)
+        .where(SearchMap.name == roi_name)
+        .where(SearchMap.tag == roi_parameters.tag)
+        .where(SearchMap.session_id == SearchMap)
     ).all()
     if roi_query:
         # See if there is already a search map with this name and update if so
@@ -51,7 +51,7 @@ def register_sxt_roi(
             # mock up response so that below still works
             roi_ispyb_response = {"success": False, "return_value": None}
         # Register new search map
-        roi = SxtRoi(
+        roi = SearchMap(
             id=(
                 roi_ispyb_response["return_value"]
                 if roi_ispyb_response["success"]
@@ -65,8 +65,6 @@ def register_sxt_roi(
             pixel_size=roi_parameters.pixel_size,
             width=roi_parameters.width,
             height=roi_parameters.height,
-            thumbnail_size_x=1024,
-            thumbnail_size_y=1024,
             image=roi_parameters.image or "",
         )
 
