@@ -149,7 +149,7 @@ murfey.instrument_server.api.router:
     methods:
       - POST
   - path: /visits/{visit_name}/sessions/{session_id}/upstream_file_data_request
-    function: gather_upstream_files
+    function: run_upstream_file_download_request
     path_params:
       - name: visit_name
         type: str
@@ -569,7 +569,7 @@ murfey.server.api.instrument.router:
     methods:
       - POST
   - path: /instrument_server/visits/{visit_name}/sessions/{session_id}/upstream_file_data_request
-    function: request_upstream_file_data_download
+    function: request_upstream_file_download
     path_params:
       - name: visit_name
         type: str
@@ -920,7 +920,7 @@ murfey.server.api.session_control.spa_router:
     function: register_square
     path_params:
       - name: gsid
-        type: int
+        type: int | str
       - name: session_id
         type: int
     methods:
@@ -1336,16 +1336,6 @@ murfey.server.api.workflow.spa_router:
         type: int
     methods:
       - POST
-murfey.server.api.workflow.sxt_router:
-  - path: /workflow/sxt/visits/{visit_name}/sessions/{session_id}/sxt_tilt_series
-    function: process_sxt_tilt_series
-    path_params:
-      - name: visit_name
-        type: str
-      - name: session_id
-        type: int
-    methods:
-      - POST
 murfey.server.api.workflow.tomo_router:
   - path: /workflow/tomo/sessions/{session_id}/tomography_processing_parameters
     function: register_tomo_proc_params
@@ -1451,6 +1441,30 @@ murfey.server.api.workflow_fib.router:
   - path: /workflow/fib/sessions/{session_id}/make_gif
     function: make_gif
     path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
+murfey.server.api.workflow_sxt.router:
+  - path: /workflow/sxt/visits/{visit_name}/sessions/{session_id}/sxt_tilt_series
+    function: process_sxt_tilt_series
+    path_params:
+      - name: visit_name
+        type: str
+      - name: session_id
+        type: int
+    methods:
+      - POST
+  - path: /workflow/sxt/convert_xrm_to_tiff
+    function: convert_xrm_to_tiff
+    path_params: []
+    methods:
+      - POST
+  - path: /workflow/sxt/visits/{visit_name}/sessions/{session_id}/register_sxt_roi
+    function: register_sxt_roi
+    path_params:
+      - name: visit_name
+        type: str
       - name: session_id
         type: int
     methods:

@@ -437,7 +437,7 @@ async def request_upstream_tiff_data_download(
 
 
 @router.post("/visits/{visit_name}/sessions/{session_id}/upstream_file_data_request")
-async def request_upstream_file_data_download(
+async def request_upstream_file_download(
     visit_name: str,
     session_id: MurfeySessionID,
     upstream_file_request: UpstreamFileRequestInfo,
@@ -475,7 +475,7 @@ async def request_upstream_file_data_download(
     async with aiohttp.ClientSession() as clientsession:
         url_path = url_path_for(
             "api.router",
-            "gather_upstream_files",
+            "run_upstream_file_download_request",
             visit_name=secure_filename(visit_name),
             session_id=session_id,
         )
@@ -488,6 +488,7 @@ async def request_upstream_file_data_download(
                 "download_dir": download_dir,
                 "upstream_instrument": upstream_file_request.upstream_instrument,
                 "upstream_visit_path": str(upstream_file_request.upstream_visit_path),
+                "search_strings": upstream_file_request.search_strings,
             },
         ) as resp:
             data = await resp.json()

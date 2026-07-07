@@ -1,7 +1,9 @@
 from pathlib import Path
+from typing import Any
 from unittest import mock
 from unittest.mock import MagicMock
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pytest_mock import MockerFixture
@@ -10,9 +12,10 @@ from murfey.server.api.auth import (
     validate_instrument_server_session_access,
     validate_instrument_token,
 )
-from murfey.server.api.session_control import spa_router
+from murfey.server.api.session_control import gather_upstream_files, spa_router
 from murfey.server.murfey_db import murfey_db_session
 from murfey.util.api import url_path_for
+from murfey.util.models import UpstreamFileRequestInfo
 
 
 def test_make_atlas_jpg(mocker: MockerFixture, tmp_path: Path):
@@ -74,3 +77,55 @@ def test_make_atlas_jpg(mocker: MockerFixture, tmp_path: Path):
     # Check that the expected calls were made
     mock_atlas_jpg.assert_called_once_with(instrument_name, visit_name, test_file)
     assert response.status_code == 200
+
+
+@pytest.mark.parametrize(
+    "search_strings",
+    (
+        ["dummy"],
+        [],
+        None,
+    ),
+)
+@pytest.mark.asyncio
+async def test_gather_upstream_files(
+    mocker: MockerFixture,
+    tmp_path: Path,
+    search_strings: list[str] | None,
+):
+    # Construct dictionary to pass to Pydantic model
+    session_id = 1
+    upstream_instrument = "dummy"
+    upstream_visit_path = str(tmp_path / "dummy")
+    params_dict: dict[str, Any] = {
+        "upstream_instrument": upstream_instrument,
+        "upstream_visit_path": upstream_visit_path,
+    }
+    if search_strings is not None:
+        params_dict["search_strings"] = search_strings
+
+    # Validate the incoming message
+    params = UpstreamFileRequestInfo(**params_dict)
+
+    # Patch the actual 'gather_upstream_files' function
+    mock_gather = mocker.patch(
+        "murfey.server.api.session_control._gather_upstream_files"
+    )
+
+    # Create a mock database session
+    mock_db = MagicMock()
+
+    # Run the function and check that the expected calls were made:
+    await gather_upstream_files(
+        visit_name="dummy",
+        session_id=session_id,
+        upstream_file_request=params,
+        db=mock_db,
+    )
+    mock_gather.assert_called_with(
+        session_id=session_id,
+        upstream_instrument=upstream_instrument,
+        upstream_visit_path=Path(upstream_visit_path),
+        search_strings=search_strings,
+        db=mock_db,
+    )

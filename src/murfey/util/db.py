@@ -174,6 +174,139 @@ class ImagingSite(SQLModel, table=True):  # type: ignore
     grid_square_id: Optional[int] = Field(foreign_key="gridsquare.id", default=None)
 
 
+class DataCollectionGroup(SQLModel, table=True):  # type: ignore
+    id: int = Field(
+        primary_key=True,
+        unique=True,
+        alias="dataCollectionGroupId",
+        sa_column_kwargs={"name": "dataCollectionGroupId"},
+    )
+    session_id: int = Field(foreign_key="session.id", primary_key=True)
+    tag: str = Field(primary_key=True)
+    atlas_id: Optional[int] = None
+    atlas_pixel_size: Optional[float] = None
+    atlas: str = ""
+    sample: Optional[int] = None
+    smartem_grid_uuid: Optional[str] = None
+
+    # -------------
+    # Relationships
+    # -------------
+    session: Optional["Session"] = Relationship(back_populates="data_collection_groups")
+    data_collections: List["DataCollection"] = Relationship(
+        back_populates="data_collection_group",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
+    imaging_sites: List["ImagingSite"] = Relationship(
+        back_populates="data_collection_group",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
+    notification_parameters: List["NotificationParameter"] = Relationship(
+        back_populates="data_collection_group",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
+    tomography_processing_parameters: List["TomographyProcessingParameters"] = (
+        Relationship(
+            back_populates="data_collection_group",
+            sa_relationship_kwargs={"cascade": "delete"},
+        )
+    )
+    grid_squares: Optional[List["GridSquare"]] = Relationship(
+        back_populates="data_collection_group",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
+    search_maps: Optional[List["SearchMap"]] = Relationship(
+        back_populates="data_collection_group",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
+
+
+class GridSquare(SQLModel, table=True):  # type: ignore
+    id: Optional[int] = Field(primary_key=True, default=None)
+    session_id: int = Field(foreign_key="session.id")
+    name: int
+    tag: str
+    x_location: Optional[float]
+    y_location: Optional[float]
+    x_stage_position: Optional[float]
+    y_stage_position: Optional[float]
+    readout_area_x: Optional[int]
+    readout_area_y: Optional[int]
+    thumbnail_size_x: Optional[int]
+    thumbnail_size_y: Optional[int]
+    pixel_size: Optional[float] = None
+    image: str = ""
+    atlas_id: Optional[int] = Field(
+        foreign_key="datacollectiongroup.dataCollectionGroupId"
+    )
+    scaled_pixel_size: Optional[float] = None
+    pixel_location_x: Optional[int] = None
+    pixel_location_y: Optional[int] = None
+    height: Optional[int] = None
+    width: Optional[int] = None
+    angle: Optional[float] = None
+    quality_indicator: Optional[float] = None
+    smartem_uuid: Optional[str] = None
+
+    # -------------
+    # Relationships
+    # -------------
+    session: Optional[Session] = Relationship(back_populates="grid_squares")
+    imaging_sites: List["ImagingSite"] = Relationship(
+        back_populates="grid_square", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    milling_steps: List["MillingStep"] = Relationship(
+        back_populates="grid_square", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    foil_holes: List["FoilHole"] = Relationship(
+        back_populates="grid_square", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    data_collection_group: Optional["DataCollectionGroup"] = Relationship(
+        back_populates="grid_squares"
+    )
+
+
+"""
+=======================================================================================
+FIB WORKFLOW
+=======================================================================================
+"""
+
+
+class MillingStep(SQLModel, table=True):  # type: ignore
+    id: int = Field(primary_key=True, default=None)
+    recipe_name: Optional[str] = Field(default=None)
+    activity_name: Optional[str] = Field(default=None)
+    is_enabled: Optional[bool] = Field(default=None)
+    status: Optional[str] = Field(default=None)
+    execution_time: Optional[float] = Field(default=None)
+    stage_x: Optional[float] = Field(default=None)
+    stage_y: Optional[float] = Field(default=None)
+    stage_z: Optional[float] = Field(default=None)
+    rotation: Optional[float] = Field(default=None)
+    tilt_alpha: Optional[float] = Field(default=None)
+    beam_type: Optional[str] = Field(default=None)
+    beam_voltage: Optional[float] = Field(default=None)
+    beam_current: Optional[float] = Field(default=None)
+    milling_angle: Optional[float] = Field(default=None)
+    depth_correction: Optional[float] = Field(default=None)
+    lamella_offset: Optional[float] = Field(default=None)
+    trench_height_front: Optional[float] = Field(default=None)
+    trench_height_rear: Optional[float] = Field(default=None)
+    width_overlap_front_left: Optional[float] = Field(default=None)
+    width_overlap_front_right: Optional[float] = Field(default=None)
+    width_overlap_rear_left: Optional[float] = Field(default=None)
+    width_overlap_rear_right: Optional[float] = Field(default=None)
+
+    # -------------
+    # Relationships
+    # -------------
+    grid_square: Optional["GridSquare"] = Relationship(
+        back_populates="milling_steps"
+    )  # Many-to-one
+    grid_square_id: Optional[int] = Field(foreign_key="gridsquare.id", default=None)
+
+
 """
 =======================================================================================
 TEM SESSION AND PROCESSING WORKFLOW
@@ -221,49 +354,6 @@ class Tilt(SQLModel, table=True):  # type: ignore
     tilt_series_id: int = Field(foreign_key="tiltseries.id")
     motion_corrected: bool = False
     tilt_series: Optional[TiltSeries] = Relationship(back_populates="tilts")
-
-
-class DataCollectionGroup(SQLModel, table=True):  # type: ignore
-    id: int = Field(
-        primary_key=True,
-        unique=True,
-        alias="dataCollectionGroupId",
-        sa_column_kwargs={"name": "dataCollectionGroupId"},
-    )
-    session_id: int = Field(foreign_key="session.id", primary_key=True)
-    tag: str = Field(primary_key=True)
-    atlas_id: Optional[int] = None
-    atlas_pixel_size: Optional[float] = None
-    atlas: str = ""
-    sample: Optional[int] = None
-    smartem_grid_uuid: Optional[str] = None
-    session: Optional["Session"] = Relationship(back_populates="data_collection_groups")
-    data_collections: List["DataCollection"] = Relationship(
-        back_populates="data_collection_group",
-        sa_relationship_kwargs={"cascade": "delete"},
-    )
-    imaging_sites: List["ImagingSite"] = Relationship(
-        back_populates="data_collection_group",
-        sa_relationship_kwargs={"cascade": "delete"},
-    )
-    notification_parameters: List["NotificationParameter"] = Relationship(
-        back_populates="data_collection_group",
-        sa_relationship_kwargs={"cascade": "delete"},
-    )
-    tomography_processing_parameters: List["TomographyProcessingParameters"] = (
-        Relationship(
-            back_populates="data_collection_group",
-            sa_relationship_kwargs={"cascade": "delete"},
-        )
-    )
-    grid_squares: Optional[List["GridSquare"]] = Relationship(
-        back_populates="data_collection_group",
-        sa_relationship_kwargs={"cascade": "delete"},
-    )
-    search_maps: Optional[List["SearchMap"]] = Relationship(
-        back_populates="data_collection_group",
-        sa_relationship_kwargs={"cascade": "delete"},
-    )
 
 
 class NotificationParameter(SQLModel, table=True):  # type: ignore
@@ -379,6 +469,12 @@ class ProcessingJob(SQLModel, table=True):  # type: ignore
     refine3ds: List["Refine3D"] = Relationship(
         back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
     )
+    bfactor_parameters: List["BFactorParameters"] = Relationship(
+        back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
+    )
+    bfactors: List["BFactors"] = Relationship(
+        back_populates="processing_job", sa_relationship_kwargs={"cascade": "delete"}
+    )
 
 
 class PreprocessStash(SQLModel, table=True):  # type: ignore
@@ -477,44 +573,6 @@ class MurfeyLedger(SQLModel, table=True):  # type: ignore
     )
 
 
-class GridSquare(SQLModel, table=True):  # type: ignore
-    id: Optional[int] = Field(primary_key=True, default=None)
-    session_id: int = Field(foreign_key="session.id")
-    name: int
-    tag: str
-    x_location: Optional[float]
-    y_location: Optional[float]
-    x_stage_position: Optional[float]
-    y_stage_position: Optional[float]
-    readout_area_x: Optional[int]
-    readout_area_y: Optional[int]
-    thumbnail_size_x: Optional[int]
-    thumbnail_size_y: Optional[int]
-    pixel_size: Optional[float] = None
-    image: str = ""
-    session: Optional[Session] = Relationship(back_populates="grid_squares")
-    imaging_sites: List["ImagingSite"] = Relationship(
-        back_populates="grid_square", sa_relationship_kwargs={"cascade": "delete"}
-    )
-    foil_holes: List["FoilHole"] = Relationship(
-        back_populates="grid_square", sa_relationship_kwargs={"cascade": "delete"}
-    )
-    atlas_id: Optional[int] = Field(
-        foreign_key="datacollectiongroup.dataCollectionGroupId"
-    )
-    scaled_pixel_size: Optional[float] = None
-    pixel_location_x: Optional[int] = None
-    pixel_location_y: Optional[int] = None
-    height: Optional[int] = None
-    width: Optional[int] = None
-    angle: Optional[float] = None
-    quality_indicator: Optional[float] = None
-    smartem_uuid: Optional[str] = None
-    data_collection_group: Optional["DataCollectionGroup"] = Relationship(
-        back_populates="grid_squares"
-    )
-
-
 class FoilHole(SQLModel, table=True):  # type: ignore
     id: Optional[int] = Field(primary_key=True, default=None)
     grid_square_id: int = Field(foreign_key="gridsquare.id")
@@ -551,41 +609,42 @@ class SearchMap(SQLModel, table=True):  # type: ignore
     session_id: int = Field(foreign_key="session.id")
     name: str
     tag: str
-    x_location: Optional[float] = None
-    y_location: Optional[float] = None
-    x_stage_position: Optional[float] = None
-    y_stage_position: Optional[float] = None
-    pixel_size: Optional[float] = None
+    lamella: bool | None = None
+    x_location: float | None = None
+    y_location: float | None = None
+    x_stage_position: float | None = None
+    y_stage_position: float | None = None
+    pixel_size: float | None = None
     image: str = ""
-    binning: Optional[float] = None
-    reference_matrix_m11: Optional[float] = None
-    reference_matrix_m12: Optional[float] = None
-    reference_matrix_m21: Optional[float] = None
-    reference_matrix_m22: Optional[float] = None
-    stage_correction_m11: Optional[float] = None
-    stage_correction_m12: Optional[float] = None
-    stage_correction_m21: Optional[float] = None
-    stage_correction_m22: Optional[float] = None
-    image_shift_correction_m11: Optional[float] = None
-    image_shift_correction_m12: Optional[float] = None
-    image_shift_correction_m21: Optional[float] = None
-    image_shift_correction_m22: Optional[float] = None
-    width: Optional[int] = None
-    height: Optional[int] = None
+    binning: float | None = None
+    reference_matrix_m11: float | None = None
+    reference_matrix_m12: float | None = None
+    reference_matrix_m21: float | None = None
+    reference_matrix_m22: float | None = None
+    stage_correction_m11: float | None = None
+    stage_correction_m12: float | None = None
+    stage_correction_m21: float | None = None
+    stage_correction_m22: float | None = None
+    image_shift_correction_m11: float | None = None
+    image_shift_correction_m12: float | None = None
+    image_shift_correction_m21: float | None = None
+    image_shift_correction_m22: float | None = None
+    width: int | None = None
+    height: int | None = None
     session: Optional[Session] = Relationship(back_populates="search_maps")
     tilt_series: List["TiltSeries"] = Relationship(
         back_populates="search_map", sa_relationship_kwargs={"cascade": "delete"}
     )
-    atlas_id: Optional[int] = Field(
+    atlas_id: int | None = Field(
         foreign_key="datacollectiongroup.dataCollectionGroupId"
     )
-    scaled_pixel_size: Optional[float] = None
-    pixel_location_x: Optional[int] = None
-    pixel_location_y: Optional[int] = None
-    scaled_height: Optional[int] = None
-    scaled_width: Optional[int] = None
-    angle: Optional[float] = None
-    quality_indicator: Optional[float] = None
+    scaled_pixel_size: float | None = None
+    pixel_location_x: int | None = None
+    pixel_location_y: int | None = None
+    scaled_height: int | None = None
+    scaled_width: int | None = None
+    angle: float | None = None
+    quality_indicator: float | None = None
     data_collection_group: Optional["DataCollectionGroup"] = Relationship(
         back_populates="search_maps"
     )
@@ -800,6 +859,9 @@ class BFactorParameters(SQLModel, table=True):  # type: ignore
     class_number: int
     mask_file: str
     run: bool = True
+    processing_job: Optional[ProcessingJob] = Relationship(
+        back_populates="bfactor_parameters"
+    )
 
 
 class BFactors(SQLModel, table=True):  # type: ignore
@@ -807,6 +869,7 @@ class BFactors(SQLModel, table=True):  # type: ignore
     pj_id: int = Field(primary_key=True, foreign_key="processingjob.processingJobId")
     number_of_particles: int
     resolution: float
+    processing_job: Optional[ProcessingJob] = Relationship(back_populates="bfactors")
 
 
 class MotionCorrection(SQLModel, table=True):  # type: ignore

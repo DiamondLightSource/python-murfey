@@ -520,7 +520,6 @@ class MultigridController:
                 k: None if v == "None" else v for k, v in metadata_json.items()
             }
         if isinstance(context, TomographyContext):
-            source = Path(metadata_json["source"])
             context.register_tomography_data_collections(
                 file_extension=metadata_json["file_extension"],
                 image_directory=str(self._environment.default_destinations[source]),
@@ -565,7 +564,7 @@ class MultigridController:
                 instrument_name=self._environment.instrument_name,
                 visit_name=self._environment.visit,
                 session_id=self._environment.murfey_session,
-                data={"rsync_source": str(source)},
+                data={"rsync_source": metadata_json.get("tag", "")},
             )
             log.info("Tomography processing flushed")
 

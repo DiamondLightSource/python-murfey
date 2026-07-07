@@ -89,6 +89,7 @@ class UpstreamFileRequestInfo(BaseModel):
     # Used in backend server for cross-instrument file download requests
     upstream_instrument: str
     upstream_visit_path: Path
+    search_strings: list[str] | None = None
 
 
 """
@@ -179,6 +180,13 @@ class MillingStepInfo(BaseModel):
     width_overlap_rear_left: float | None = None
     width_overlap_rear_right: float | None = None
 
+    @field_validator("status", mode="before")
+    @classmethod
+    def handle_stringified_none(cls, v: Any) -> None:
+        if isinstance(v, str) and v.lower() == "none":
+            return None
+        return v
+
 
 class MillingSteps(BaseModel):
     # Processing steps supported by AutoTEM
@@ -226,6 +234,12 @@ class LamellaSiteInfo(BaseModel):
     steps: MillingSteps | None = None
 
 
+class FIBGIFParameters(BaseModel):
+    lamella_number: int
+    images: list[Path]
+    output_file: Path
+
+
 """
 =======================================================================================
 Single Particle Analysis
@@ -265,6 +279,7 @@ class ProcessingParametersSPA(BaseModel):
 class GridSquareParameters(BaseModel):
     tag: str
     image: str = ""
+    sample: int | None = None
 
     # Actual coordinates for image centre in real space
     x_location: Optional[float] = None
@@ -317,20 +332,21 @@ class FoilHoleParameters(BaseModel):
 
 class SearchMapParameters(BaseModel):
     tag: str
-    x_location: Optional[float] = None
-    y_location: Optional[float] = None
-    x_stage_position: Optional[float] = None
-    y_stage_position: Optional[float] = None
-    pixel_size: Optional[float] = None
-    image: Optional[str] = None
-    binning: Optional[float] = None
+    x_location: float | None = None
+    y_location: float | None = None
+    x_stage_position: float | None = None
+    y_stage_position: float | None = None
+    pixel_size: float | None = None
+    image: str | None = None
+    binning: float | None = None
     reference_matrix: Dict[str, float] = {}
     stage_correction: Dict[str, float] = {}
     image_shift_correction: Dict[str, float] = {}
-    height: Optional[int] = None
-    width: Optional[int] = None
-    height_on_atlas: Optional[int] = None
-    width_on_atlas: Optional[int] = None
+    height: int | None = None
+    width: int | None = None
+    height_on_atlas: int | None = None
+    width_on_atlas: int | None = None
+    lamella: bool | None = None
 
 
 class BatchPositionParameters(BaseModel):

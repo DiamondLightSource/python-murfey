@@ -19,9 +19,9 @@ logger = logging.getLogger("murfey.workflows.clem.register_align_and_merge_resul
 class AlignAndMergeResult(BaseModel):
     series_name: str
     image_stacks: list[Path]
-    align_self: Optional[str] = None
-    flatten: Optional[str] = "mean"
-    align_across: Optional[str] = None
+    align_self: bool = False
+    flatten: bool = True
+    align_across: bool = False
     output_file: Path
     thumbnail: Optional[Path] = None
     thumbnail_size: Optional[tuple[int, int]] = None

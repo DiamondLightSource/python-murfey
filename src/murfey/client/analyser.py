@@ -243,11 +243,15 @@ class Analyser(Observer):
             )
             return True
 
-        if "Metadata" in file_path.parts or file_path.name == "EpuSession.dm":
+        if (
+            "Metadata" in file_path.parts
+            or "gridsquares" in file_path.parts
+            or file_path.name == "EpuSession.dm"
+        ):
             if (context := _get_context("SPAMetadataContext")) is None:
                 return False
             self._context = context.load()(
-                "epu",
+                "serialem" if self._serialem else "epu",
                 self._basepath,
                 self._murfey_config,
                 self._token,
@@ -357,12 +361,13 @@ class Analyser(Observer):
         if self._limited:
             if (
                 "Metadata" in transferred_file.parts
+                or "gridsquares" in transferred_file.parts
                 or transferred_file.name == "EpuSession.dm"
             ) and not self._context:
                 if not (context := _get_context("SPAMetadataContext")):
                     return None
                 self._context = context.load()(
-                    "epu",
+                    "serialem" if self._serialem else "epu",
                     self._basepath,
                     self._murfey_config,
                     self._token,
