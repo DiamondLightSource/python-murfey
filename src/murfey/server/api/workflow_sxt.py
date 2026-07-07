@@ -10,6 +10,7 @@ from murfey.server.api.auth import (
     validate_instrument_token,
 )
 from murfey.server.murfey_db import murfey_db
+from murfey.util.models import SearchMapParameters
 from murfey.workflows.sxt.process_sxt_tilt_series import SXTTiltSeriesInfo
 
 logger = getLogger("murfey.server.api.workflow_sxt")
@@ -62,23 +63,22 @@ def convert_xrm_to_tiff(xrm_file: XrmFile, db=murfey_db):
         )
 
 
-class SxtRoiInfo(BaseModel):
-    tag: str
-    name: str
-    x_stage_position: float
-    y_stage_position: float
-    pixel_size: float
-    height: int
-    width: int
-    image: Path
-
-
-@router.post("/visits/{visit_name}/sessions/{session_id}/register_sxt_roi")
+@router.post("/sessions/{session_id}/sxt_roi/{roi_name}")
 def register_sxt_roi(
-    visit_name: str,
     session_id: MurfeySessionID,
-    tilt_series_info: SXTTiltSeriesInfo,
+    roi_name: str,
+    roi_info: SearchMapParameters,
     db=murfey_db,
 ):
-    # TODO
-    return
+    if _transport_object:
+        logger.info(f"Registering SXT region {roi_info.name}")
+        _transport_object.send(
+            _transport_object.feedback_queue,
+            {
+                "register": "sxt.register_roi",
+                "session_id": session_id,
+                "roi_name": roi_name,
+                "roi_info": roi_info.model_dump(mode="json"),
+            },
+            new_connection=True,
+        )

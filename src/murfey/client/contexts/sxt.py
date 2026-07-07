@@ -303,11 +303,10 @@ class SXTContext(Context):
                         function_name="register_sxt_roi",
                         token=self._token,
                         instrument_name=environment.instrument_name,
-                        visit_name=environment.visit,
                         session_id=environment.murfey_session,
+                        roi_name=transferred_file.stem,
                         data={
                             "tag": dcg_tag,
-                            "name": transferred_file.stem,
                             "x_stage_position": metadata.get("x_position", None),
                             "y_stage_position": metadata.get("y_position", None),
                             "pixel_size": round(metadata.get("pixel_size", 0), 2),
