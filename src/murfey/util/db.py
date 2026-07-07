@@ -186,10 +186,6 @@ class DataCollectionGroup(SQLModel, table=True):  # type: ignore
     atlas_id: Optional[int] = None
     atlas_pixel_size: Optional[float] = None
     atlas: str = ""
-    atlas_x_stage_position: float | None = None
-    atlas_y_stage_position: float | None = None
-    atlas_height: int | None = None
-    atlas_width: int | None = None
     sample: Optional[int] = None
     smartem_grid_uuid: Optional[str] = None
 

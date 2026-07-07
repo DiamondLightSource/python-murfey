@@ -57,6 +57,7 @@ from murfey.util.db import (
     DataCollectionGroup,
     FoilHole,
     GridSquare,
+    ImagingSite,
     Movie,
     PreprocessStash,
     ProcessingJob,
@@ -175,20 +176,30 @@ def register_dc_group(
             dcg_instance.atlas_pixel_size = (
                 dcg_params.atlas_pixel_size or dcg_instance.atlas_pixel_size
             )
-            dcg_instance.atlas_x_stage_position = (
-                dcg_params.atlas_x_stage_position or dcg_instance.atlas_x_stage_position
-            )
-            dcg_instance.atlas_y_stage_position = (
-                dcg_params.atlas_y_stage_position or dcg_instance.atlas_y_stage_position
-            )
-            dcg_instance.atlas_height = (
-                dcg_params.atlas_height or dcg_instance.atlas_height
-            )
-            dcg_instance.atlas_width = (
-                dcg_params.atlas_width or dcg_instance.atlas_width
-            )
             if smartem_grid_uuid:
                 dcg_instance.smartem_grid_uuid = smartem_grid_uuid
+
+            # Update any imaging sites
+            atlas_sites = db.exec(
+                select(ImagingSite).where(ImagingSite.dcg_id == dcg_instance.dcg_id)
+            ).all()
+            for atlas_instance in atlas_sites:
+                atlas_instance.pos_x = (
+                    dcg_params.atlas_x_stage_position or atlas_instance.pos_x
+                )
+                atlas_instance.pos_y = (
+                    dcg_params.atlas_y_stage_position or atlas_instance.pos_y
+                )
+                atlas_instance.image_pixels_x = (
+                    dcg_params.atlas_width or atlas_instance.image_pixels_x
+                )
+                atlas_instance.image_pixels_y = (
+                    dcg_params.atlas_height or atlas_instance.image_pixels_y
+                )
+                atlas_instance.image_pixel_size = (
+                    dcg_params.atlas_pixel_size or atlas_instance.image_pixel_size
+                )
+                db.add(atlas_instance)
 
             if _transport_object:
                 if dcg_instance.atlas_id is not None:
@@ -281,6 +292,8 @@ def register_dc_group(
             "atlas_pixel_size": dcg_params.atlas_pixel_size,
             "atlas_x_stage_position": dcg_params.atlas_x_stage_position,
             "atlas_y_stage_position": dcg_params.atlas_y_stage_position,
+            "atlas_width": dcg_params.atlas_width,
+            "atlas_height": dcg_params.atlas_height,
         }
 
         if _transport_object:
