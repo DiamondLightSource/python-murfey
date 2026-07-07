@@ -1,6 +1,7 @@
 import logging
 
-from sqlmodel.orm.session import Session as SQLModelSession, select
+from sqlmodel import select
+from sqlmodel.orm.session import Session as SQLModelSession
 
 from murfey.server import _transport_object
 from murfey.util import sanitise
@@ -25,7 +26,7 @@ def register_sxt_roi(
         select(SearchMap)
         .where(SearchMap.name == roi_name)
         .where(SearchMap.tag == roi_parameters.tag)
-        .where(SearchMap.session_id == SearchMap)
+        .where(SearchMap.session_id == session_id)
     ).all()
     if roi_query:
         # See if there is already a search map with this name and update if so
@@ -68,32 +69,35 @@ def register_sxt_roi(
     atlas_sites = murfey_db.exec(
         select(ImagingSite).where(ImagingSite.dcg_id == dcg.id)
     ).all()
-
-    if all(
+    if atlas_sites and all(
         [
             roi.x_stage_position,
             roi.y_stage_position,
             roi.pixel_size,
-            atlas_sites,
+            atlas_sites[0].pos_x,
+            atlas_sites[0].pos_y,
+            atlas_sites[0].image_pixel_size,
+            atlas_sites[0].image_pixels_x,
+            atlas_sites[0].image_pixels_y,
         ]
     ):
         atlas = atlas_sites[0]
         # Convert from stage position to pixel locations
         roi.x_location = (roi.x_stage_position - atlas.pos_x) / atlas.image_pixel_size
-        roi.y_location = (roi.y_stage_position - atlas.pox_y) / atlas.image_pixel_size
+        roi.y_location = (roi.y_stage_position - atlas.pos_y) / atlas.image_pixel_size
 
         # Scaling from different pixel size of atlas and roi, and atlas thumbnail size
-        roi_parameters.x_location = roi.x_location
-        roi_parameters.y_location = roi.y_location
+        roi_parameters.x_location = roi.x_location * (512 / atlas.image_pixels_x) + 256
+        roi_parameters.y_location = 256 - roi.y_location * (512 / atlas.image_pixels_y)
         roi_parameters.width_on_atlas = (
             roi.width
             * (roi.pixel_size / atlas.image_pixel_size)
-            * (1024 / atlas.image_pixels_x)
+            * (512 / atlas.image_pixels_x)
         )
         roi_parameters.height_on_atlas = (
             roi.height
             * (roi.pixel_size / atlas.image_pixel_size)
-            * (1024 / atlas.image_pixels_y)
+            * (512 / atlas.image_pixels_y)
         )
         if _transport_object:
             _transport_object.do_update_sxt_roi(roi.id, roi_parameters)
@@ -101,7 +105,8 @@ def register_sxt_roi(
         logger.info(
             f"Unable to register roi {sanitise(roi.name)} position yet: "
             f"roi pixel size {sanitise(str(roi.pixel_size))}, "
-            f"atlas pixel size {sanitise(str(dcg.atlas_pixel_size))}"
+            f"atlas pixel size {sanitise(str(dcg.atlas_pixel_size))}, "
+            f"roi count {len(atlas_sites)}"
         )
     murfey_db.add(roi)
     murfey_db.commit()

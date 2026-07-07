@@ -71,7 +71,7 @@ def register_sxt_roi(
     db=murfey_db,
 ):
     if _transport_object:
-        logger.info(f"Registering SXT region {roi_info.name}")
+        logger.info(f"Registering SXT region {roi_name}")
         _transport_object.send(
             _transport_object.feedback_queue,
             {

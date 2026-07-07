@@ -246,13 +246,16 @@ class SXTContext(Context):
                         / environment.visit
                     )
                     destination_extra = ""
-                converted_file_path = (
+                converted_tiff_path = (
                     Path(self._machine_config.get("rsync_basepath", ""))
                     / destination_base
                     / self._machine_config.get("processed_directory_name", "")
                     / self._machine_config.get("processed_extra_directory", "")
                     / destination_extra
                     / f"{transferred_file.relative_to(source).stem}_Annotated.tiff"
+                )
+                thumbnail_path = converted_tiff_path.parent / (
+                    converted_tiff_path.stem + "_thumbnail.jpg"
                 )
                 capture_post(
                     base_url=str(environment.url.geturl()),
@@ -262,7 +265,7 @@ class SXTContext(Context):
                     instrument_name=environment.instrument_name,
                     data={
                         "xrm_path": str(image_path),
-                        "tiff_path": str(converted_file_path),
+                        "tiff_path": str(converted_tiff_path),
                     },
                 )
 
@@ -274,7 +277,7 @@ class SXTContext(Context):
                     dcg_data = {
                         "experiment_type_id": 44,  # Atlas
                         "tag": dcg_tag,
-                        "atlas": str(converted_file_path),
+                        "atlas": str(thumbnail_path),
                         "atlas_pixel_size": round(metadata.get("pixel_size", 0), 2),
                         "atlas_x_stage_position": metadata.get("x_position", None),
                         "atlas_y_stage_position": metadata.get("y_position", None),
@@ -316,7 +319,7 @@ class SXTContext(Context):
                             "width": int(
                                 metadata.get("width", 0) * metadata["mosaic_columns"]
                             ),
-                            "image": str(converted_file_path),
+                            "image": str(thumbnail_path),
                         },
                     )
 
