@@ -53,6 +53,7 @@ class Session(SQLModel, table=True):  # type: ignore
     instrument_name: str = Field(default="")
     process: bool = Field(default=True)
     visit_end_time: Optional[datetime] = Field(default=None)
+    smartem_acquisition_uuid: str | None = Field(default=None)
 
     # Image sites associated with this session
     imaging_sites: List["ImagingSite"] = Relationship(
