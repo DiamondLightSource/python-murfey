@@ -162,8 +162,12 @@ async def setup_multigrid_watcher(
         session = db.exec(select(Session).where(Session.id == session_id)).one()
         visit = session.visit
         async with aiohttp.ClientSession() as clientsession:
-            acquisition_uuid = None
-            if SMARTEM_ACTIVE and machine_config.smartem_api_url:
+            acquisition_uuid = session.smartem_acquisition_uuid
+            if (
+                SMARTEM_ACTIVE
+                and machine_config.smartem_api_url
+                and acquisition_uuid is None
+            ):
                 log.info("registering an acquisition with smartem")
                 try:
                     microscope_data = MicroscopeData(instrument_id=instrument_name)
