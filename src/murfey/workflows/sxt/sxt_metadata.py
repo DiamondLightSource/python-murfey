@@ -74,19 +74,19 @@ def register_sxt_roi(
             roi.y_stage_position,
             roi.pixel_size,
             dcg.atlas_pixel_size,
-            dcg.atlas_stage_x,
+            dcg.atlas_x_stage_position,
             dcg.atlas_height,
         ]
     ):
         # Convert from stage position to pixel locations
         roi.x_location = (
-            roi.x_stage_position - dcg.atlas_stage_x
+            roi.x_stage_position - dcg.atlas_x_stage_position
         ) / dcg.atlas_pixel_size
         roi.y_location = (
-            roi.y_stage_position - dcg.atlas_stage_y
+            roi.y_stage_position - dcg.atlas_y_stage_position
         ) / dcg.atlas_pixel_size
 
-        # Scaling from different pixel size of atlas and roi, and atlas thumbnailing
+        # Scaling from different pixel size of atlas and roi, and atlas thumbnail size
         roi_parameters.x_location = roi.x_location
         roi_parameters.y_location = roi.y_location
         roi_parameters.height_on_atlas = (
