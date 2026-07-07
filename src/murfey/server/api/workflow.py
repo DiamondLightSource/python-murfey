@@ -64,7 +64,6 @@ from murfey.util.db import (
     Session,
     SessionProcessingParameters,
     SPARelionParameters,
-    SxtRoi,
     Tilt,
     TiltSeries,
 )
@@ -122,15 +121,15 @@ def register_dc_group(
         db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
     )
     logger.info(f"Registering data collection group on microscope {instrument_name}")
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
     smartem_grid_uuid = None
     if (
         dcg_params.create_smartem_grid
         and SMARTEM_ACTIVE
         and dcg_params.acquisition_uuid
     ):
-        machine_config = get_machine_config(instrument_name=instrument_name)[
-            instrument_name
-        ]
         if machine_config.smartem_api_url:
             try:
                 smartem_client = SmartEMAPIClient(
@@ -226,23 +225,19 @@ def register_dc_group(
         ).all()
         search_map_params = SearchMapParameters(tag=dcg_params.tag)
         for sm in search_maps:
-            register_search_map_in_database(
-                session_id, sm.name, search_map_params, db, close_db=False
-            )
-
-        sxt_rois = db.exec(
-            select(SxtRoi)
-            .where(SxtRoi.session_id == session_id)
-            .where(SxtRoi.tag == dcg_params.tag)
-        ).all()
-        for roi in sxt_rois:
-            if _transport_object:
+            # Different behaviour for tomo and SXT
+            if "tomo" in machine_config.acquisition_software:
+                register_search_map_in_database(
+                    session_id, sm.name, search_map_params, db, close_db=False
+                )
+            elif _transport_object:
                 _transport_object.send(
                     _transport_object.feedback_queue,
                     {
-                        "register": "register_sxt_roi",
+                        "register": "sxt.register_roi",
                         "session_id": session_id,
-                        **roi.model_dump(),
+                        "roi_name": sm.name,
+                        "roi_info": search_map_params.model_dump(mode="json"),
                     },
                 )
         db.close()
