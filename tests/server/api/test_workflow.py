@@ -6,6 +6,7 @@ from murfey.server.api.workflow import (
     DCGroupParameters,
     register_dc_group,
 )
+from murfey.util.config import MachineConfig
 from murfey.util.db import DataCollectionGroup, SearchMap
 from tests.conftest import ExampleVisit
 
@@ -42,6 +43,10 @@ def test_register_dc_group_new_dcg(mock_transport, murfey_db_session: Session):
             "atlas": "/path/to/Sample10/Atlas/Atlas_1.jpg",
             "sample": 10,
             "atlas_pixel_size": 1e-5,
+            "atlas_x_stage_position": None,
+            "atlas_y_stage_position": None,
+            "atlas_width": None,
+            "atlas_height": None,
             "microscope": "",
             "proposal_code": ExampleVisit.proposal_code,
             "proposal_number": str(ExampleVisit.proposal_number),
@@ -263,6 +268,10 @@ def test_register_dc_group_new_dcg_old_atlas(
             "atlas": "/path/to/Sample10/Atlas/Atlas_1.jpg",
             "sample": 10,
             "atlas_pixel_size": 1e-5,
+            "atlas_x_stage_position": None,
+            "atlas_y_stage_position": None,
+            "atlas_width": None,
+            "atlas_height": None,
             "microscope": "",
             "proposal_code": ExampleVisit.proposal_code,
             "proposal_number": str(ExampleVisit.proposal_number),
@@ -328,14 +337,21 @@ def test_register_dc_group_new_atlas(mock_transport, murfey_db_session: Session)
 
 @mock.patch("murfey.server.api.workflow._transport_object")
 @mock.patch("murfey.server.api.workflow.register_search_map_in_database")
+@mock.patch("murfey.server.api.workflow.get_machine_config")
 def test_register_dc_group_new_atlas_with_searchmaps(
-    mock_register_search_map, mock_transport, murfey_db_session: Session
+    mock_machine_config,
+    mock_register_search_map,
+    mock_transport,
+    murfey_db_session: Session,
 ):
     """
     Test the request to update an existing data collection group
     by adding an atlas, using the same tag, and also update search maps
     """
     mock_transport.feedback_queue = "mock_feedback_queue"
+    mock_machine_config.return_value = {
+        "i01": MachineConfig(acquisition_software=["tomo"])
+    }
 
     # Make sure dcg is present with an atlas id
     dcg = DataCollectionGroup(
