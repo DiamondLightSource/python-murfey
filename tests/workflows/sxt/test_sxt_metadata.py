@@ -29,7 +29,7 @@ def set_up_db(murfey_db_session: Session):
         murfey_db_session,
         ImagingSite,
         lookup_kwargs={
-            "dcg_id": dcg_entry.dcg_id,
+            "dcg_id": dcg_entry.id,
             "pos_x": 2,
             "pos_y": 3,
             "image_pixel_size": 0.5,
