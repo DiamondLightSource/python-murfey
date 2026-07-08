@@ -350,7 +350,7 @@ def test_register_dc_group_new_atlas_with_searchmaps(
     """
     mock_transport.feedback_queue = "mock_feedback_queue"
     mock_machine_config.return_value = {
-        "i01": MachineConfig(acquisition_software=["tomo"])
+        "": MachineConfig(acquisition_software=["tomo"])
     }
 
     # Make sure dcg is present with an atlas id
