@@ -461,9 +461,7 @@ def test_register_dc_group_new_atlas_with_sxt_roi(
     by adding an atlas, using the same tag, and also update sxt rois
     """
     mock_transport.feedback_queue = "mock_feedback_queue"
-    mock_machine_config.return_value = {
-        "": MachineConfig(acquisition_software=["tomo"])
-    }
+    mock_machine_config.return_value = {"": MachineConfig(acquisition_software=["sxt"])}
 
     # Make sure dcg is present with an atlas id
     dcg = DataCollectionGroup(
