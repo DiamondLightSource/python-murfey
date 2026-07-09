@@ -70,7 +70,7 @@ def test_register_new_sxt_roi(mock_transport, murfey_db_session: Session, tmp_pa
     assert roi_entry.name == "roi_1"
     assert roi_entry.tag == "/path/to/tomogram_source"
     assert roi_entry.x_stage_position == 10
-    assert roi_entry.y_stage_position == 2
+    assert roi_entry.y_stage_position == 20
     assert not roi_entry.pixel_size
     assert not roi_entry.width
     assert not roi_entry.height
@@ -121,7 +121,7 @@ def test_update_sxt_roi(mock_transport, murfey_db_session: Session, tmp_path):
     assert roi_entry.name == "roi_1"
     assert roi_entry.tag == "/path/to/tomogram_source"
     assert roi_entry.x_stage_position == 10
-    assert roi_entry.y_stage_position == 2
+    assert roi_entry.y_stage_position == 20
     assert roi_entry.pixel_size == 0.025
     assert roi_entry.width == 200
     assert roi_entry.height == 400
