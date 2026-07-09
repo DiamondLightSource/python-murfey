@@ -406,6 +406,14 @@ def register_atlas(
                         grid_uuid = grid.uuid
                         break
             if grid_uuid is not None:
+                existing_atlas = smartem_client.get_grid_atlas(grid_uuid)
+                if (
+                    existing_atlas.name == atlas_registration_data.name
+                    and existing_atlas.storage_folder
+                    == atlas_registration_data.storage_folder
+                ):
+                    # there is a question here of whether the grid should be registered if specified
+                    return
                 atlas_data = AtlasData(
                     id=atlas_registration_data.name,
                     acquisition_date=datetime.now(),
