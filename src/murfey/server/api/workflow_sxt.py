@@ -10,6 +10,7 @@ from murfey.server.api.auth import (
     validate_instrument_token,
 )
 from murfey.server.murfey_db import murfey_db
+from murfey.util import sanitise
 from murfey.util.models import SearchMapParameters
 from murfey.workflows.sxt.process_sxt_tilt_series import SXTTiltSeriesInfo
 
@@ -71,7 +72,7 @@ def register_sxt_roi(
     db=murfey_db,
 ):
     if _transport_object:
-        logger.info(f"Registering SXT region {roi_name}")
+        logger.info(f"Registering SXT region {sanitise(roi_name)}")
         _transport_object.send(
             _transport_object.feedback_queue,
             {
