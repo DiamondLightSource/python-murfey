@@ -551,7 +551,7 @@ def test_register_dc_group_new_atlas_with_sxt_roi(
         select(ImagingSite).where(ImagingSite.dcg_id == dcg.id)
     ).one()
     assert image_site.site_name == "processing_tag"
-    assert image_site.pox_x == 10
+    assert image_site.pos_x == 10
     assert image_site.image_pixels_x == 200
     assert image_site.image_pixe_size == 1e-4
 
@@ -667,6 +667,6 @@ def test_register_dc_group_roi_update(
         select(ImagingSite).where(ImagingSite.dcg_id == dcg.id)
     ).one()
     assert image_site.site_name == "processing_tag"
-    assert image_site.pox_x == 10
+    assert image_site.pos_x == 10
     assert image_site.image_pixels_x == 200
     assert image_site.image_pixe_size == 1e-4
