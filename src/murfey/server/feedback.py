@@ -12,6 +12,11 @@ import math
 import subprocess
 import time
 from datetime import datetime
+from functools import partial
+from importlib.metadata import (
+    EntryPoint,  # For type hinting only
+    entry_points,
+)
 from pathlib import Path
 from typing import Dict, List, NamedTuple, Tuple
 
@@ -23,6 +28,9 @@ from pipeliner.star_keys import GENERAL_BLOCK, JOB_COUNTER
 from sqlalchemy import func
 from sqlalchemy.exc import (
     InvalidRequestError,
+    NoResultFound,
+    OperationalError,
+    PendingRollbackError,
     SQLAlchemyError,
 )
 from sqlalchemy.orm.exc import ObjectDeletedError
