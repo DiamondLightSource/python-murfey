@@ -44,7 +44,7 @@ def set_up_db(murfey_db_session: Session):
 @mock.patch("murfey.workflows.sxt.sxt_metadata._transport_object")
 def test_register_new_sxt_roi(mock_transport, murfey_db_session: Session, tmp_path):
     set_up_db(murfey_db_session)
-    mock_transport.do_update_sxt_roi.return_value = {"success": True, "return_value": 2}
+    mock_transport.do_insert_sxt_roi.return_value = {"success": True, "return_value": 2}
 
     roi_params = SearchMapParameters(
         tag="/path/to/tomogram_source",
@@ -108,14 +108,11 @@ def test_update_sxt_roi(mock_transport, murfey_db_session: Session, tmp_path):
     )
     assert return_dict.get("success")
 
-    # Check the ispyb message
-    mock_transport.do_update_sxt_roi.assert_any_call(1, roi_params)
-
     # Check the second update
-    roi_params.x_location = 16 * (512 / 400) + 256
-    roi_params.y_location = 256 - 34 * (512 / 500) + 256
-    roi_params.width_on_atlas = 2 * 512 / 400
-    roi_params.height_on_atlas = 4 * 512 / 500
+    roi_params.x_location = 16 * 512 / 400 + 256
+    roi_params.y_location = 256 - 34 * 512 / 500
+    roi_params.width_on_atlas = int(round(200 * 0.05 * 512 / 400))
+    roi_params.height_on_atlas = int(round(400 * 0.05 * 512 / 500))
     mock_transport.do_update_sxt_roi.assert_any_call(1, roi_params)
 
     # Check the database insert

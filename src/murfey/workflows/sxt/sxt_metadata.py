@@ -89,15 +89,19 @@ def register_sxt_roi(
         # Scaling from different pixel size of atlas and roi, and atlas thumbnail size
         roi_parameters.x_location = roi.x_location * (512 / atlas.image_pixels_x) + 256
         roi_parameters.y_location = 256 - roi.y_location * (512 / atlas.image_pixels_y)
-        roi_parameters.width_on_atlas = (
-            roi.width
-            * (roi.pixel_size / atlas.image_pixel_size)
-            * (512 / atlas.image_pixels_x)
+        roi_parameters.width_on_atlas = int(
+            round(
+                roi.width
+                * (roi.pixel_size / atlas.image_pixel_size)
+                * (512 / atlas.image_pixels_x)
+            )
         )
-        roi_parameters.height_on_atlas = (
-            roi.height
-            * (roi.pixel_size / atlas.image_pixel_size)
-            * (512 / atlas.image_pixels_y)
+        roi_parameters.height_on_atlas = int(
+            round(
+                roi.height
+                * (roi.pixel_size / atlas.image_pixel_size)
+                * (512 / atlas.image_pixels_y)
+            )
         )
         if _transport_object:
             _transport_object.do_update_sxt_roi(roi.id, roi_parameters)
