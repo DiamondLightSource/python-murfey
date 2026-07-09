@@ -553,7 +553,7 @@ def test_register_dc_group_new_atlas_with_sxt_roi(
     assert image_site.site_name == "processing_tag"
     assert image_site.pos_x == 10
     assert image_site.image_pixels_x == 200
-    assert image_site.image_pixe_size == 1e-4
+    assert image_site.image_pixel_size == 1e-4
 
     # Check search map row updates
     assert mock_transport.send.call_count == 3
@@ -669,4 +669,4 @@ def test_register_dc_group_roi_update(
     assert image_site.site_name == "processing_tag"
     assert image_site.pos_x == 10
     assert image_site.image_pixels_x == 200
-    assert image_site.image_pixe_size == 1e-4
+    assert image_site.image_pixel_size == 1e-4
