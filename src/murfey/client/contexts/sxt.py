@@ -36,24 +36,26 @@ def _find_reference(txrm_file: Path) -> Path | None:
         )
     candidates.sort(key=lambda x: x.timestamp, reverse=True)
     for ref_option in candidates:
-        mosaic_size = 1
-        with OleFileIO(ref_option.full_path) as xrm_ole:
-            # Find images which are not mosaics (txrm spec typos this as mosiac)
-            if xrm_ole.exists("ImageInfo/MosiacRows") and xrm_ole.exists(
-                "ImageInfo/MosiacColumns"
-            ):
-                mosaic_size = int(
-                    np.frombuffer(
-                        xrm_ole.openstream("ImageInfo/MosiacRows").getvalue(), np.int32
-                    )[0]
-                    * np.frombuffer(
-                        xrm_ole.openstream("ImageInfo/MosiacColumns").getvalue(),
-                        np.int32,
-                    )[0]
-                )
-        if mosaic_size == 0:
-            logger.info(f"Found reference {ref_option.name}")
-            return Path(ref_option.full_path)
+        if "ref" in ref_option.name.lower():
+            mosaic_size = 1
+            with OleFileIO(ref_option.full_path) as xrm_ole:
+                # Find images which are not mosaics (txrm spec typos this as mosiac)
+                if xrm_ole.exists("ImageInfo/MosiacRows") and xrm_ole.exists(
+                    "ImageInfo/MosiacColumns"
+                ):
+                    mosaic_size = int(
+                        np.frombuffer(
+                            xrm_ole.openstream("ImageInfo/MosiacRows").getvalue(),
+                            np.int32,
+                        )[0]
+                        * np.frombuffer(
+                            xrm_ole.openstream("ImageInfo/MosiacColumns").getvalue(),
+                            np.int32,
+                        )[0]
+                    )
+            if mosaic_size == 0:
+                logger.info(f"Found reference {ref_option.name}")
+                return Path(ref_option.full_path)
     logger.warning(f"No reference found for {txrm_file}")
     return None
 
