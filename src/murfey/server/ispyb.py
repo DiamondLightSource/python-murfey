@@ -557,7 +557,7 @@ class TransportManager:
                 roi_parameters.height / roi_parameters.height_on_atlas
             )
         roi_parameters.x_location = (
-            int(roi_parameters.x_location8) if roi_parameters.x_location else None
+            int(roi_parameters.x_location) if roi_parameters.x_location else None
         )
         roi_parameters.y_location = (
             int(roi_parameters.y_location) if roi_parameters.y_location else None
