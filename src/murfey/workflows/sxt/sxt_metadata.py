@@ -103,6 +103,8 @@ def register_sxt_roi(
         )
         if _transport_object:
             _transport_object.do_update_sxt_roi(roi.id, roi_parameters)
+        else:
+            logger.warning("No transport object for register_sxt_roi")
     else:
         logger.info(
             f"Unable to register roi {sanitise(roi.name)} position yet: "

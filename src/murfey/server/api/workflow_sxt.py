@@ -83,3 +83,5 @@ def register_sxt_roi(
             },
             new_connection=True,
         )
+    else:
+        logger.warning("No transport object for register_sxt_roi")
