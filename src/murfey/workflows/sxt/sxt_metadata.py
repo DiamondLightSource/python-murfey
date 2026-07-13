@@ -22,15 +22,14 @@ def register_sxt_roi(
         .where(DataCollectionGroup.session_id == session_id)
         .where(DataCollectionGroup.tag == roi_parameters.tag)
     ).one()
-    roi_query = murfey_db.exec(
+    roi = murfey_db.exec(
         select(SearchMap)
         .where(SearchMap.name == roi_name)
         .where(SearchMap.tag == roi_parameters.tag)
         .where(SearchMap.session_id == session_id)
-    ).all()
-    if roi_query:
+    ).one_or_none()
+    if roi:
         # See if there is already a search map with this name and update if so
-        roi = roi_query[0]
         roi.x_stage_position = roi_parameters.x_stage_position or roi.x_stage_position
         roi.y_stage_position = roi_parameters.y_stage_position or roi.y_stage_position
         roi.height = roi_parameters.height or roi.height
@@ -66,22 +65,21 @@ def register_sxt_roi(
             image=roi_parameters.image or "",
         )
 
-    atlas_sites = murfey_db.exec(
+    atlas = murfey_db.exec(
         select(ImagingSite).where(ImagingSite.dcg_id == dcg.id)
-    ).all()
-    if atlas_sites and all(
+    ).one_or_none()
+    if atlas and all(
         [
             roi.x_stage_position,
             roi.y_stage_position,
             roi.pixel_size,
-            atlas_sites[0].pos_x,
-            atlas_sites[0].pos_y,
-            atlas_sites[0].image_pixel_size,
-            atlas_sites[0].image_pixels_x,
-            atlas_sites[0].image_pixels_y,
+            atlas.pos_x,
+            atlas.pos_y,
+            atlas.image_pixel_size,
+            atlas.image_pixels_x,
+            atlas.image_pixels_y,
         ]
     ):
-        atlas = atlas_sites[0]
         # Convert from stage position to pixel locations
         roi.x_location = (roi.x_stage_position - atlas.pos_x) / atlas.image_pixel_size
         roi.y_location = (roi.y_stage_position - atlas.pos_y) / atlas.image_pixel_size
@@ -110,7 +108,7 @@ def register_sxt_roi(
             f"Unable to register roi {sanitise(roi.name)} position yet: "
             f"roi pixel size {sanitise(str(roi.pixel_size))}, "
             f"atlas pixel size {sanitise(str(dcg.atlas_pixel_size))}, "
-            f"roi count {len(atlas_sites)}"
+            f"roi pixel size {sanitise(str(atlas.image_pixel_size))}"
         )
     murfey_db.add(roi)
     murfey_db.commit()

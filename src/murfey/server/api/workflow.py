@@ -180,26 +180,25 @@ def register_dc_group(
                 dcg_instance.smartem_grid_uuid = smartem_grid_uuid
 
             # Update any atlases which are registered as imaging sites
-            if atlas_sites := db.exec(
+            if atlas_instance := db.exec(
                 select(ImagingSite).where(ImagingSite.dcg_id == dcg_instance.id)
-            ).all():
-                for atlas_instance in atlas_sites:
-                    atlas_instance.pos_x = (
-                        dcg_params.atlas_x_stage_position or atlas_instance.pos_x
-                    )
-                    atlas_instance.pos_y = (
-                        dcg_params.atlas_y_stage_position or atlas_instance.pos_y
-                    )
-                    atlas_instance.image_pixels_x = (
-                        dcg_params.atlas_width or atlas_instance.image_pixels_x
-                    )
-                    atlas_instance.image_pixels_y = (
-                        dcg_params.atlas_height or atlas_instance.image_pixels_y
-                    )
-                    atlas_instance.image_pixel_size = (
-                        dcg_params.atlas_pixel_size or atlas_instance.image_pixel_size
-                    )
-                    db.add(atlas_instance)
+            ).one_or_none():
+                atlas_instance.pos_x = (
+                    dcg_params.atlas_x_stage_position or atlas_instance.pos_x
+                )
+                atlas_instance.pos_y = (
+                    dcg_params.atlas_y_stage_position or atlas_instance.pos_y
+                )
+                atlas_instance.image_pixels_x = (
+                    dcg_params.atlas_width or atlas_instance.image_pixels_x
+                )
+                atlas_instance.image_pixels_y = (
+                    dcg_params.atlas_height or atlas_instance.image_pixels_y
+                )
+                atlas_instance.image_pixel_size = (
+                    dcg_params.atlas_pixel_size or atlas_instance.image_pixel_size
+                )
+                db.add(atlas_instance)
             elif dcg_params.atlas_x_stage_position:
                 atlas_instance = ImagingSite(
                     dcg_id=dcg_instance.id,
