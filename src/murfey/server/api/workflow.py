@@ -456,7 +456,7 @@ def register_spa_proc_params(
         )
     else:
         logger.error(
-            f"Pre-processing was requested for {session_id} "
+            f"Pre-processing was requested for {sanitise(str(session_id))} "
             "but no Zocalo transport object was found"
         )
         return proc_params

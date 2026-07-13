@@ -8,6 +8,7 @@ from pipeliner.project_graph import ProjectGraph
 from pydantic import BaseModel
 from werkzeug.utils import secure_filename
 
+from murfey.util import sanitise, secure_path
 from murfey.util.config import MachineConfig, get_machine_config
 
 logger = logging.getLogger("murfey.util.processing_params")
@@ -25,7 +26,7 @@ def _job_dir_for_alias_cached(visit_name: str, alias: str, mtime_ns: int) -> str
     default_pipeline.star its mtime changes and the next call falls through
     to a fresh read.
     """
-    project_dir = Path(visit_name)
+    project_dir = secure_path(Path(visit_name))
     pipeline_file = project_dir / "default_pipeline.star"
     if not pipeline_file.is_file():
         return None
@@ -38,9 +39,8 @@ def _job_dir_for_alias_cached(visit_name: str, alias: str, mtime_ns: int) -> str
                     return Path(proc.name).name
     except Exception:
         logger.error(
-            "ProjectGraph read failed while looking up alias %r in %s",
-            alias,
-            pipeline_file,
+            f"ProjectGraph read failed while looking up alias {sanitise(str(alias))} "
+            f"in {sanitise(str(pipeline_file))}",
             exc_info=True,
         )
         return None
@@ -54,25 +54,21 @@ def _job_dir_for_alias(visit_name: str, alias: str) -> str:
     Falls back to the positional default job002 and logs a warning so
     drift from the live pipeline is visible in the logs instead of silent.
     """
-    project_dir = Path(visit_name).resolve()
+    project_dir = secure_path(Path(visit_name)).resolve()
     pipeline_file = project_dir / "default_pipeline.star"
     try:
         mtime_ns = pipeline_file.stat().st_mtime_ns
     except FileNotFoundError:
         logger.warning(
-            "default_pipeline.star missing at %s — falling back to %s for alias %r",
-            pipeline_file,
-            _DEFAULT_MOTIONCORR_FALLBACK,
-            alias,
+            f"default_pipeline.star missing at {sanitise(str(pipeline_file))} "
+            f"— falling back to {sanitise(str(_DEFAULT_MOTIONCORR_FALLBACK))} for alias {sanitise(str(alias))}",
         )
         return _DEFAULT_MOTIONCORR_FALLBACK
     job_dir = _job_dir_for_alias_cached(str(project_dir), alias, mtime_ns)
     if job_dir is None:
         logger.warning(
-            "Alias %r not found in %s — falling back to %s",
-            alias,
-            pipeline_file,
-            _DEFAULT_MOTIONCORR_FALLBACK,
+            f"Alias {sanitise(str(alias))} not found in {sanitise(str(pipeline_file))} "
+            f"— falling back to {sanitise(str(_DEFAULT_MOTIONCORR_FALLBACK))}",
         )
         return _DEFAULT_MOTIONCORR_FALLBACK
     return job_dir
