@@ -23,6 +23,7 @@ from murfey.client.rsync import RSyncerUpdate, TransferResult
 from murfey.util.client import Observer, get_machine_config_client
 from murfey.util.mdoc import get_block
 from murfey.util.models import ProcessingParametersSPA, ProcessingParametersTomo
+from murfey.util.sim import SIM_DATA_SUFFIXES
 
 logger = logging.getLogger("murfey.client.analyser")
 
@@ -209,6 +210,23 @@ class Analyser(Observer):
                 return False
             self._context = context.load()(
                 "meteor",
+                self._basepath,
+                self._murfey_config,
+                self._token,
+            )
+            return True
+
+        # -----------------------------------------------------------------------------
+        # SIM workflow checks
+        # -----------------------------------------------------------------------------
+        if (
+            # CryoSIM raw data files have no extension, and end with specific suffixes
+            not file_path.suffix and file_path.stem.endswith(SIM_DATA_SUFFIXES)
+        ):
+            if (context := _get_context("SIMContext")) is None:
+                return False
+            self._context = context.load()(
+                "sim",
                 self._basepath,
                 self._murfey_config,
                 self._token,
