@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from murfey.server import _transport_object
 from murfey.server.api.auth import validate_instrument_token
 
-logger = logging.getLogger("murfey.server.api.workflow_fib")
+logger = logging.getLogger("murfey.server.api.workflow_sim")
 
 router = APIRouter(
     prefix="/workflow/sim",
