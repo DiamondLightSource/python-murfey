@@ -543,6 +543,96 @@ class TransportManager:
             )
         return {"success": False, "return_value": None}
 
+    def do_insert_sxt_roi(
+        self,
+        atlas_id: int,
+        roi_parameters: SearchMapParameters,
+    ):
+        if (
+            roi_parameters.pixel_size
+            and roi_parameters.height
+            and roi_parameters.height_on_atlas
+        ):
+            roi_parameters.pixel_size *= (
+                roi_parameters.height / roi_parameters.height_on_atlas
+            )
+        roi_parameters.x_location = (
+            int(roi_parameters.x_location) if roi_parameters.x_location else None
+        )
+        roi_parameters.y_location = (
+            int(roi_parameters.y_location) if roi_parameters.y_location else None
+        )
+        record = GridSquare(
+            atlasId=atlas_id,
+            gridSquareImage=roi_parameters.image,
+            pixelLocationX=roi_parameters.x_location,
+            pixelLocationY=roi_parameters.y_location,
+            height=roi_parameters.height_on_atlas,
+            width=roi_parameters.width_on_atlas,
+            angle=0,
+            stageLocationX=roi_parameters.x_stage_position,
+            stageLocationY=roi_parameters.y_stage_position,
+            pixelSize=roi_parameters.pixel_size,
+        )
+        try:
+            with ISPyBSession() as db:
+                db.add(record)
+                db.commit()
+                log.info(f"Created SXT ROI (GridSquare) {record.gridSquareId}")
+                return {"success": True, "return_value": record.gridSquareId}
+        except ispyb.ISPyBException as e:
+            log.error(
+                "Inserting SXT ROI (GridSquare) entry caused exception '%s'.",
+                e,
+                exc_info=True,
+            )
+        return {"success": False, "return_value": None}
+
+    def do_update_sxt_roi(self, roi_id, roi_parameters: SearchMapParameters):
+        try:
+            with ISPyBSession() as db:
+                grid_square = (
+                    db.query(GridSquare).filter(GridSquare.gridSquareId == roi_id).one()
+                )
+                if (
+                    roi_parameters.pixel_size
+                    and roi_parameters.height
+                    and roi_parameters.height_on_atlas
+                ):
+                    roi_parameters.pixel_size *= (
+                        roi_parameters.height / roi_parameters.height_on_atlas
+                    )
+                grid_square.gridSquareImage = (
+                    roi_parameters.image or grid_square.gridSquareImage
+                )
+                if roi_parameters.x_location:
+                    grid_square.pixelLocationX = int(roi_parameters.x_location)
+                if roi_parameters.y_location:
+                    grid_square.pixelLocationY = int(roi_parameters.y_location)
+                if roi_parameters.height_on_atlas:
+                    grid_square.height = int(roi_parameters.height_on_atlas)
+                if roi_parameters.width_on_atlas:
+                    grid_square.width = int(roi_parameters.width_on_atlas)
+                grid_square.stageLocationX = (
+                    roi_parameters.x_stage_position or grid_square.stageLocationX
+                )
+                grid_square.stageLocationY = (
+                    roi_parameters.y_stage_position or grid_square.stageLocationY
+                )
+                grid_square.pixelSize = (
+                    roi_parameters.pixel_size or grid_square.pixelSize
+                )
+                db.add(grid_square)
+                db.commit()
+                return {"success": True, "return_value": grid_square.gridSquareId}
+        except ispyb.ISPyBException as e:
+            log.error(
+                "Updating SXT ROI (GridSquare) entry caused exception '%s'.",
+                e,
+                exc_info=True,
+            )
+        return {"success": False, "return_value": None}
+
     def send(self, queue: str, message: dict, new_connection: bool = False):
         if self.transport:
             if not self.transport.is_connected():

@@ -9,7 +9,7 @@ from sqlmodel.orm.session import Session as SQLModelSession
 
 from murfey.server import _transport_object
 from murfey.server.ispyb import ISPyBSession, get_session_id
-from murfey.util.db import DataCollectionGroup
+from murfey.util.db import DataCollectionGroup, ImagingSite
 
 logger = logging.getLogger("murfey.workflows.register_data_collection_group")
 
@@ -90,6 +90,19 @@ def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
                 smartem_grid_uuid=message.get("smartem_grid_uuid"),
             )
         murfey_db.add(murfey_dcg)
+        if dcgid is not None and message.get("atlas_x_stage_position"):
+            atlas_site = ImagingSite(
+                dcg_id=dcgid,
+                session_id=message["session_id"],
+                site_name=message.get("tag"),
+                data_type="atlas",
+                pos_x=message.get("atlas_x_stage_position"),
+                pos_y=message.get("atlas_y_stage_position"),
+                image_pixels_x=message.get("atlas_width"),
+                image_pixels_y=message.get("atlas_height"),
+                image_pixel_size=message.get("atlas_pixel_size"),
+            )
+            murfey_db.add(atlas_site)
         murfey_db.commit()
         murfey_db.close()
 
