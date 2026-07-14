@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from murfey.server import _transport_object
 from murfey.server.api.auth import validate_instrument_token
+from murfey.util import sanitise_path
 
 logger = logging.getLogger("murfey.server.api.workflow_sim")
 
@@ -27,7 +28,9 @@ def request_sim_processing(session_id: int, sim_data: SIMDataFile):
         return None
 
     # Construct message and submit it to 'processing_recipe'
-    logger.info(f"Submitting request to process the cryoSIM file {sim_data.file}")
+    logger.info(
+        f"Submitting request to process the cryoSIM file {sanitise_path(sim_data.file)}"
+    )
     recipe = {
         # Placeholder; fields will be populated once service is set up
         "recipes": ["sim-process-data"],
