@@ -4,7 +4,6 @@ from pathlib import Path
 from murfey.client.context import Context
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.util.client import capture_post
-from murfey.util.sim import SIM_DATA_SUFFIXES
 
 logger = logging.getLogger("murfey.client.contexts.sim")
 
@@ -63,7 +62,17 @@ class SIMContext(Context):
         # Look for raw data files
         # These have no extensions, and end with one of the listed suffixes
         if not transferred_file.suffix and transferred_file.stem.endswith(
-            SIM_DATA_SUFFIXES
+            (
+                # Fluorescent SIM raw data files end as follows
+                "_BR",
+                "_BFR",
+                "_GR",
+                "_GFR",
+                "_BR_FL",
+                "_BFR_FL",
+                "_GR_FL",
+                "_GFR_FL",
+            )
         ):
             source = _get_source(transferred_file, environment)
             if source is None:
@@ -80,6 +89,7 @@ class SIMContext(Context):
                     f"Could not find destination file path for {transferred_file.name!r}"
                 )
                 return None
+            # Submit fluorescent raw data files for processing
             capture_post(
                 base_url=str(environment.url.geturl()),
                 router_name="workflow_sim.router",
