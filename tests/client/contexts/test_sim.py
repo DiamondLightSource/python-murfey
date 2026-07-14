@@ -21,6 +21,9 @@ def visit_dir(tmp_path: Path):
 def sim_data(visit_dir: Path):
     file_list = []
     for path in [
+        # Bright field
+        "raw/CtrlApr_G2/20260703_132856_CtrlApr_G2_F3A_BF",
+        # Fluorescent
         "raw/SR002_G1/20260707_112417_SR002G1_F1F_BR",
         "raw/SR002_G1/20260707_112417_SR002G1_F1F_BFR",
         "raw/44drug_G2/20260703_114348_44drug_G2_E2DR_GR",
@@ -127,7 +130,9 @@ def test_post_transfer(
     # Iterate across the FIB files to compare against
     destination_dir = tmp_path / "sim" / "data" / "current_year" / visit_name
     destination_files = [
-        destination_dir / file.relative_to(visit_dir) for file in sim_data
+        destination_dir / file.relative_to(visit_dir)
+        for file in sim_data
+        if not file.stem.endswith("_BF")
     ]
 
     # Mock the functions used in 'post_transfer'
@@ -152,6 +157,7 @@ def test_post_transfer(
         machine_config={},
         token="dummy",
     )
+    # Pass the list of files through
     for file in sim_data:
         context.post_transfer(file, environment=mock_environment)
     if not use_env:
@@ -163,25 +169,27 @@ def test_post_transfer(
             f"Could not find destination file path for {file.name!r}"
         )
     else:
-        mock_get_source.assert_called_with(file, mock_environment)
-        mock_file_transferred_to.assert_called_with(
-            environment=mock_environment,
-            source=basepath,
-            file_path=file,
-            rsync_basepath=Path(""),
-        )
-
-        assert mock_capture_post.call_count == len(sim_data)
-        for dst in destination_files:
-            mock_capture_post.assert_any_call(
-                base_url=mock.ANY,
-                router_name="workflow_sim.router",
-                function_name="request_sim_processing",
-                token=context._token,
-                instrument_name=instrument_name,
-                data={
-                    "file": f"{dst}",
-                },
-                # Endpoint kwargs
-                session_id=session_id,
-            )
+        for src, dst in zip(sim_data, [Path(""), *destination_files]):
+            if src.stem.endswith("_BF"):
+                continue
+            else:
+                mock_get_source.assert_any_call(src, mock_environment)
+                mock_file_transferred_to.assert_any_call(
+                    environment=mock_environment,
+                    source=basepath,
+                    file_path=src,
+                    rsync_basepath=Path(""),
+                )
+                mock_capture_post.assert_any_call(
+                    base_url=mock.ANY,
+                    router_name="workflow_sim.router",
+                    function_name="request_sim_processing",
+                    token=context._token,
+                    instrument_name=instrument_name,
+                    data={
+                        "file": f"{dst}",
+                    },
+                    # Endpoint kwargs
+                    session_id=session_id,
+                )
+        assert mock_capture_post.call_count == len(sim_data) - 1

@@ -37,6 +37,9 @@ example_files = {
         "visit/maps/visit/LayersData/Layer/Electron Snapshot (2)/Electron Snapshot (2).tiff",
     ],
     "SIMContext": [
+        # Bright field
+        "visit/raw/CtrlApr_G2/20260703_132856_CtrlApr_G2_F3A_BF",
+        # Fluorescent
         "visit/raw/SR002_G1/20260707_112417_SR002G1_F1F_BR",
         "visit/raw/SR002_G1/20260707_112417_SR002G1_F1F_BFR",
         "visit/raw/44drug_G2/20260703_114348_44drug_G2_E2DR_GR",
