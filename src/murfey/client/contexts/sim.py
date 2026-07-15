@@ -89,7 +89,9 @@ class SIMContext(Context):
                     f"Could not find destination file path for {transferred_file.name!r}"
                 )
                 return None
+
             # Submit fluorescent raw data files for processing
+            logger.info(f"Requesting processing for {transferred_file.name!r}")
             capture_post(
                 base_url=str(environment.url.geturl()),
                 router_name="workflow_sim.router",
