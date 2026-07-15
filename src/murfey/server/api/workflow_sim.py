@@ -32,14 +32,16 @@ def request_sim_processing(session_id: int, sim_data: SIMDataFile):
         f"Submitting request to process the cryoSIM file {sanitise_path(sim_data.file)}"
     )
     recipe = {
-        # Placeholder; fields will be populated once service is set up
         "recipes": ["sim-process-data"],
         "parameters": {
             # Job parameters
+            "session_id": session_id,
             "file": f"{str(sim_data.file)}",
             "feedback_queue": _transport_object.feedback_queue,
         },
     }
-    _transport_object.send(
-        queue="processing_recipe", message=recipe, new_connection=True
-    )
+    logger.debug(f"Will submit the following message to 'processing_recipe':\n{recipe}")
+    # Disabled for now; will submit message once recipe and service have been set up
+    # _transport_object.send(
+    #     queue="processing_recipe", message=recipe, new_connection=True
+    # )

@@ -42,10 +42,17 @@ def test_request_sim_processing(
     if has_transport_object:
         recipe = {
             "recipes": ["sim-process-data"],
-            "parameters": {"file": f"{sim_data.file}", "feedback_queue": "dummy"},
+            "parameters": {
+                "session_id": session_id,
+                "file": f"{sim_data.file}",
+                "feedback_queue": "dummy",
+            },
         }
-        mock_transport_object.send.assert_called_with(
-            queue="processing_recipe", message=recipe, new_connection=True
+        mock_logger.debug.assert_called_with(
+            f"Will submit the following message to 'processing_recipe':\n{recipe}"
         )
+        # mock_transport_object.send.assert_called_with(
+        #     queue="processing_recipe", message=recipe, new_connection=True
+        # )
     else:
         mock_logger.error.assert_called_with("No TransportManager object was set up")
