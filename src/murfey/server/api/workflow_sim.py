@@ -1,3 +1,4 @@
+import json
 import logging
 from pathlib import Path
 
@@ -40,7 +41,10 @@ def request_sim_processing(session_id: int, sim_data: SIMDataFile):
             "feedback_queue": _transport_object.feedback_queue,
         },
     }
-    logger.debug(f"Will submit the following message to 'processing_recipe':\n{recipe}")
+    logger.debug(
+        "Will submit the following message to 'processing_recipe':\n"
+        f"{json.dumps(recipe, indent=2, default=str)}"
+    )
     # Disabled for now; will submit message once recipe and service have been set up
     # _transport_object.send(
     #     queue="processing_recipe", message=recipe, new_connection=True

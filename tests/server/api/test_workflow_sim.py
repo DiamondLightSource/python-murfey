@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -49,7 +50,8 @@ def test_request_sim_processing(
             },
         }
         mock_logger.debug.assert_called_with(
-            f"Will submit the following message to 'processing_recipe':\n{recipe}"
+            "Will submit the following message to 'processing_recipe':\n"
+            f"{json.dumps(recipe, indent=2, default=str)}"
         )
         # mock_transport_object.send.assert_called_with(
         #     queue="processing_recipe", message=recipe, new_connection=True
