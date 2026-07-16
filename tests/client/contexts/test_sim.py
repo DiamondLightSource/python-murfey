@@ -5,7 +5,8 @@ from unittest.mock import MagicMock
 import pytest
 from pytest_mock import MockerFixture
 
-from murfey.client.contexts.sim import SIMContext, _file_transferred_to, _get_source
+from murfey.client.context import _file_transferred_to, _get_source
+from murfey.client.contexts.sim import SIMContext
 
 visit_name = "cm12345-6"
 instrument_name = "sim"
@@ -97,24 +98,23 @@ def test_sim_context_initialises(tmp_path: Path):
 
 @pytest.mark.parametrize(
     "test_params",
-    (  # Has environment | Has source | Has destination
+    (  # Has environment | Has source
         # Success case
-        (True, True, True),
+        (True, True),
         # Fail cases
-        (True, True, False),  # No destination
-        (True, False, True),  # No source
-        (False, True, True),  # No environment
+        (True, False),  # No source
+        (False, True),  # No environment
     ),
 )
 def test_post_transfer(
     mocker: MockerFixture,
-    test_params: tuple[bool, bool, bool],
+    test_params: tuple[bool, bool],
     tmp_path: Path,
     visit_dir: Path,
     sim_data: list[Path],
 ):
     # Unpack test params
-    use_env, has_src, has_dst = test_params
+    use_env, has_src = test_params
 
     # Mock the environment
     mock_environment = None
@@ -140,12 +140,8 @@ def test_post_transfer(
     mock_get_source.return_value = tmp_path if has_src else None
 
     mock_file_transferred_to = mocker.patch(
-        "murfey.client.contexts.sim._file_transferred_to"
+        "murfey.client.contexts.sim._file_transferred_to", side_effect=destination_files
     )
-    if has_dst:
-        mock_file_transferred_to.side_effect = destination_files
-    else:
-        mock_file_transferred_to.return_value = None
 
     mock_capture_post = mocker.patch("murfey.client.contexts.sim.capture_post")
 
@@ -164,10 +160,6 @@ def test_post_transfer(
         mock_logger.warning.assert_called_with("No environment passed in")
     elif not has_src:
         mock_logger.warning.assert_called_with(f"No source found for file {file}")
-    elif not has_dst:
-        mock_logger.warning.assert_called_with(
-            f"Could not find destination file path for {file.name!r}"
-        )
     else:
         for src, dst in zip(sim_data, [Path(""), *destination_files]):
             if src.stem.endswith("_BF"):
