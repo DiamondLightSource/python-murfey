@@ -36,6 +36,19 @@ example_files = {
         "visit/maps/visit/LayersData/Layer/Electron Snapshot/Electron Snapshot.tiff",
         "visit/maps/visit/LayersData/Layer/Electron Snapshot (2)/Electron Snapshot (2).tiff",
     ],
+    "SIMContext": [
+        # Bright field
+        "visit/raw/CtrlApr_G2/20260703_132856_CtrlApr_G2_F3A_BF",
+        # Fluorescent
+        "visit/raw/SR002_G1/20260707_112417_SR002G1_F1F_BR",
+        "visit/raw/SR002_G1/20260707_112417_SR002G1_F1F_BFR",
+        "visit/raw/44drug_G2/20260703_114348_44drug_G2_E2DR_GR",
+        "visit/raw/44drug_G2/20260703_113142_44drug_G2_E2DR_GFR",
+        "visit/raw/SR002_G1/20260707_112417_SR002G1_F1F_BR_FL",
+        "visit/raw/SR002_G1/20260707_112417_SR002G1_F1F_BFR_FL",
+        "visit/raw/44drug_G2/20260703_114348_44drug_G2_E2DR_GR_FL",
+        "visit/raw/44drug_G2/20260703_113142_44drug_G2_E2DR_GFR_FL",
+    ],
     "SXTContext": [
         "visit/tomo__tag_ROI10_area1_angle-60to60@1.5_1sec_251p.txrm",
         "visit/X-ray_mosaic_ROI2.xrm",
@@ -258,6 +271,35 @@ def test_analyse_fib(
     assert spy_find_context.call_count == 1
     assert analyser._context is not None and "FIBContext" in str(analyser._context)
     assert analyser._context._acquisition_software == software
+
+    # "_post_transfer" should be called on every one of these files
+    assert mock_post_transfer.call_count == len(test_files)
+
+
+def test_analyse_sim(
+    mocker: MockerFixture,
+    tmp_path: Path,
+):
+    # Load the example files corresponding to the SIM workflow
+    test_files = [
+        file
+        for context, file_list in example_files.items()
+        for file in file_list
+        if context == "SIMContext"
+    ]
+
+    # Mock the 'post_transfer' class function
+    mock_post_transfer = mocker.patch.object(Analyser, "post_transfer")
+    spy_find_context = mocker.spy(Analyser, "_find_context")
+
+    # Initialise the Analyser
+    analyser = Analyser(tmp_path, "")
+    for file in test_files:
+        analyser._analyse(tmp_path / file)
+
+    # "_find_context" should be called only once
+    assert spy_find_context.call_count == 1
+    assert analyser._context is not None and "SIMContext" in str(analyser._context)
 
     # "_post_transfer" should be called on every one of these files
     assert mock_post_transfer.call_count == len(test_files)
