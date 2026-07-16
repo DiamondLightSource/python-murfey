@@ -154,6 +154,7 @@ def create_electron_snapshot_metadata(
             -1.309,  # Rotation
             0.8,  # Alpha tilt
             0,  # Beta tilt
+            2,  # Expected slot number
             3072,  # Image size X
             2048,  # Y
             1e-6,  # Pixel size X
@@ -171,9 +172,10 @@ def create_electron_snapshot_metadata(
             -0.003,  # Stage X
             0.0003,  # Y
             0.01,  # Z
-            1.309,  # Rotation
+            1.833,  # Rotation
             0,  # Alpha tilt
             0,  # Beta tilt
+            1,  # Expected slot number
             3072,  # Image size X
             2048,  # Y
             1e-6,  # Pixel size X
@@ -200,6 +202,7 @@ def test_parse_metadata(
         float,
         int,
         int,
+        int,
         float,
         float,
     ],
@@ -221,6 +224,7 @@ def test_parse_metadata(
         rotation,
         tilt_alpha,
         tilt_beta,
+        expected_slot_number,
         pixels_x,
         pixels_y,
         pixel_size_x,
@@ -234,7 +238,6 @@ def test_parse_metadata(
         / image_name
         / f"{image_name}.tiff"
     )
-    slot_number = 1 if pos_x < 0 else 2
 
     # Mock the results of opening an image file
     xml_string = create_electron_snapshot_metadata(
@@ -283,8 +286,8 @@ def test_parse_metadata(
     assert parsed.pixels_y == pixels_y
     assert parsed.pixel_size_x == pixel_size_x
     assert parsed.pixel_size_y == pixel_size_y
-    assert parsed.slot_number == slot_number
-    assert parsed.site_name == f"{project_name}--slot_{slot_number}"
+    assert parsed.slot_number == expected_slot_number
+    assert parsed.site_name == f"{project_name}--slot_{expected_slot_number}"
     assert parsed.pixel_size == 0.5 * (pixel_size_x + pixel_size_y)
 
 

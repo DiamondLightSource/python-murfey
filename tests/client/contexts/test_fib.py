@@ -756,7 +756,11 @@ def test_fib_full_autotem_context_drift_correction_images(
         if has_stage_position:
             stage_dict: dict[str, dict] = {"preparation_site": {}}
             if has_stage_values:
-                stage_dict["preparation_site"] = {"x": 0.003}
+                stage_dict["preparation_site"] = {
+                    "x": 0.003,
+                    "y": 0.003,
+                    "rotation": -75,
+                }
             metadata_dict["stage_info"] = stage_dict
         if has_site_info:
             context._site_info[lamella_num] = LamellaSiteInfo(**metadata_dict)
