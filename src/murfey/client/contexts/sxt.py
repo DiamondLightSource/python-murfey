@@ -36,24 +36,26 @@ def _find_reference(txrm_file: Path) -> Path | None:
         )
     candidates.sort(key=lambda x: x.timestamp, reverse=True)
     for ref_option in candidates:
-        mosaic_size = 1
-        with OleFileIO(ref_option.full_path) as xrm_ole:
-            # Find images which are not mosaics (txrm spec typos this as mosiac)
-            if xrm_ole.exists("ImageInfo/MosiacRows") and xrm_ole.exists(
-                "ImageInfo/MosiacColumns"
-            ):
-                mosaic_size = int(
-                    np.frombuffer(
-                        xrm_ole.openstream("ImageInfo/MosiacRows").getvalue(), np.int32
-                    )[0]
-                    * np.frombuffer(
-                        xrm_ole.openstream("ImageInfo/MosiacColumns").getvalue(),
-                        np.int32,
-                    )[0]
-                )
-        if mosaic_size == 0:
-            logger.info(f"Found reference {ref_option.name}")
-            return Path(ref_option.full_path)
+        if "ref" in ref_option.name.lower():
+            mosaic_size = 1
+            with OleFileIO(ref_option.full_path) as xrm_ole:
+                # Find images which are not mosaics (txrm spec typos this as mosiac)
+                if xrm_ole.exists("ImageInfo/MosiacRows") and xrm_ole.exists(
+                    "ImageInfo/MosiacColumns"
+                ):
+                    mosaic_size = int(
+                        np.frombuffer(
+                            xrm_ole.openstream("ImageInfo/MosiacRows").getvalue(),
+                            np.int32,
+                        )[0]
+                        * np.frombuffer(
+                            xrm_ole.openstream("ImageInfo/MosiacColumns").getvalue(),
+                            np.int32,
+                        )[0]
+                    )
+            if mosaic_size == 0:
+                logger.info(f"Found reference {ref_option.name}")
+                return Path(ref_option.full_path)
     logger.warning(f"No reference found for {txrm_file}")
     return None
 
@@ -246,13 +248,16 @@ class SXTContext(Context):
                         / environment.visit
                     )
                     destination_extra = ""
-                converted_file_path = (
+                converted_tiff_path = (
                     Path(self._machine_config.get("rsync_basepath", ""))
                     / destination_base
                     / self._machine_config.get("processed_directory_name", "")
                     / self._machine_config.get("processed_extra_directory", "")
                     / destination_extra
                     / f"{transferred_file.relative_to(source).stem}_Annotated.tiff"
+                )
+                thumbnail_path = converted_tiff_path.parent / (
+                    converted_tiff_path.stem + "_thumbnail.jpg"
                 )
                 capture_post(
                     base_url=str(environment.url.geturl()),
@@ -262,7 +267,7 @@ class SXTContext(Context):
                     instrument_name=environment.instrument_name,
                     data={
                         "xrm_path": str(image_path),
-                        "tiff_path": str(converted_file_path),
+                        "tiff_path": str(converted_tiff_path),
                     },
                 )
 
@@ -274,7 +279,7 @@ class SXTContext(Context):
                     dcg_data = {
                         "experiment_type_id": 44,  # Atlas
                         "tag": dcg_tag,
-                        "atlas": str(converted_file_path),
+                        "atlas": str(thumbnail_path),
                         "atlas_pixel_size": round(metadata.get("pixel_size", 0), 2),
                         "atlas_x_stage_position": metadata.get("x_position", None),
                         "atlas_y_stage_position": metadata.get("y_position", None),
@@ -303,11 +308,10 @@ class SXTContext(Context):
                         function_name="register_sxt_roi",
                         token=self._token,
                         instrument_name=environment.instrument_name,
-                        visit_name=environment.visit,
                         session_id=environment.murfey_session,
+                        roi_name=transferred_file.stem,
                         data={
                             "tag": dcg_tag,
-                            "name": transferred_file.stem,
                             "x_stage_position": metadata.get("x_position", None),
                             "y_stage_position": metadata.get("y_position", None),
                             "pixel_size": round(metadata.get("pixel_size", 0), 2),
@@ -317,7 +321,7 @@ class SXTContext(Context):
                             "width": int(
                                 metadata.get("width", 0) * metadata["mosaic_columns"]
                             ),
-                            "image": str(converted_file_path),
+                            "image": str(thumbnail_path),
                         },
                     )
 

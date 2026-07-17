@@ -82,7 +82,7 @@ def test_sxt_context_xrm_atlas(mock_ole_file, mock_post, tmp_path):
         json={
             "experiment_type_id": 44,
             "tag": f"{tmp_path}/cm12345-6/grid1",
-            "atlas": "/path/to/dest/cm12345-6/processed/grid1/example_atlas_Annotated.tiff",
+            "atlas": "/path/to/dest/cm12345-6/processed/grid1/example_atlas_Annotated_thumbnail.jpg",
             "atlas_pixel_size": 0.3,
             "atlas_x_stage_position": 1,
             "atlas_y_stage_position": -1,
@@ -158,16 +158,15 @@ def test_sxt_context_xrm_roi(mock_ole_file, mock_post, tmp_path):
         headers={"Authorization": "Bearer "},
     )
     mock_post.assert_any_call(
-        "http://localhost:8000/workflow/sxt/visits/cm12345-6/sessions/1/register_sxt_roi",
+        "http://localhost:8000/workflow/sxt/sessions/1/sxt_roi/example_roi",
         json={
             "tag": f"{tmp_path}/cm12345-6/grid1",
-            "name": "example_roi",
             "x_stage_position": 1,
             "y_stage_position": -1,
             "pixel_size": 0.03,
             "height": 6000,
             "width": 4500,
-            "image": "/path/to/dest/cm12345-6/processed/grid1/example_roi_Annotated.tiff",
+            "image": "/path/to/dest/cm12345-6/processed/grid1/example_roi_Annotated_thumbnail.jpg",
         },
         headers={"Authorization": "Bearer "},
     )

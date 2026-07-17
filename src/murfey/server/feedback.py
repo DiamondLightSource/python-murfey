@@ -12,7 +12,6 @@ import math
 import subprocess
 import time
 from datetime import datetime
-from functools import partial
 from importlib.metadata import (
     EntryPoint,  # For type hinting only
     entry_points,
@@ -1201,6 +1200,7 @@ def _resize_initial_model(
         input_size_z = input_mrc.header.nz
     if executables.get("clip") and not input_size_x == input_size_y == input_size_z:
         # If the initial model is not a cube, do some padding
+        input_path_cube = input_path.parent / f"{input_path.stem}_cube.mrc"
         clip_proc = subprocess.run(
             [
                 f"{executables['clip']}",
@@ -1212,13 +1212,13 @@ def _resize_initial_model(
                 "-oz",
                 str(max(input_size_x, input_size_y, input_size_z)),
                 str(input_path),
-                str(input_path.with_suffix("_cube.mrc")),
+                str(input_path_cube),
             ],
             capture_output=True,
             text=True,
             env=env,
         )
-        input_path = input_path.with_suffix("_cube.mrc")
+        input_path = input_path_cube
         if clip_proc.returncode:
             logger.error(
                 f"Clipping initial model {input_path} failed \n {clip_proc.stdout}"
@@ -2307,6 +2307,7 @@ def feedback_listen():
                     channel_hint="", callback=None, sub_id=None
                 )
             )
+
         # Re-subscription callback invoked by send() after reconnect() replaces
         # _transport_object.transport. Resolve the transport at call time rather
         # than capturing it now: a partial() bound to today's transport would

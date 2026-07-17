@@ -216,6 +216,38 @@ class Analyser(Observer):
             return True
 
         # -----------------------------------------------------------------------------
+        # SIM workflow checks
+        # -----------------------------------------------------------------------------
+        if (
+            # CryoSIM raw data files have no extension, and end with specific suffixes
+            not file_path.suffix
+            and file_path.stem.endswith(
+                (
+                    # Bright field
+                    "_BF",
+                    # Fluorescent
+                    "_BR",
+                    "_BFR",
+                    "_GR",
+                    "_GFR",
+                    "_BR_FL",
+                    "_BFR_FL",
+                    "_GR_FL",
+                    "_GFR_FL",
+                )
+            )
+        ):
+            if (context := _get_context("SIMContext")) is None:
+                return False
+            self._context = context.load()(
+                "sim",
+                self._basepath,
+                self._murfey_config,
+                self._token,
+            )
+            return True
+
+        # -----------------------------------------------------------------------------
         # SXT workflow checks
         # -----------------------------------------------------------------------------
         if file_path.suffix in (".txrm", ".xrm"):

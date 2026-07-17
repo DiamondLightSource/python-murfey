@@ -102,6 +102,7 @@ GitHub = "https://github.com/DiamondLightSource/python-murfey"
 AtlasContext = "murfey.client.contexts.atlas:AtlasContext"
 CLEMContext = "murfey.client.contexts.clem:CLEMContext"
 FIBContext = "murfey.client.contexts.fib:FIBContext"
+SIMContext = "murfey.client.contexts.sim:SIMContext"
 SPAContext = "murfey.client.contexts.spa:SPAContext"
 SPAMetadataContext = "murfey.client.contexts.spa_metadata:SPAMetadataContext"
 SXTContext = "murfey.client.contexts.sxt:SXTContext"
@@ -128,6 +129,7 @@ TomographyMetadataContext = "murfey.client.contexts.tomo_metadata:TomographyMeta
 "spa.flush_spa_preprocess" = "murfey.workflows.spa.flush_spa_preprocess:flush_spa_preprocess"
 "spa.motion_corrected" = "murfey.workflows.spa.motion_correction:motion_corrected"
 "sxt.process_tilt_series" = "murfey.workflows.sxt.process_sxt_tilt_series:run"
+"sxt.register_roi" = "murfey.workflows.sxt.sxt_metadata:run"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

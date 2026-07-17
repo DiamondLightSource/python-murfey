@@ -1445,6 +1445,14 @@ murfey.server.api.workflow_fib.router:
         type: int
     methods:
       - POST
+murfey.server.api.workflow_sim.router:
+  - path: /workflow/sim/sessions/{session_id}/process_data
+    function: request_sim_processing
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
 murfey.server.api.workflow_sxt.router:
   - path: /workflow/sxt/visits/{visit_name}/sessions/{session_id}/sxt_tilt_series
     function: process_sxt_tilt_series
@@ -1460,10 +1468,10 @@ murfey.server.api.workflow_sxt.router:
     path_params: []
     methods:
       - POST
-  - path: /workflow/sxt/visits/{visit_name}/sessions/{session_id}/register_sxt_roi
+  - path: /workflow/sxt/sessions/{session_id}/sxt_roi/{roi_name}
     function: register_sxt_roi
     path_params:
-      - name: visit_name
+      - name: roi_name
         type: str
       - name: session_id
         type: int

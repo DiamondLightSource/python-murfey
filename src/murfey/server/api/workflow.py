@@ -57,6 +57,7 @@ from murfey.util.db import (
     DataCollectionGroup,
     FoilHole,
     GridSquare,
+    ImagingSite,
     Movie,
     PreprocessStash,
     ProcessingJob,
@@ -121,15 +122,15 @@ def register_dc_group(
         db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
     )
     logger.info(f"Registering data collection group on microscope {instrument_name}")
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
     smartem_grid_uuid = None
     if (
         dcg_params.create_smartem_grid
         and SMARTEM_ACTIVE
         and dcg_params.acquisition_uuid
     ):
-        machine_config = get_machine_config(instrument_name=instrument_name)[
-            instrument_name
-        ]
         if machine_config.smartem_api_url:
             try:
                 smartem_client = SmartEMAPIClient(
@@ -178,6 +179,40 @@ def register_dc_group(
             if smartem_grid_uuid:
                 dcg_instance.smartem_grid_uuid = smartem_grid_uuid
 
+            # Update any atlases which are registered as imaging sites
+            if atlas_instance := db.exec(
+                select(ImagingSite).where(ImagingSite.dcg_id == dcg_instance.id)
+            ).one_or_none():
+                atlas_instance.pos_x = (
+                    dcg_params.atlas_x_stage_position or atlas_instance.pos_x
+                )
+                atlas_instance.pos_y = (
+                    dcg_params.atlas_y_stage_position or atlas_instance.pos_y
+                )
+                atlas_instance.image_pixels_x = (
+                    dcg_params.atlas_width or atlas_instance.image_pixels_x
+                )
+                atlas_instance.image_pixels_y = (
+                    dcg_params.atlas_height or atlas_instance.image_pixels_y
+                )
+                atlas_instance.image_pixel_size = (
+                    dcg_params.atlas_pixel_size or atlas_instance.image_pixel_size
+                )
+                db.add(atlas_instance)
+            elif dcg_params.atlas_x_stage_position:
+                atlas_instance = ImagingSite(
+                    dcg_id=dcg_instance.id,
+                    session_id=session_id,
+                    site_name=dcg_instance.tag,
+                    data_type="atlas",
+                    pos_x=dcg_params.atlas_x_stage_position,
+                    pos_y=dcg_params.atlas_y_stage_position,
+                    image_pixels_x=dcg_params.atlas_width,
+                    image_pixels_y=dcg_params.atlas_height,
+                    image_pixel_size=dcg_params.atlas_pixel_size,
+                )
+                db.add(atlas_instance)
+
             if murfey.server._transport_object:
                 if dcg_instance.atlas_id is not None:
                     murfey.server._transport_object.send(
@@ -213,9 +248,21 @@ def register_dc_group(
         ).all()
         search_map_params = SearchMapParameters(tag=dcg_params.tag)
         for sm in search_maps:
-            register_search_map_in_database(
-                session_id, sm.name, search_map_params, db, close_db=False
-            )
+            # Different behaviour for tomo and SXT
+            if "tomo" in machine_config.acquisition_software:
+                register_search_map_in_database(
+                    session_id, sm.name, search_map_params, db, close_db=False
+                )
+            elif murfey.server._transport_object:
+                murfey.server._transport_object.send(
+                    murfey.server._transport_object.feedback_queue,
+                    {
+                        "register": "sxt.register_roi",
+                        "session_id": session_id,
+                        "roi_name": sm.name,
+                        "roi_info": search_map_params.model_dump(mode="json"),
+                    },
+                )
         db.close()
     elif dcg_murfey := db.exec(
         select(DataCollectionGroup)
@@ -255,6 +302,10 @@ def register_dc_group(
             "atlas": dcg_params.atlas,
             "sample": dcg_params.sample,
             "atlas_pixel_size": dcg_params.atlas_pixel_size,
+            "atlas_x_stage_position": dcg_params.atlas_x_stage_position,
+            "atlas_y_stage_position": dcg_params.atlas_y_stage_position,
+            "atlas_width": dcg_params.atlas_width,
+            "atlas_height": dcg_params.atlas_height,
         }
 
         if murfey.server._transport_object:
