@@ -475,7 +475,7 @@ def test_sxt_context_txrm_zero_angles(mock_ole_file, mock_post, tmp_path):
     mock_post.assert_any_call(
         "http://localhost:8000/workflow/sxt/convert_xrm_to_tiff",
         json={
-            "xrm_path": str(tmp_path / "destination/cm12345-6/grid1/example_0.txrm"),
+            "xrm_path": "/path/to/dest/cm12345-6/raw/grid1/example_0.txrm",
             "tiff_path": "/path/to/dest/cm12345-6/processed/grid1/example_0_Annotated.tiff",
         },
         headers={"Authorization": "Bearer "},
