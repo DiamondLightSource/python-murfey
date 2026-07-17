@@ -3,7 +3,7 @@ import logging
 from sqlmodel import select
 from sqlmodel.orm.session import Session as SQLModelSession
 
-from murfey.server import _transport_object
+import murfey.server
 from murfey.util import sanitise
 from murfey.util.db import DataCollectionGroup, ImagingSite, SearchMap
 from murfey.util.models import SearchMapParameters
@@ -36,12 +36,12 @@ def register_sxt_roi(
         roi.width = roi_parameters.width or roi.width
         roi.pixel_size = roi_parameters.pixel_size or roi.pixel_size
         roi.image = roi_parameters.image or roi.image
-        if _transport_object:
-            _transport_object.do_update_sxt_roi(roi.id, roi_parameters)
+        if murfey.server._transport_object:
+            murfey.server._transport_object.do_update_sxt_roi(roi.id, roi_parameters)
     else:
         logger.info(f"Registering new sxt roi {sanitise(roi_name)}")
-        if _transport_object:
-            roi_ispyb_response = _transport_object.do_insert_sxt_roi(
+        if murfey.server._transport_object:
+            roi_ispyb_response = murfey.server._transport_object.do_insert_sxt_roi(
                 dcg.atlas_id, roi_parameters
             )
         else:
@@ -101,8 +101,8 @@ def register_sxt_roi(
                 * (512 / atlas.image_pixels_y)
             )
         )
-        if _transport_object:
-            _transport_object.do_update_sxt_roi(roi.id, roi_parameters)
+        if murfey.server._transport_object:
+            murfey.server._transport_object.do_update_sxt_roi(roi.id, roi_parameters)
         else:
             logger.warning("No transport object for register_sxt_roi")
     else:

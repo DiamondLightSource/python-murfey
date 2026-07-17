@@ -19,8 +19,8 @@ from typing import Literal, Optional, TypeAlias
 from pydantic import BaseModel, computed_field
 from sqlmodel import Session, select
 
+import murfey.server
 import murfey.util.db as MurfeyDB
-from murfey.server import _transport_object
 from murfey.util.models import GridSquareParameters
 from murfey.util.processing_params import (
     default_clem_processing_parameters as processing_params,
@@ -362,7 +362,7 @@ def _register_grid_square(
     murfey_db: Session,
 ):
     # Skip this step if no transport manager object is configured
-    if _transport_object is None:
+    if murfey.server._transport_object is None:
         logger.error("Unable to find transport manager")
         return
     if (dcg_name := imaging_site.dcg_name) is None:
@@ -504,7 +504,7 @@ def _register_grid_square(
                 grid_square_entry.image = grid_square_params.image
 
                 # Update existing entry on ISPyB
-                _transport_object.do_update_grid_square(
+                murfey.server._transport_object.do_update_grid_square(
                     grid_square_id=grid_square_entry.id,
                     grid_square_parameters=grid_square_params,
                     color_flags=color_flags,
@@ -517,11 +517,13 @@ def _register_grid_square(
                     .where(MurfeyDB.DataCollectionGroup.tag == grid_square_params.tag)
                 ).one()
                 # Register to ISPyB
-                grid_square_ispyb_result = _transport_object.do_insert_grid_square(
-                    atlas_id=dcg_entry.atlas_id,
-                    grid_square_id=clem_img_site.id,
-                    grid_square_parameters=grid_square_params,
-                    color_flags=color_flags,
+                grid_square_ispyb_result = (
+                    murfey.server._transport_object.do_insert_grid_square(
+                        atlas_id=dcg_entry.atlas_id,
+                        grid_square_id=clem_img_site.id,
+                        grid_square_parameters=grid_square_params,
+                        color_flags=color_flags,
+                    )
                 )
                 # Register to Murfey
                 grid_square_entry = MurfeyDB.GridSquare(
@@ -668,7 +670,7 @@ def run(message: dict, murfey_db: Session) -> dict[str, bool]:
                     series_name=result.series_name,
                     images=image_combo,
                     metadata=result.metadata,
-                    messenger=_transport_object,
+                    messenger=murfey.server._transport_object,
                 )
             except Exception:
                 logger.error(

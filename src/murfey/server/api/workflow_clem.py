@@ -13,8 +13,8 @@ from fastapi import APIRouter
 from pydantic import BaseModel, field_validator
 from sqlmodel import Session, select
 
+import murfey.server
 import murfey.util.db as MurfeyDB
-from murfey.server import _transport_object
 from murfey.server.murfey_db import murfey_db
 
 # Set up logger
@@ -58,7 +58,7 @@ def process_raw_lifs(
         root_folder="images",
         session_id=session_id,
         instrument_name=instrument_name,
-        messenger=_transport_object,
+        messenger=murfey.server._transport_object,
     )
     return True
 
@@ -97,7 +97,7 @@ def process_raw_tiffs(
         session_id=session_id,
         instrument_name=instrument_name,
         metadata=tiff_info.series_metadata,
-        messenger=_transport_object,
+        messenger=murfey.server._transport_object,
     )
     return True
 
@@ -164,6 +164,6 @@ def align_and_merge_stacks(
         flatten=align_and_merge_params.flatten,
         align_across=align_and_merge_params.align_across,
         # Optional session parameters
-        messenger=_transport_object,
+        messenger=murfey.server._transport_object,
     )
     return True

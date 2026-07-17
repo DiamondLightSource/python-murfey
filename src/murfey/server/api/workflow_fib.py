@@ -4,7 +4,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from murfey.server import _transport_object
+import murfey.server
 from murfey.server.api.auth import validate_instrument_token
 from murfey.util.models import FIBGIFParameters, LamellaSiteInfo
 
@@ -26,11 +26,11 @@ def register_fib_atlas(
     session_id: int,
     fib_atlas: FIBAtlasFile,
 ):
-    if _transport_object is None:
+    if murfey.server._transport_object is None:
         logger.error("No TransportManager object was set up")
         return None
-    _transport_object.send(
-        _transport_object.feedback_queue,
+    murfey.server._transport_object.send(
+        murfey.server._transport_object.feedback_queue,
         {
             "register": "fib.register_atlas",
             "session_id": session_id,
@@ -44,11 +44,11 @@ def register_fib_milling_progress(
     session_id: int,
     site_info: LamellaSiteInfo,
 ):
-    if _transport_object is None:
+    if murfey.server._transport_object is None:
         logger.error("No TransportManager object was set up")
         return None
-    _transport_object.send(
-        _transport_object.feedback_queue,
+    murfey.server._transport_object.send(
+        murfey.server._transport_object.feedback_queue,
         {
             "register": "fib.register_milling_progress",
             "session_id": session_id,
@@ -62,11 +62,11 @@ async def make_gif(
     session_id: int,
     gif_params: FIBGIFParameters,
 ):
-    if _transport_object is None:
+    if murfey.server._transport_object is None:
         logger.error("No TransportManager object was set up")
         return None
-    _transport_object.send(
-        _transport_object.feedback_queue,
+    murfey.server._transport_object.send(
+        murfey.server._transport_object.feedback_queue,
         {
             "register": "fib.make_milling_gif",
             "session_id": session_id,

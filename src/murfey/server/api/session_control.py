@@ -19,8 +19,8 @@ try:
 except ImportError:
     SMARTEM_ACTIVE = False
 
+import murfey.server
 import murfey.server.prometheus as prom
-from murfey.server import _transport_object
 from murfey.server.api.auth import (
     MurfeySessionIDInstrument as MurfeySessionID,
     validate_instrument_token,
@@ -194,14 +194,14 @@ def register_processing_success_in_ispyb(
         .where(AutoProcProgram.pj_id == ProcessingJob.id)
     ).all()
     appids = [c[3].id for c in collected_ids]
-    if _transport_object:
+    if murfey.server._transport_object:
         if db is not None:
             apps = db.query(ISPyBAutoProcProgram).filter(
                 ISPyBAutoProcProgram.autoProcProgramId.in_(appids)
             )
             for updated in apps:
                 updated.processingStatus = True
-                _transport_object.do_update_processing_status(updated)
+                murfey.server._transport_object.do_update_processing_status(updated)
 
 
 @router.get("/num_movies")
@@ -228,8 +228,10 @@ def failed_client_post(instrument_name: str, post_info: PostInfo):
         "data": post_info.data,
         "kwargs": post_info.kwargs,
     }
-    if _transport_object:
-        _transport_object.send(_transport_object.feedback_queue, zocalo_message)
+    if murfey.server._transport_object:
+        murfey.server._transport_object.send(
+            murfey.server._transport_object.feedback_queue, zocalo_message
+        )
 
 
 @router.post("/sessions/{session_id}/rsyncer")

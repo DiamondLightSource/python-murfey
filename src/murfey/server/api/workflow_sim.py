@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from murfey.server import _transport_object
+import murfey.server
 from murfey.server.api.auth import validate_instrument_token
 from murfey.util import sanitise_path
 
@@ -24,7 +24,7 @@ class SIMDataFile(BaseModel):
 
 @router.post("/sessions/{session_id}/process_data")
 def request_sim_processing(session_id: int, sim_data: SIMDataFile):
-    if _transport_object is None:
+    if murfey.server._transport_object is None:
         logger.error("No TransportManager object was set up")
         return None
 
@@ -38,7 +38,7 @@ def request_sim_processing(session_id: int, sim_data: SIMDataFile):
             # Job parameters
             "session_id": session_id,
             "file": f"{str(sim_data.file)}",
-            "feedback_queue": _transport_object.feedback_queue,
+            "feedback_queue": murfey.server._transport_object.feedback_queue,
         },
     }
     logger.debug(

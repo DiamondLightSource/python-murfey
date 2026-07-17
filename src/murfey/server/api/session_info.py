@@ -9,9 +9,9 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 from sqlmodel import select
 
+import murfey.server
 import murfey.server.api.websocket as ws
 import murfey.server.prometheus as prom
-from murfey.server import _transport_object
 from murfey.server.api import templates
 from murfey.server.api.auth import (
     MurfeyInstrumentNameFrontend as MurfeyInstrumentName,
@@ -67,7 +67,7 @@ def health_check(db=ispyb_db):
     conn.close()
     return {
         "ispyb_connection": True,
-        "rabbitmq_connection": _transport_object.transport.is_connected(),
+        "rabbitmq_connection": murfey.server._transport_object.transport.is_connected(),
     }
 
 
