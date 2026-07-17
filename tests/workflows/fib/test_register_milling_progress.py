@@ -391,12 +391,7 @@ def test_run_with_db(
     from murfey.server.ispyb import TransportManager
 
     mocker.patch(
-        "murfey.workflows.register_data_collection_group._transport_object",
-        new=TransportManager("PikaTransport"),
-    )
-    mocker.patch(
-        "murfey.workflows.fib.register_milling_progress._transport_object",
-        new=TransportManager("PikaTransport"),
+        "murfey.server._transport_object", new=TransportManager("PikaTransport")
     )
 
     # Run the workflow twice (fresh insert and update existing)
@@ -497,10 +492,7 @@ def test_run_fails(
 
     # Mock TransportManager accordingly
     mock_transport_object = MagicMock() if has_transport_object else None
-    mocker.patch(
-        "murfey.workflows.fib.register_milling_progress._transport_object",
-        mock_transport_object,
-    )
+    mocker.patch("murfey.server._transport_object", mock_transport_object)
 
     # Mock the Murfey database
     mock_murfey_db = MagicMock()

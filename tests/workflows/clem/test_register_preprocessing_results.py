@@ -366,16 +366,7 @@ def test_run_with_db(
     from murfey.server.ispyb import TransportManager
 
     mocker.patch(
-        "murfey.workflows.clem.register_preprocessing_results._transport_object",
-        new=TransportManager("PikaTransport"),
-    )
-    mocker.patch(
-        "murfey.workflows.register_data_collection_group._transport_object",
-        new=TransportManager("PikaTransport"),
-    )
-    mocker.patch(
-        "murfey.workflows.register_atlas_update._transport_object",
-        new=TransportManager("PikaTransport"),
+        "murfey.server._transport_object", new=TransportManager("PikaTransport")
     )
 
     # Run the function

@@ -41,7 +41,7 @@ def set_up_db(murfey_db_session: Session):
     return dcg_entry.id
 
 
-@mock.patch("murfey.workflows.sxt.sxt_metadata._transport_object")
+@mock.patch("murfey.server._transport_object")
 def test_register_new_sxt_roi(mock_transport, murfey_db_session: Session, tmp_path):
     set_up_db(murfey_db_session)
     mock_transport.do_insert_sxt_roi.return_value = {"success": True, "return_value": 2}
@@ -77,7 +77,7 @@ def test_register_new_sxt_roi(mock_transport, murfey_db_session: Session, tmp_pa
     assert roi_entry.image == "/path/to/image.jpg"
 
 
-@mock.patch("murfey.workflows.sxt.sxt_metadata._transport_object")
+@mock.patch("murfey.server._transport_object")
 def test_update_sxt_roi(mock_transport, murfey_db_session: Session, tmp_path):
     set_up_db(murfey_db_session)
 
