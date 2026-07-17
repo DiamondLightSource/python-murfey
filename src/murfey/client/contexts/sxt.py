@@ -76,6 +76,38 @@ class SXTContext(Context):
         self._basepath = basepath
         self._machine_config = machine_config
 
+    def determined_converted_tiff_path(
+        self,
+        transferred_file: Path,
+        environment: MurfeyInstanceEnvironment,
+        source: Path,
+    ):
+        """Find the output path of a converted txrm file in the processed directory"""
+        if environment.visit in Path(environment.default_destinations[source]).parts:
+            # Split either side of the raw directory
+            visit_idx = Path(environment.default_destinations[source]).parts.index(
+                environment.visit
+            )
+            destination_base = "/".join(
+                Path(environment.default_destinations[source]).parts[: visit_idx + 1]
+            )
+            destination_extra = "/".join(
+                Path(environment.default_destinations[source]).parts[visit_idx + 2 :]
+            )
+        else:
+            destination_base = str(
+                Path(environment.default_destinations[source]) / environment.visit
+            )
+            destination_extra = ""
+        return (
+            Path(self._machine_config.get("rsync_basepath", ""))
+            / destination_base
+            / self._machine_config.get("processed_directory_name", "")
+            / self._machine_config.get("processed_extra_directory", "")
+            / destination_extra
+            / f"{transferred_file.relative_to(source).stem}_Annotated.tiff"
+        )
+
     def register_sxt_data_collection(
         self,
         tilt_series: str,
@@ -224,37 +256,8 @@ class SXTContext(Context):
                     transferred_file,
                     Path(self._machine_config.get("rsync_basepath", "")),
                 )
-                if (
-                    environment.visit
-                    in Path(environment.default_destinations[source]).parts
-                ):
-                    # Split either side of the raw directory
-                    visit_idx = Path(
-                        environment.default_destinations[source]
-                    ).parts.index(environment.visit)
-                    destination_base = "/".join(
-                        Path(environment.default_destinations[source]).parts[
-                            : visit_idx + 1
-                        ]
-                    )
-                    destination_extra = "/".join(
-                        Path(environment.default_destinations[source]).parts[
-                            visit_idx + 2 :
-                        ]
-                    )
-                else:
-                    destination_base = str(
-                        Path(environment.default_destinations[source])
-                        / environment.visit
-                    )
-                    destination_extra = ""
-                converted_tiff_path = (
-                    Path(self._machine_config.get("rsync_basepath", ""))
-                    / destination_base
-                    / self._machine_config.get("processed_directory_name", "")
-                    / self._machine_config.get("processed_extra_directory", "")
-                    / destination_extra
-                    / f"{transferred_file.relative_to(source).stem}_Annotated.tiff"
+                converted_tiff_path = self.determined_converted_tiff_path(
+                    transferred_file, environment, source
                 )
                 thumbnail_path = converted_tiff_path.parent / (
                     converted_tiff_path.stem + "_thumbnail.jpg"
@@ -416,6 +419,34 @@ class SXTContext(Context):
             else:
                 reference_file = None
 
+            logger.info(
+                f"The following tilt series will be processed: {transferred_file.stem}"
+            )
+            file_transferred_to = _file_transferred_to(
+                environment,
+                source,
+                transferred_file,
+                Path(self._machine_config.get("rsync_basepath", "")),
+            )
+
+            if not angles or all(angles) == 0:
+                logger.info(f"All angles in {transferred_file.stem} are zero")
+                converted_tiff_path = self.determined_converted_tiff_path(
+                    transferred_file, environment, source
+                )
+                capture_post(
+                    base_url=str(environment.url.geturl()),
+                    router_name="workflow_sxt.router",
+                    function_name="convert_xrm_to_tiff",
+                    token=self._token,
+                    instrument_name=environment.instrument_name,
+                    data={
+                        "xrm_path": str(file_transferred_to),
+                        "tiff_path": str(converted_tiff_path),
+                    },
+                )
+                return True
+
             if "@" in transferred_file.stem:
                 tilt_series_tag = "_".join(
                     transferred_file.stem.split("@")[0].split("_")[:-1]
@@ -441,15 +472,6 @@ class SXTContext(Context):
                 environment=environment,
             )
 
-            logger.info(
-                f"The following tilt series will be processed: {transferred_file.stem}"
-            )
-            file_transferred_to = _file_transferred_to(
-                environment,
-                source,
-                transferred_file,
-                Path(self._machine_config.get("rsync_basepath", "")),
-            )
             if reference_file:
                 reference_file_transferred_to = _file_transferred_to(
                     environment,
