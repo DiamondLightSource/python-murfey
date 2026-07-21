@@ -1,10 +1,15 @@
 from pathlib import Path
+from unittest import mock
 from unittest.mock import MagicMock
 
 import pytest
+from pytest_mock import MockerFixture
 
 from murfey.client.context import _file_transferred_to, _get_source
+from murfey.client.contexts.clem import CLEMContext
 
+instrument_name = "clem"
+session_id = 1
 visit_name = "cm12345-6"
 project_name = "2025_06_30_10_00_00--grid_1001"
 example_file_paths = [
@@ -133,8 +138,90 @@ def test_file_transferred_to(tmp_path: Path, visit_dir: Path, file_path: str):
     ) == destination_dir / file.relative_to(visit_dir)
 
 
-def test_post_transfer_lif_data():
-    pass
+@pytest.mark.parametrize(
+    "test_params",
+    (  # Has environment | Has source
+        (True, True),
+        (False, True),
+        (True, False),
+    ),
+)
+def test_post_transfer_lif_data(
+    mocker: MockerFixture,
+    tmp_path: Path,
+    visit_dir: Path,
+    test_params: tuple[bool, bool],
+):
+    # Unpack test params
+    has_env, has_src = test_params
+
+    # Create a mock LIF file and its destination path
+    rsync_basepath = tmp_path / "data" / "clem"
+    src = visit_dir / "images" / f"{project_name}.lif"
+    dst = rsync_basepath / "current_year" / src.relative_to(visit_dir.parent)
+
+    # Mock the environment
+    mock_environment = (
+        MagicMock(instrument_name=instrument_name, murfey_session=session_id)
+        if has_env
+        else None
+    )
+
+    # Mock '_get_source'
+    mock_get_source = mocker.patch(
+        "murfey.client.contexts.clem._get_source",
+        return_value=visit_dir if has_src else None,
+    )
+
+    # Mock '_file_transferred_to'
+    mock_file_transferred_to = mocker.patch(
+        "murfey.client.contexts.clem._file_transferred_to", return_value=dst
+    )
+
+    # Mock 'capture_post'
+    mock_capture_post = mocker.patch(
+        "murfey.client.contexts.clem.capture_post", return_value=True
+    )
+
+    # Initialise the CLEMContext
+    context = CLEMContext(
+        acquisition_software="leica",
+        basepath=tmp_path,
+        machine_config={"rsync_basepath": str(rsync_basepath)},
+        token="dummy",
+    )
+    # Run the function on the LIF file
+    context.post_transfer(
+        src,
+        environment=mock_environment,
+    )
+
+    # Check that the calls were made with the expected parameters
+    if not has_env:
+        mock_get_source.assert_not_called()
+        mock_file_transferred_to.assert_not_called()
+        mock_capture_post.assert_not_called()
+    else:
+        mock_get_source.assert_called_once_with(src, mock_environment)
+        if not has_src:
+            mock_file_transferred_to.assert_not_called()
+            mock_capture_post.assert_not_called()
+        else:
+            mock_file_transferred_to.assert_called_once_with(
+                environment=mock_environment,
+                source=visit_dir,
+                file_path=src,
+                rsync_basepath=rsync_basepath,
+            )
+            mock_capture_post.assert_called_once_with(
+                base_url=mock.ANY,
+                router_name="workflow_clem.router",
+                function_name="process_raw_lifs",
+                token=context._token,
+                instrument_name=instrument_name,
+                session_id=session_id,
+                data={"lif_file": str(dst)},
+            )
 
 
 def test_post_transfer_tiff_data():
