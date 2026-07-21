@@ -10,40 +10,12 @@ from xml.etree import ElementTree as ET
 
 from defusedxml.ElementTree import parse
 
-from murfey.client.context import Context
+from murfey.client.context import Context, _file_transferred_to, _get_source
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.util.client import capture_post
 
 # Create logger object
 logger = logging.getLogger("murfey.client.contexts.clem")
-
-
-def _file_transferred_to(
-    environment: MurfeyInstanceEnvironment,
-    source: Path,
-    file_path: Path,
-    rsync_basepath: Path,
-):
-    """
-    Returns the Path of the transferred file on the DLS file system.
-    """
-    # Construct destination path
-    base_destination = rsync_basepath / Path(environment.default_destinations[source])
-    # Add visit number to the path if it's not present in default destination
-    if environment.visit not in environment.default_destinations[source]:
-        base_destination = base_destination / environment.visit
-    destination = base_destination / file_path.relative_to(source)
-    return destination
-
-
-def _get_source(file_path: Path, environment: MurfeyInstanceEnvironment):
-    """
-    Returns the Path of the file on the client PC.
-    """
-    for s in environment.sources:
-        if file_path.is_relative_to(s):
-            return s
-    return None
 
 
 def _get_image_elements(root: ET.Element) -> list[ET.Element]:
