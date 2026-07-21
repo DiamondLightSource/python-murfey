@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Type, TypeVar
 
-from murfey.client.context import Context
+from murfey.client.context import Context, _file_transferred_to, _get_source
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.util.client import capture_post
 from murfey.util.fib import number_from_name
@@ -200,34 +200,6 @@ def _get_project_name(file_path: Path):
         return None
 
 
-def _get_source(file_path: Path, environment: MurfeyInstanceEnvironment) -> Path | None:
-    """
-    Returns the Path of the file on the client PC.
-    """
-    for s in environment.sources:
-        if file_path.is_relative_to(s):
-            return s
-    return None
-
-
-def _file_transferred_to(
-    environment: MurfeyInstanceEnvironment,
-    source: Path,
-    file_path: Path,
-    rsync_basepath: Path,
-) -> Path | None:
-    """
-    Returns the Path of the transferred file on the DLS file system.
-    """
-    # Construct destination path
-    base_destination = rsync_basepath / Path(environment.default_destinations[source])
-    # Add visit number to the path if it's not present in default destination
-    if environment.visit not in environment.default_destinations[source]:
-        base_destination = base_destination / environment.visit
-    destination = base_destination / file_path.relative_to(source)
-    return destination
-
-
 @dataclass
 class FIBImage:
     images: list[Path] = field(default_factory=list)
@@ -338,11 +310,6 @@ class FIBContext(Context):
                     file_path=transferred_file,
                     rsync_basepath=Path(self._machine_config.get("rsync_basepath", "")),
                 )
-                if destination_file is None:
-                    logger.warning(
-                        f"Could not find destination file path for {transferred_file.name!r}"
-                    )
-                    return None
 
                 # Register image in database
                 self._register_atlas(destination_file, environment)
@@ -587,11 +554,6 @@ class FIBContext(Context):
                 file_path=file,
                 rsync_basepath=Path(self._machine_config.get("rsync_basepath", "")),
             )
-            if destination_file is None:
-                logger.warning(
-                    f"Could not find destination file path for {file.name!r}"
-                )
-                return
         else:
             destination_file = file
 
