@@ -1,3 +1,5 @@
+import textwrap
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from unittest import mock
 from unittest.mock import MagicMock
@@ -6,7 +8,7 @@ import pytest
 from pytest_mock import MockerFixture
 
 from murfey.client.context import _file_transferred_to, _get_source
-from murfey.client.contexts.clem import CLEMContext
+from murfey.client.contexts.clem import CLEMContext, _get_image_elements
 
 instrument_name = "clem"
 session_id = 1
@@ -99,6 +101,33 @@ def visit_dir(
     visit_dir = tmp_path / visit_name
     visit_dir.mkdir(parents=True, exist_ok=True)
     return visit_dir
+
+
+def test_get_image_elements():
+    # Create a mock XML Element to read
+    mock_xml_str = textwrap.dedent("""\
+    <?xml version="1.0"?>
+    <LMSDataContainerHeader Version="2" ApplicationDescription="LMSIOManager" ApplicationVersion="1,3,2573,0">
+        <Element Name="Series001_Lng_SVCC" Visibility="1" CopyOption="1" UniqueID="12dcf2d5-6579-11f1-b397-186024aedba3">
+            <Data>
+                <Image TextDescription="Series001_Lng_SVCC">
+                    <ImageDescription>Dummy</ImageDescription>
+                </Image>
+            </Data>
+            <Children>
+                <Element Name="Series002_Lng_SVCC" Visibility="1" CopyOption="1" UniqueID="12dcf2d5-6579-11f1-b397-186024aedba3">
+                    <Data>
+                        <Image TextDescription="Series002_Lng_SVCC">
+                            <ImageDescription>Dummy</ImageDescription>
+                        </Image>
+                    </Data>
+                </Element>
+            </Children>
+        </Element>
+    </LMSDataContainerHeader>
+    """)
+    mock_xml = ET.fromstring(mock_xml_str)
+    assert len(_get_image_elements(mock_xml)) == 2
 
 
 @pytest.mark.parametrize("file_path", example_file_paths)
