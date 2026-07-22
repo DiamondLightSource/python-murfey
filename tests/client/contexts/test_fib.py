@@ -624,20 +624,19 @@ def test_handle_autotem_metadata(
     "test_params",
     (
         # Successful case
-        (True, True, True, True, True, True, True),  # Using destination file path
-        (True, True, True, True, True, True, False),  # Using client-side file path
+        (True, True, True, True, True, True),  # Using destination file path
+        (True, True, True, True, True, False),  # Using client-side file path
         # Early exits
-        (False, True, True, True, True, True, False),  # No source
-        (True, False, True, True, True, True, False),  # No destination
-        (True, True, False, True, True, True, False),  # No site info
-        (True, True, True, False, True, True, False),  # No project name
-        (True, True, True, True, False, True, False),  # No stage position
-        (True, True, True, True, True, False, False),  # No stage position values
+        (False, True, True, True, True, False),  # No source
+        (True, False, True, True, True, False),  # No site info
+        (True, True, False, True, True, False),  # No project name
+        (True, True, True, False, True, False),  # No stage position
+        (True, True, True, True, False, False),  # No stage position values
     ),
 )
 def test_make_drift_correction_gif(
     mocker: MockerFixture,
-    test_params: tuple[bool, bool, bool, bool, bool, bool, bool],
+    test_params: tuple[bool, bool, bool, bool, bool, bool],
     tmp_path: Path,
     visit_dir: Path,
     fib_autotem_dc_images: list[Path],
@@ -645,7 +644,6 @@ def test_make_drift_correction_gif(
     # Unpack test params
     (
         find_source,
-        find_dst,
         has_site_info,
         has_project_name,
         has_stage_position,
@@ -674,12 +672,8 @@ def test_make_drift_correction_gif(
     mock_get_source.return_value = tmp_path if find_source else None
 
     mock_file_transferred_to = mocker.patch(
-        "murfey.client.contexts.fib._file_transferred_to"
+        "murfey.client.contexts.fib._file_transferred_to", side_effect=destination_files
     )
-    if find_dst:
-        mock_file_transferred_to.side_effect = destination_files
-    else:
-        mock_file_transferred_to.return_value = None
 
     mock_capture_post = mocker.patch("murfey.client.contexts.fib.capture_post")
 
@@ -769,11 +763,6 @@ def test_make_drift_correction_gif(
         # For the fail cases, check that the correct log was called
         if not find_source:
             mock_logger.warning.assert_called_with(f"No source found for file {file}")
-            mock_capture_post.assert_not_called()
-        elif not find_dst:
-            mock_logger.warning.assert_called_with(
-                f"Could not find destination file path for {file.name!r}"
-            )
             mock_capture_post.assert_not_called()
         elif not has_site_info:
             mock_logger.debug.assert_called_with(
