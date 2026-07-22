@@ -5,8 +5,8 @@ import numpy as np
 from sqlalchemy import func
 from sqlmodel import Session, select
 
+import murfey.server
 import murfey.server.prometheus as prom
-from murfey.server import _transport_object
 from murfey.server.feedback import (
     _app_id,
     _pj_id,
@@ -127,11 +127,11 @@ def _register_picked_particles_use_diameter(message: dict, _db: Session):
                     },
                     "recipes": ["em-spa-extract"],
                 }
-                if _transport_object:
+                if murfey.server._transport_object:
                     zocalo_message["parameters"]["feedback_queue"] = (
-                        _transport_object.feedback_queue
+                        murfey.server._transport_object.feedback_queue
                     )
-                    _transport_object.send(
+                    murfey.server._transport_object.send(
                         "processing_recipe", zocalo_message, new_connection=True
                     )
         else:
@@ -167,11 +167,11 @@ def _register_picked_particles_use_diameter(message: dict, _db: Session):
                 },
                 "recipes": ["em-spa-extract"],
             }
-            if _transport_object:
+            if murfey.server._transport_object:
                 zocalo_message["parameters"]["feedback_queue"] = (
-                    _transport_object.feedback_queue
+                    murfey.server._transport_object.feedback_queue
                 )
-                _transport_object.send(
+                murfey.server._transport_object.send(
                     "processing_recipe", zocalo_message, new_connection=True
                 )
 
@@ -249,11 +249,13 @@ def _register_picked_particles_use_boxsize(message: dict, _db: Session):
         },
         "recipes": ["em-spa-extract"],
     }
-    if _transport_object:
+    if murfey.server._transport_object:
         zocalo_message["parameters"]["feedback_queue"] = (
-            _transport_object.feedback_queue
+            murfey.server._transport_object.feedback_queue
         )
-        _transport_object.send("processing_recipe", zocalo_message, new_connection=True)
+        murfey.server._transport_object.send(
+            "processing_recipe", zocalo_message, new_connection=True
+        )
     _db.close()
 
 
@@ -266,8 +268,8 @@ def _request_email(
     config = get_machine_config(instrument_name=session.instrument_name)[
         session.instrument_name
     ]
-    if _transport_object:
-        _transport_object.send(
+    if murfey.server._transport_object:
+        murfey.server._transport_object.send(
             config.notifications_queue,
             {
                 "groupId": dcg_id,

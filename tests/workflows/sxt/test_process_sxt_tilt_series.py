@@ -70,7 +70,7 @@ def set_up_db(murfey_db_session: Session):
     return dcg_entry.id, dc_entry.id, aretomo_autoproc_entry.id, imod_autoproc_entry.id
 
 
-@mock.patch("murfey.workflows.sxt.process_sxt_tilt_series._transport_object")
+@mock.patch("murfey.server._transport_object")
 def test_process_new_sxt_tilt_series(
     mock_transport, murfey_db_session: Session, tmp_path
 ):

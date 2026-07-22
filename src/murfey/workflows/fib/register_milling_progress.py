@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING, Any
 
 from sqlmodel import Session as SQLModelSession, select
 
+import murfey.server
 import murfey.util.db as MurfeyDB
-from murfey.server import _transport_object
 from murfey.util.models import (
     GridSquareParameters,
     LamellaSiteInfo,
@@ -297,7 +297,7 @@ def _register_milling_step(
 
 def run(message: dict[str, Any], murfey_db: SQLModelSession):
     # Early exit if no TransportManager was set up
-    if _transport_object is None:
+    if murfey.server._transport_object is None:
         logger.error("No TransportManager object was configured")
         return {"success": False, "requeue": False}
 
@@ -379,7 +379,7 @@ def run(message: dict[str, Any], murfey_db: SQLModelSession):
                 project_name=project_name,
                 slot_number=slot_number,
                 site_number=site_number,
-                transport_object=_transport_object,
+                transport_object=murfey.server._transport_object,
                 murfey_db=murfey_db,
             )
         except Exception:
@@ -400,7 +400,7 @@ def run(message: dict[str, Any], murfey_db: SQLModelSession):
                 milling_steps=milling_steps,
                 stage_info=stage_info,
                 grid_square=grid_square_entry,
-                transport_object=_transport_object,
+                transport_object=murfey.server._transport_object,
                 murfey_db=murfey_db,
             )
         except Exception:

@@ -366,16 +366,7 @@ def test_run_with_db(
     from murfey.server.ispyb import TransportManager
 
     mocker.patch(
-        "murfey.workflows.clem.register_preprocessing_results._transport_object",
-        new=TransportManager("PikaTransport"),
-    )
-    mocker.patch(
-        "murfey.workflows.register_data_collection_group._transport_object",
-        new=TransportManager("PikaTransport"),
-    )
-    mocker.patch(
-        "murfey.workflows.register_atlas_update._transport_object",
-        new=TransportManager("PikaTransport"),
+        "murfey.server._transport_object", new=TransportManager("PikaTransport")
     )
 
     # Run the function
@@ -456,7 +447,7 @@ def test_run_with_db(
         assert getattr(ispyb_atlas, flag) == value
     assert ispyb_atlas.mode == collection_mode
 
-    # ISPyB's GrridSquare should have half the number of initial entries
+    # ISPyB's GridSquare should have half the number of initial entries
     ispyb_gs_search = (
         ispyb_db_session.execute(
             sa_select(ISPyBDB.GridSquare).where(

@@ -5,7 +5,7 @@ import numpy as np
 from sqlalchemy import func
 from sqlmodel import Session, select
 
-from murfey.server import _transport_object
+import murfey.server
 from murfey.server.feedback import _app_id, _murfey_id
 from murfey.util.config import get_machine_config
 from murfey.util.db import (
@@ -141,11 +141,11 @@ def _register_picked_tomogram_use_diameter(message: dict, murfey_db: Session):
                     },
                     "recipes": ["em-tomo-class2d"],
                 }
-                if _transport_object:
+                if murfey.server._transport_object:
                     zocalo_message["parameters"]["feedback_queue"] = (
-                        _transport_object.feedback_queue
+                        murfey.server._transport_object.feedback_queue
                     )
-                    _transport_object.send(
+                    murfey.server._transport_object.send(
                         "processing_recipe", zocalo_message, new_connection=True
                     )
                 feedback_params.next_job += 2
@@ -182,11 +182,11 @@ def _register_picked_tomogram_use_diameter(message: dict, murfey_db: Session):
                 },
                 "recipes": ["em-tomo-class2d"],
             }
-            if _transport_object:
+            if murfey.server._transport_object:
                 zocalo_message["parameters"]["feedback_queue"] = (
-                    _transport_object.feedback_queue
+                    murfey.server._transport_object.feedback_queue
                 )
-                _transport_object.send(
+                murfey.server._transport_object.send(
                     "processing_recipe", zocalo_message, new_connection=True
                 )
             feedback_params.next_job += 2

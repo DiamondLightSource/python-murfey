@@ -4,7 +4,7 @@ from importlib.metadata import entry_points
 import numpy as np
 from sqlmodel import Session, select
 
-from murfey.server import _transport_object
+import murfey.server
 from murfey.server.api.auth import MurfeySessionIDInstrument as MurfeySessionID
 from murfey.server.gain import Camera
 from murfey.util import sanitise
@@ -101,12 +101,14 @@ def register_search_map_in_database(
         )
         search_map.height = search_map_params.height or search_map.height
         search_map.width = search_map_params.width or search_map.width
-        if _transport_object:
-            _transport_object.do_update_search_map(search_map.id, search_map_params)
+        if murfey.server._transport_object:
+            murfey.server._transport_object.do_update_search_map(
+                search_map.id, search_map_params
+            )
     else:
         logger.info(f"Registering new search map {sanitise(search_map_name)}")
-        if _transport_object:
-            sm_ispyb_response = _transport_object.do_insert_search_map(
+        if murfey.server._transport_object:
+            sm_ispyb_response = murfey.server._transport_object.do_insert_search_map(
                 dcg.atlas_id, search_map_params
             )
         else:
@@ -232,8 +234,10 @@ def register_search_map_in_database(
         )
         search_map.x_location = search_map_params.x_location
         search_map.y_location = search_map_params.y_location
-        if _transport_object:
-            _transport_object.do_update_search_map(search_map.id, search_map_params)
+        if murfey.server._transport_object:
+            murfey.server._transport_object.do_update_search_map(
+                search_map.id, search_map_params
+            )
     else:
         logger.info(
             f"Unable to register search map {sanitise(search_map_name)} position yet: "
