@@ -130,6 +130,7 @@ def _parse_metadata(file: Path, visit_name: str, rotation_offset: float):
             ("pos_x", ".//StageSettings/StagePosition/X"),
             ("pos_y", ".//StageSettings/StagePosition/Y"),
             ("pos_z", ".//StageSettings/StagePosition/Z"),
+            # Angles are in radians
             ("rotation", ".//StageSettings/StagePosition/Rotation"),
             ("tilt_alpha", ".//StageSettings/StagePosition/Tilt/Alpha"),
             ("tilt_beta", ".//StageSettings/StagePosition/Tilt/Beta"),
@@ -143,7 +144,7 @@ def _parse_metadata(file: Path, visit_name: str, rotation_offset: float):
     extracted["slot_number"] = get_slot_number(
         x=float(extracted["pos_x"]),
         y=float(extracted["pos_y"]),
-        rotation=math.degrees(float(extracted["rotation"])),
+        rotation=math.degrees(float(extracted["rotation"])),  # Convert to degrees
         rotation_offset=rotation_offset,
     )
     # Return the parsed Pydantic model
