@@ -33,11 +33,19 @@ def number_from_name(name: str) -> int:
 def get_slot_number(
     x: float | None = None,
     y: float | None = None,
+    # Angles are in degrees
     rotation: float | None = None,
     rotation_offset: float = -75,
 ):
+    """
+    In the Aquilos, the stage position values corresponding to slots 1 and 2 are
+    taken at a fixed stage rotation; at different stage rotation values, the x-
+    and y- ranges corresponding to slots 1 and 2 will change. This function will
+    rotate the provided stage values into the correct reference frame and return
+    the slot number.
+    """
     if x is not None and y is not None and rotation is not None:
-        # Rotate the xy-coordinates to the -75 degrees frame
+        # Rotate the xy-coordinates to reference frame
         theta = math.radians(rotation - rotation_offset)
         sin = math.sin(theta)
         cos = math.cos(theta)
