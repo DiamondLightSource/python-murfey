@@ -370,7 +370,12 @@ def run(message: dict[str, Any], murfey_db: SQLModelSession):
             )
 
             # Calculate the slot number
-            slot_number = get_slot_number(latest_stage_position, rotation_offset)
+            slot_number = get_slot_number(
+                x=latest_stage_position.x,
+                y=latest_stage_position.y,
+                rotation=latest_stage_position.rotation,
+                rotation_offset=rotation_offset,
+            )
             if slot_number is None:
                 logger.error(
                     "Could not construct lookup tags; 'slot_number' is missing"
