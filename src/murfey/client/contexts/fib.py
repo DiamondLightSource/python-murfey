@@ -5,12 +5,12 @@ import threading
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Type, TypeVar
+from typing import Callable, Type, TypeVar, cast
 
 from murfey.client.context import Context
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.util.client import capture_post
-from murfey.util.fib import number_from_name
+from murfey.util.fib import get_slot_number, number_from_name
 from murfey.util.models import (
     LamellaSiteInfo,
     MillingStepInfo,
@@ -489,12 +489,24 @@ class FIBContext(Context):
         # Determine the slot number
         slot_number: int | None = None
         for stage_name in reversed(STAGE_POSITION_NAMES.keys()):
-            if (stage_info := getattr(site_info.stage_info, stage_name, None)) is None:
-                continue
-            if stage_info.slot_number is None:
+            stage_values: StagePositionValues | None = getattr(
+                site_info.stage_info, stage_name, None
+            )
+            if stage_values is None:
                 continue
             else:
-                slot_number = stage_info.slot_number
+                rotation_offset = cast(
+                    float,
+                    self._machine_config.get("calibrations", {}).get(
+                        "rotation_offset", 0
+                    ),
+                )
+                slot_number = get_slot_number(
+                    x=stage_values.x,
+                    y=stage_values.y,
+                    rotation=stage_values.rotation,
+                    rotation_offset=rotation_offset,
+                )
                 break
         # Early exit if no slot number
         if slot_number is None:

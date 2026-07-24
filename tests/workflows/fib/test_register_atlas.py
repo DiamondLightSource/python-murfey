@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session as SQLAlchemySession
 from sqlmodel import Session as SQLModelSession, select as sm_select
 
 import murfey.util.db as MurfeyDB
+from murfey.util.fib import get_slot_number
 from murfey.workflows.fib.register_atlas import FIBAtlasMetadata, _parse_metadata, run
 from tests.conftest import ExampleVisit
 
@@ -152,8 +153,10 @@ def create_electron_snapshot_metadata(
             0.0003,  # Y
             0.01,  # Z
             -1.309,  # Rotation
+            -75,  # Rotation offset
             0.8,  # Alpha tilt
             0,  # Beta tilt
+            2,  # Expected slot number
             3072,  # Image size X
             2048,  # Y
             1e-6,  # Pixel size X
@@ -171,9 +174,11 @@ def create_electron_snapshot_metadata(
             -0.003,  # Stage X
             0.0003,  # Y
             0.01,  # Z
-            1.309,  # Rotation
+            1.833,  # Rotation
+            -75,  # Rotation offset
             0,  # Alpha tilt
             0,  # Beta tilt
+            2,  # Expected slot number
             3072,  # Image size X
             2048,  # Y
             1e-6,  # Pixel size X
@@ -198,6 +203,8 @@ def test_parse_metadata(
         float,
         float,
         float,
+        float,
+        int,
         int,
         int,
         float,
@@ -219,8 +226,10 @@ def test_parse_metadata(
         pos_y,
         pos_z,
         rotation,
+        rotation_offset,
         tilt_alpha,
         tilt_beta,
+        expected_slot_number,
         pixels_x,
         pixels_y,
         pixel_size_x,
@@ -234,7 +243,6 @@ def test_parse_metadata(
         / image_name
         / f"{image_name}.tiff"
     )
-    slot_number = 1 if pos_x < 0 else 2
 
     # Mock the results of opening an image file
     xml_string = create_electron_snapshot_metadata(
@@ -264,7 +272,7 @@ def test_parse_metadata(
     )
 
     # Run the function and check that output is correct
-    parsed = _parse_metadata(file, visit_name)
+    parsed = _parse_metadata(file, visit_name, rotation_offset)
 
     assert parsed.visit_name == visit_name
     assert parsed.file == file
@@ -283,8 +291,8 @@ def test_parse_metadata(
     assert parsed.pixels_y == pixels_y
     assert parsed.pixel_size_x == pixel_size_x
     assert parsed.pixel_size_y == pixel_size_y
-    assert parsed.slot_number == slot_number
-    assert parsed.site_name == f"{project_name}--slot_{slot_number}"
+    assert parsed.slot_number == expected_slot_number
+    assert parsed.site_name == f"{project_name}--slot_{expected_slot_number}"
     assert parsed.pixel_size == 0.5 * (pixel_size_x + pixel_size_y)
 
 
@@ -299,6 +307,7 @@ def test_run_with_db(
     ispyb_db_session: SQLAlchemySession,
     mock_ispyb_credentials,
 ):
+    rotation_offset = -75
     test_files = (
         visit_dir / "maps/LayersData/Layer/Electron Snapshot/Electron Snapshot.tiff",
         visit_dir
@@ -318,6 +327,19 @@ def test_run_with_db(
 
     murfey_db_session.add(session_entry)
     murfey_db_session.commit()
+
+    # Mock the MachineConfig
+    mock_machine_config = MagicMock(
+        calibrations={
+            "rotation_offset": rotation_offset,
+        }
+    )
+    mocker.patch(
+        "murfey.workflows.fib.register_atlas.get_machine_config",
+        return_value={
+            instrument_name: mock_machine_config,
+        },
+    )
 
     # Mock the ISPyB connection where the TransportManager class is located
     mock_security_config = MagicMock()
@@ -352,25 +374,35 @@ def test_run_with_db(
     # Mock the metadata returned from the image file
     import murfey.workflows.fib.register_atlas
 
+    for test_file in test_files:
+        extracted = {
+            "voltage": 2000,
+            "shift_x": 0,
+            "shift_y": 0,
+            "len_x": 0.003072,
+            "len_y": 0.002048,
+            "pos_x": 0.003,
+            "pos_y": 0.0003,
+            "pos_z": 0.01,
+            "rotation": -1.309,
+            "tilt_alpha": 0.8,
+            "tilt_beta": 0,
+            "pixels_x": 3072,
+            "pixels_y": 2048,
+            "pixel_size_x": 1e-6,
+            "pixel_size_y": 1e-6,
+        }
+        extracted["slot_number"] = get_slot_number(
+            x=extracted["pos_x"],
+            y=extracted["pos_y"],
+            rotation=extracted["rotation"],
+            rotation_offset=rotation_offset,
+        )
     mock_metadata = [
         FIBAtlasMetadata(
             visit_name=visit_name,
             file=test_file,
-            voltage=2000,
-            shift_x=0,
-            shift_y=0,
-            len_x=0.003072,
-            len_y=0.002048,
-            pos_x=0.003,
-            pos_y=0.0003,
-            pos_z=0.01,
-            rotation=-1.309,
-            tilt_alpha=0.8,
-            tilt_beta=0,
-            pixels_x=3072,
-            pixels_y=2048,
-            pixel_size_x=1e-6,
-            pixel_size_y=1e-6,
+            **extracted,
         )
         for test_file in test_files
     ]

@@ -299,7 +299,6 @@ stage_info = {
         "z": 0.0323644854106331,
         "rotation": 285.003247202109,
         "tilt_alpha": 25.9996646026832,
-        "slot_number": 1,
     },
     "chunk_site": {
         "x": -0.0030037500000000003,
@@ -307,7 +306,6 @@ stage_info = {
         "z": 0.032350405092592606,
         "rotation": 285.003247202109,
         "tilt_alpha": -0.000134158926728586,
-        "slot_number": 1,
     },
     "thinning_site": {
         "x": -0.0030037500000000003,
@@ -315,7 +313,6 @@ stage_info = {
         "z": 0.032350405092592606,
         "rotation": 285.003247202109,
         "tilt_alpha": -0.000134158926728586,
-        "slot_number": 1,
     },
     "chunk_coincidence_params": {
         "x": -0.0030048260286678298,
@@ -323,7 +320,6 @@ stage_info = {
         "z": 0.0323400707790533,
         "rotation": 285.003247202109,
         "tilt_alpha": -0.000134158926728586,
-        "slot_number": 1,
     },
     "thinning_params": {
         "x": -0.0030037500000000003,
@@ -331,7 +327,6 @@ stage_info = {
         "z": 0.032350405092592606,
         "rotation": 285.003247202109,
         "tilt_alpha": -0.000134158926728586,
-        "slot_number": 1,
     },
 }
 site_info = {
@@ -369,9 +364,21 @@ def test_run_with_db(
     murfey_db_session.add(session_entry)
     murfey_db_session.commit()
 
+    # Mock the MachineConfig
+    mock_machine_config = MagicMock(
+        calibrations={
+            "rotation_offset": -75,
+        }
+    )
+    mocker.patch(
+        "murfey.workflows.fib.register_milling_progress.get_machine_config",
+        return_value={
+            instrument_name: mock_machine_config,
+        },
+    )
+
     # Mock the ISPyB connection where the TransportManager class is located
-    mock_security_config = MagicMock()
-    mock_security_config.ispyb_credentials = mock_ispyb_credentials
+    mock_security_config = MagicMock(ispyb_credentials=mock_ispyb_credentials)
     mocker.patch(
         "murfey.server.ispyb.get_security_config",
         return_value=mock_security_config,

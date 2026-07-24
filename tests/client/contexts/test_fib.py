@@ -60,6 +60,11 @@ def visit_dir(tmp_path: Path):
     return tmp_path / visit_name
 
 
+@pytest.fixture
+def mock_machine_config():
+    return {"calibrations": {"rotation_offset": -75}}
+
+
 def _create_stage_position_node(stage_values: dict[str, str]):
     stage_position_node = ET.Element("StagePosition")
     for key, value in stage_values.items():
@@ -481,6 +486,7 @@ def test_handle_autotem_metadata(
     test_params: tuple[bool, bool, bool, bool, bool, bool, bool, bool],
     tmp_path: Path,
     visit_dir: Path,
+    mock_machine_config: dict,
 ):
     # Unpack test params
     (
@@ -528,7 +534,7 @@ def test_handle_autotem_metadata(
     context = FIBContext(
         acquisition_software="autotem",
         basepath=basepath,
-        machine_config={},
+        machine_config=mock_machine_config,
         token="",
     )
     if has_drift_correction_images:
@@ -640,6 +646,7 @@ def test_make_drift_correction_gif(
     test_params: tuple[bool, bool, bool, bool, bool, bool, bool],
     tmp_path: Path,
     visit_dir: Path,
+    mock_machine_config: dict,
     fib_autotem_dc_images: list[Path],
 ):
     # Unpack test params
@@ -688,7 +695,7 @@ def test_make_drift_correction_gif(
     context = FIBContext(
         acquisition_software="autotem",
         basepath=basepath,
-        machine_config={},
+        machine_config=mock_machine_config,
         token="",
     )
 
@@ -704,7 +711,11 @@ def test_make_drift_correction_gif(
         if has_stage_position:
             stage_dict: dict[str, dict] = {"preparation_site": {}}
             if has_stage_values:
-                stage_dict["preparation_site"] = {"x": 0.003}
+                stage_dict["preparation_site"] = {
+                    "x": 0.003,
+                    "y": 0.003,
+                    "rotation": -75,
+                }
             metadata_dict["stage_info"] = stage_dict
         if has_site_info:
             context._site_info[lamella_num] = LamellaSiteInfo(**metadata_dict)
@@ -861,6 +872,7 @@ def test_fib_autotem_context(
     mocker: MockerFixture,
     visit_dir: Path,
     test_params: tuple[bool, str],
+    mock_machine_config: dict,
 ):
     # Unpack test params
     is_manual, trigger = test_params
@@ -902,7 +914,7 @@ def test_fib_autotem_context(
     context = FIBContext(
         acquisition_software="autotem",
         basepath=basepath,
-        machine_config={},
+        machine_config=mock_machine_config,
         token="",
     )
 
@@ -936,6 +948,7 @@ def test_fib_maps_context(
     mocker: MockerFixture,
     tmp_path: Path,
     visit_dir: Path,
+    mock_machine_config: dict,
     fib_maps_images: list[Path],
 ):
     # Mock the environment
@@ -961,7 +974,7 @@ def test_fib_maps_context(
     context = FIBContext(
         acquisition_software="maps",
         basepath=basepath,
-        machine_config={},
+        machine_config=mock_machine_config,
         token="",
     )
 
