@@ -1,10 +1,11 @@
 import logging
+import math
 import traceback
 import xml.etree.ElementTree as ET
 from functools import cached_property
 from importlib.metadata import entry_points
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import PIL.Image
@@ -12,7 +13,8 @@ from pydantic import BaseModel, computed_field, model_validator
 from sqlmodel import Session, select
 
 import murfey.util.db as MurfeyDB
-from murfey.util.fib import number_from_name
+from murfey.util.config import get_machine_config
+from murfey.util.fib import get_slot_number, number_from_name
 
 logger = logging.getLogger("murfey.workflows.fib.register_atlas")
 
@@ -39,6 +41,7 @@ class FIBAtlasMetadata(BaseModel):
     pos_y: float
     pos_z: float
     rotation: float  # Radians
+    slot_number: int
     tilt_alpha: float  # Radians
     tilt_beta: float  # Radians
     # Image dimensions
@@ -69,17 +72,6 @@ class FIBAtlasMetadata(BaseModel):
     # mypy doesn't support decorators on @property
     @computed_field  # type: ignore
     @cached_property
-    def slot_number(self) -> int:
-        """
-        Decide on a slot number for the site being inspected. From observation,
-        the x-position is entirely negative for one slot and entirely positive
-        for the other.
-        """
-        return 1 if self.pos_x < 0 else 2
-
-    # mypy doesn't support decorators on @property
-    @computed_field  # type: ignore
-    @cached_property
     def project_name(self) -> str:
         """
         Extract the project name from the file path. This assumes a specific
@@ -100,7 +92,7 @@ class FIBAtlasMetadata(BaseModel):
         return f"{self.project_name}--slot_{self.slot_number}"
 
 
-def _parse_metadata(file: Path, visit_name: str):
+def _parse_metadata(file: Path, visit_name: str, rotation_offset: float):
     """
     Parses through the atlas image's tags to extract the relevant metadata
     """
@@ -127,31 +119,38 @@ def _parse_metadata(file: Path, visit_name: str):
         raise ValueError(f"Could not find required metadata in file {file}")
 
     # Extract key values from metadata
+    extracted: dict[str, Any] = {
+        key: node.text if (node := xml_metadata.find(node_path)) is not None else None
+        for key, node_path in (
+            ("voltage", ".//Optics/AccelerationVoltage"),
+            ("shift_x", ".//Optics/BeamShift/X"),
+            ("shift_y", ".//Optics/BeamShift/Y"),
+            ("len_x", ".//Optics/ScanFieldOfView/X"),
+            ("len_y", ".//Optics/ScanFieldOfView/Y"),
+            ("pos_x", ".//StageSettings/StagePosition/X"),
+            ("pos_y", ".//StageSettings/StagePosition/Y"),
+            ("pos_z", ".//StageSettings/StagePosition/Z"),
+            ("rotation", ".//StageSettings/StagePosition/Rotation"),
+            ("tilt_alpha", ".//StageSettings/StagePosition/Tilt/Alpha"),
+            ("tilt_beta", ".//StageSettings/StagePosition/Tilt/Beta"),
+            ("pixels_x", ".//BinaryResult/ImageSize/X"),
+            ("pixels_y", ".//BinaryResult/ImageSize/Y"),
+            ("pixel_size_x", ".//BinaryResult/PixelSize/X"),
+            ("pixel_size_y", ".//BinaryResult/PixelSize/Y"),
+        )
+    }
+    # Calculate the slot number
+    extracted["slot_number"] = get_slot_number(
+        x=float(extracted["pos_x"]),
+        y=float(extracted["pos_y"]),
+        rotation=math.degrees(float(extracted["rotation"])),
+        rotation_offset=rotation_offset,
+    )
+    # Return the parsed Pydantic model
     return FIBAtlasMetadata(
         visit_name=visit_name,
         file=file,
-        **{
-            key: node.text
-            if (node := xml_metadata.find(node_path)) is not None
-            else None
-            for key, node_path in (
-                ("voltage", ".//Optics/AccelerationVoltage"),
-                ("shift_x", ".//Optics/BeamShift/X"),
-                ("shift_y", ".//Optics/BeamShift/Y"),
-                ("len_x", ".//Optics/ScanFieldOfView/X"),
-                ("len_y", ".//Optics/ScanFieldOfView/Y"),
-                ("pos_x", ".//StageSettings/StagePosition/X"),
-                ("pos_y", ".//StageSettings/StagePosition/Y"),
-                ("pos_z", ".//StageSettings/StagePosition/Z"),
-                ("rotation", ".//StageSettings/StagePosition/Rotation"),
-                ("tilt_alpha", ".//StageSettings/StagePosition/Tilt/Alpha"),
-                ("tilt_beta", ".//StageSettings/StagePosition/Tilt/Beta"),
-                ("pixels_x", ".//BinaryResult/ImageSize/X"),
-                ("pixels_y", ".//BinaryResult/ImageSize/Y"),
-                ("pixel_size_x", ".//BinaryResult/PixelSize/X"),
-                ("pixel_size_y", ".//BinaryResult/PixelSize/Y"),
-            )
-        },
+        **extracted,
     )
 
 
@@ -364,6 +363,7 @@ def run(
                 )
             ).one()
             visit_name = murfey_session.visit
+            instrument_name = murfey_session.instrument_name
         except Exception:
             logger.error(
                 "Exception encountered while querying Murfey database", exc_info=True
@@ -371,8 +371,18 @@ def run(
             return {"success": False, "requeue": False}
 
         try:
+            # Load the machine config
+            machine_config = get_machine_config(instrument_name)[instrument_name]
+            rotation_offset: float = cast(
+                float, machine_config.calibrations.get("rotation_offset", 0)
+            )
+
             # Extract metadata from Electron Snapshot image
-            metadata = _parse_metadata(fib_info.atlas_file, visit_name)
+            metadata = _parse_metadata(
+                fib_info.atlas_file,
+                visit_name=visit_name,
+                rotation_offset=rotation_offset,
+            )
         except Exception:
             logger.error(
                 f"Error extracting metadata from file {fib_info.atlas_file}",
