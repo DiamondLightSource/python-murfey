@@ -5,8 +5,6 @@ General functinos specific to the FIB workflow
 import math
 from pathlib import Path
 
-from murfey.util.models import StagePositionValues
-
 
 def number_from_name(name: str) -> int:
     """
@@ -32,16 +30,17 @@ def number_from_name(name: str) -> int:
     return 1
 
 
-def get_slot_number(stage_values: StagePositionValues, rotation_offset: float = -75):
-    if (
-        stage_values.x is not None
-        and stage_values.y is not None
-        and stage_values.rotation is not None
-    ):
+def get_slot_number(
+    x: float | None = None,
+    y: float | None = None,
+    rotation: float | None = None,
+    rotation_offset: float = -75,
+):
+    if x is not None and y is not None and rotation is not None:
         # Rotate the xy-coordinates to the -75 degrees frame
-        theta = math.radians(stage_values.rotation - rotation_offset)
+        theta = math.radians(rotation - rotation_offset)
         sin = math.sin(theta)
         cos = math.cos(theta)
-        x_rot = (stage_values.x * cos) - (stage_values.y * sin)
+        x_rot = (x * cos) - (y * sin)
         return 1 if x_rot < 0 else 2
     return None
