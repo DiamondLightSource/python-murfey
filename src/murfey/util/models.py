@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, computed_field, field_validator
+from pydantic import BaseModel, field_validator
 
 """
 =======================================================================================
@@ -109,32 +109,32 @@ class StagePositionValues(BaseModel):
     rotation: float | None = None
     tilt_alpha: float | None = None
 
-    @computed_field
-    def slot_number(self) -> int | None:
-        """
-        In the Aquilos, -75 degrees is the stage rotation value when the sample grid is
-        facing the electron and ion beam guns, and the plane formed by the two guns is
-        normal to the surface of the sample grid.
+    # @computed_field
+    # def slot_number(self) -> int | None:
+    #     """
+    #     In the Aquilos, -75 degrees is the stage rotation value when the sample grid is
+    #     facing the electron and ion beam guns, and the plane formed by the two guns is
+    #     normal to the surface of the sample grid.
 
-        The xyz values recorded represent the stage position that brings the imaged
-        region into focus. At a rotation of -75 degrees, a negative x-value corresponds
-        to Slot 1, while a positive one corresponds to Slot 2.
+    #     The xyz values recorded represent the stage position that brings the imaged
+    #     region into focus. At a rotation of -75 degrees, a negative x-value corresponds
+    #     to Slot 1, while a positive one corresponds to Slot 2.
 
-        The xy values that keep a particular point on the grid at the euncentric focus
-        under the electron and ion beams will change based on the stage rotation. This
-        means that a transformation matrix will need to be applied to estimate the
-        x-value of the region when the stage rotation is at -75 degrees. The correct
-        slot number can then be determined from there.
-        """
-        if self.x is not None and self.y is not None and self.rotation is not None:
-            # Rotate the xy-coordinates to the -75 degrees frame
-            theta = math.radians(self.rotation + 75)
-            sin = math.sin(theta)
-            cos = math.cos(theta)
-            x_rot = (self.x * cos) - (self.y * sin)
-            return 1 if x_rot < 0 else 2
-        # return 1 if self.x < 0 else 2
-        return None
+    #     The xy values that keep a particular point on the grid at the euncentric focus
+    #     under the electron and ion beams will change based on the stage rotation. This
+    #     means that a transformation matrix will need to be applied to estimate the
+    #     x-value of the region when the stage rotation is at -75 degrees. The correct
+    #     slot number can then be determined from there.
+    #     """
+    #     if self.x is not None and self.y is not None and self.rotation is not None:
+    #         # Rotate the xy-coordinates to the -75 degrees frame
+    #         theta = math.radians(self.rotation + 75)
+    #         sin = math.sin(theta)
+    #         cos = math.cos(theta)
+    #         x_rot = (self.x * cos) - (self.y * sin)
+    #         return 1 if x_rot < 0 else 2
+    #     # return 1 if self.x < 0 else 2
+    #     return None
 
 
 class StagePositionInfo(BaseModel):
