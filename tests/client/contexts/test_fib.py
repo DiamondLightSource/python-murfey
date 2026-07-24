@@ -13,9 +13,11 @@ from murfey.client.contexts.fib import (
     FIBContext,
     FIBImage,
     _file_transferred_to,
+    _get_project_name,
     _get_source,
     _parse_boolean,
 )
+from murfey.util.fib import number_from_name
 from murfey.util.models import LamellaSiteInfo
 
 # Mock session values
@@ -467,29 +469,27 @@ def test_file_transferred_to(
     "test_params",
     (
         # Pass cases
-        (True, True, True, True, True, True, True, True, True),  # DC images
-        (True, True, True, True, True, True, True, True, False),  # No DC images
+        (True, True, True, True, True, True, True, True),  # DC images
+        (True, True, True, True, True, True, True, False),  # No DC images
         # Only one of these, and the last one, should be False at a given time
-        (True, True, True, True, True, True, True, False, False),  # No activity name
-        (True, True, True, True, True, True, False, True, False),  # No activity
-        (True, True, True, True, True, False, True, True, False),  # No recipe name
-        (True, True, True, True, False, True, True, True, False),  # No recipe
-        (True, True, True, False, True, True, True, True, False),  # No site name
-        (True, True, False, True, True, True, True, True, False),  # No sites
-        (True, False, True, True, True, True, True, True, False),  # No project name
-        (False, True, True, True, True, True, True, True, False),  # No environment
+        (True, True, True, True, True, True, False, False),  # No activity name
+        (True, True, True, True, True, False, True, False),  # No activity content
+        (True, True, True, True, False, True, True, False),  # No recipe name
+        (True, True, True, False, True, True, True, False),  # No recipe content
+        (True, True, False, True, True, True, True, False),  # No site name
+        (True, False, True, True, True, True, True, False),  # No site contents
+        (False, True, True, True, True, True, True, False),  # No project name
     ),
 )
-def test_fib_full_autotem_context_projectdata(
+def test_handle_autotem_metadata(
     mocker: MockerFixture,
-    test_params: tuple[bool, bool, bool, bool, bool, bool, bool, bool, bool],
+    test_params: tuple[bool, bool, bool, bool, bool, bool, bool, bool],
     tmp_path: Path,
     visit_dir: Path,
     mock_machine_config: dict,
 ):
     # Unpack test params
     (
-        has_environment,
         has_project_name,
         has_sites,
         has_site_name,
@@ -501,46 +501,19 @@ def test_fib_full_autotem_context_projectdata(
     ) = test_params
 
     # Mock the environment
-    mock_environment = None
-    if has_environment:
-        mock_environment = MagicMock()
-        mock_environment.visit = visit_name
+    mock_environment = MagicMock()
+    mock_environment.visit = visit_name
 
     # Mock the logger to check that specific logs are called
     mock_logger = mocker.patch("murfey.client.contexts.fib.logger")
 
-    # Mock '_get_source'
-    mock_get_source = mocker.patch("murfey.client.contexts.fib._get_source")
-    mock_get_source.return_value = tmp_path
-
-    # Mock '_file_transferred_to'
-    mock_file_transferred_to = mocker.patch(
-        "murfey.client.contexts.fib._file_transferred_to"
-    )
-    mock_file_transferred_to.return_value = (
-        tmp_path
-        / "fib"
-        / "data"
-        / "current_year"
-        / visit_name
-        / "autotem"
-        / project_name
-        / "ProjectData.dat"
-    )
-    # Set the expected output directory to be derived from metadata
-    output_dir = (
-        tmp_path
-        / "fib"
-        / "data"
-        / "current_year"
-        / visit_name
-        / "processed"
-        / project_name
-        / "grid_2"
-    )
-
     # Mock the functions used in 'post_transfer'
     mock_capture_post = mocker.patch("murfey.client.contexts.fib.capture_post")
+
+    # Mock the '_make_drift_correction_gif' class function
+    mock_drift_correction_gif = mocker.patch(
+        "murfey.client.contexts.fib.FIBContext._make_drift_correction_gif"
+    )
 
     # Create the mock metadata file to parse
     mock_projectdata = create_fib_autotem_project_data(
@@ -574,12 +547,11 @@ def test_fib_full_autotem_context_projectdata(
             )
 
     # Run 'post_transfer' and check for expected calls and outputs
-    context.post_transfer(mock_projectdata, environment=mock_environment)
+    context._handle_autotem_metadata(mock_projectdata, environment=mock_environment)
 
     # Check the success case
     if all(
         (
-            has_environment,
             has_project_name,
             has_sites,
             has_site_name,
@@ -589,11 +561,6 @@ def test_fib_full_autotem_context_projectdata(
             has_activity_name,
         )
     ):
-        # 'capture_post' should be called once when registering the site
-        # and again if registering a drift correction image
-        assert mock_capture_post.call_count == num_lamellae * (
-            2 if has_drift_correction_images else 1
-        )
         # There should be one dictionary entry for each lamella now
         assert len(context._site_info) == num_lamellae
         for i in range(num_lamellae):
@@ -610,30 +577,17 @@ def test_fib_full_autotem_context_projectdata(
             mock_logger.info.assert_any_call(
                 f"Updating metadata for site {lamella_number}"
             )
-
+            # If drift correction images are present, it should also call the next function
             if has_drift_correction_images:
-                mock_capture_post.assert_any_call(
-                    base_url=mock.ANY,
-                    router_name="workflow_fib.router",
-                    function_name="make_gif",
-                    token=mock.ANY,
-                    instrument_name=mock.ANY,
-                    data={
-                        "lamella_number": lamella_number,
-                        "images": [str(tmp_path / "dummy.png")],
-                        "output_file": str(
-                            output_dir
-                            / "drift_correction"
-                            / f"lamella_{lamella_number}.gif"
-                        ),
-                    },
-                    session_id=mock.ANY,
+                mock_drift_correction_gif.assert_any_call(
+                    context._drift_correction_images[lamella_number].images[-1],
+                    mock_environment,
+                    is_destination_file=True,
                 )
+
+    # These test parameters are related, with one being False at a time
     # These fail cases will return an empty dict and not call "post_transfer"
-    if not has_environment:
-        mock_logger.warning.assert_called_with("No environment passed in")
-        mock_capture_post.assert_not_called()
-    elif not has_project_name:
+    if not has_project_name:
         mock_logger.warning.assert_called_with("Metadata file has no project name")
         mock_capture_post.assert_not_called()
     elif not has_sites:
@@ -675,26 +629,19 @@ def test_fib_full_autotem_context_projectdata(
 @pytest.mark.parametrize(
     "test_params",
     (
-        # Early exits
-        # No MurfeyInstanceEnvironment
-        (False, True, True, True, True, True, True),
-        # No source
-        (True, False, True, True, True, True, True),
-        # No destination
-        (True, True, False, True, True, True, True),
-        # No site info
-        (True, True, True, False, True, True, True),
-        # No project name
-        (True, True, True, True, False, True, True),
-        # No stage position
-        (True, True, True, True, True, False, True),
-        # No stage position values
-        (True, True, True, True, True, True, False),
         # Successful case
-        (True, True, True, True, True, True, True),
+        (True, True, True, True, True, True, True),  # Using destination file path
+        (True, True, True, True, True, True, False),  # Using client-side file path
+        # Early exits
+        (False, True, True, True, True, True, False),  # No source
+        (True, False, True, True, True, True, False),  # No destination
+        (True, True, False, True, True, True, False),  # No site info
+        (True, True, True, False, True, True, False),  # No project name
+        (True, True, True, True, False, True, False),  # No stage position
+        (True, True, True, True, True, False, False),  # No stage position values
     ),
 )
-def test_fib_full_autotem_context_drift_correction_images(
+def test_make_drift_correction_gif(
     mocker: MockerFixture,
     test_params: tuple[bool, bool, bool, bool, bool, bool, bool],
     tmp_path: Path,
@@ -704,20 +651,21 @@ def test_fib_full_autotem_context_drift_correction_images(
 ):
     # Unpack test params
     (
-        use_env,
         find_source,
         find_dst,
         has_site_info,
         has_project_name,
         has_stage_position,
         has_stage_values,
+        use_destination_file,
     ) = test_params
 
     # Mock the environment
-    mock_environment = None
-    if use_env:
-        mock_environment = MagicMock()
-        mock_environment.visit = visit_name
+    mock_environment = MagicMock()
+    mock_environment.visit = visit_name
+    mock_environment.url.geturl.return_value = "dummy"
+    mock_environment.instrument_name = "dummy"
+    mock_environment.murfey_session = 1
 
     # Mock the logger to check if specific logs are triggered
     mock_logger = mocker.patch("murfey.client.contexts.fib.logger")
@@ -772,45 +720,24 @@ def test_fib_full_autotem_context_drift_correction_images(
         if has_site_info:
             context._site_info[lamella_num] = LamellaSiteInfo(**metadata_dict)
 
-    # Parse images one-by-one and check that expected calls were made
-    for file in fib_autotem_dc_images:
-        context.post_transfer(file, environment=mock_environment)
-    if not use_env:
-        mock_logger.warning.assert_called_with("No environment passed in")
-    elif not find_source:
-        mock_logger.warning.assert_called_with(f"No source found for file {file}")
-    elif not find_dst:
-        mock_logger.warning.assert_called_with(
-            f"Could not find destination file path for {file.name!r}"
-        )
-    elif not has_site_info:
-        mock_logger.debug.assert_called_with(
-            f"No metadata found for site {lamella_num} yet"
-        )
-    elif not has_project_name:
-        mock_logger.warning.assert_any_call(
-            f"No project name associated with site {lamella_num}"
-        )
-    elif not has_stage_position:
-        mock_logger.warning.assert_any_call(
-            f"No stage position information associated with site {lamella_num}"
-        )
-    elif not has_stage_values:
-        mock_logger.warning.assert_any_call(
-            f"Could not determine slot number of site {lamella_num}"
-        )
-    else:
-        mock_get_source.assert_called_with(file, mock_environment)
-        mock_file_transferred_to.assert_called_with(
-            environment=mock_environment,
-            source=basepath,
-            file_path=file,
-            rsync_basepath=Path(""),
-        )
-        assert len(context._drift_correction_images) == num_lamellae
+    # Run test and checks differently depending on input file type
+    if use_destination_file:
+        for file in destination_files:
+            # Find which lamella site it corresponds to
+            lamella_dir = file.relative_to(
+                destination_dir / "autotem" / "visit" / "Sites"
+            )
+            lamella_num = number_from_name(lamella_dir.parts[0])
 
-        for i in range(num_lamellae):
-            lamella_num = i + 1
+            # Store destination file under corresponding site
+            if not context._drift_correction_images.get(lamella_num):
+                context._drift_correction_images[lamella_num] = FIBImage(images=[file])
+            else:
+                context._drift_correction_images[lamella_num].images.append(file)
+            context._make_drift_correction_gif(
+                file, mock_environment, is_destination_file=True
+            )
+
             # The output file should point to 'grid_2' for a positive x stage position
             output_file = (
                 tmp_path
@@ -824,34 +751,163 @@ def test_fib_full_autotem_context_drift_correction_images(
                 / "drift_correction"
                 / f"lamella_{lamella_num}.gif"
             )
-            assert (
-                context._drift_correction_images[lamella_num].output_file == output_file
+
+            # Check it made its way through to 'capture_post'
+            mock_capture_post.assert_any_call(
+                base_url="dummy",
+                router_name="workflow_fib.router",
+                function_name="make_gif",
+                token=context._token,
+                instrument_name="dummy",
+                data={
+                    "lamella_number": lamella_num,
+                    "images": [
+                        str(file)
+                        for file in context._drift_correction_images[lamella_num].images
+                    ],
+                    "output_file": str(output_file),
+                },
+                session_id=1,
             )
-        # 'capture_post' should be called for every image
+
+        # 'capture_post' should have been called for each file
         assert mock_capture_post.call_count == len(destination_files)
+    else:
+        # Parse images one-by-one and check that expected calls were made
+        for file in fib_autotem_dc_images:
+            context._make_drift_correction_gif(file, mock_environment)
+
+        # For the fail cases, check that the correct log was called
+        if not find_source:
+            mock_logger.warning.assert_called_with(f"No source found for file {file}")
+            mock_capture_post.assert_not_called()
+        elif not find_dst:
+            mock_logger.warning.assert_called_with(
+                f"Could not find destination file path for {file.name!r}"
+            )
+            mock_capture_post.assert_not_called()
+        elif not has_site_info:
+            mock_logger.debug.assert_called_with(
+                f"No metadata found for site {lamella_num} yet"
+            )
+            mock_capture_post.assert_not_called()
+        elif not has_project_name:
+            mock_logger.warning.assert_any_call(
+                f"No project name associated with site {lamella_num}"
+            )
+            mock_capture_post.assert_not_called()
+        elif not has_stage_position:
+            mock_logger.warning.assert_any_call(
+                f"No stage position information associated with site {lamella_num}"
+            )
+            mock_capture_post.assert_not_called()
+        elif not has_stage_values:
+            mock_logger.warning.assert_any_call(
+                f"Could not determine slot number of site {lamella_num}"
+            )
+            mock_capture_post.assert_not_called()
+        else:
+            mock_get_source.assert_called_with(file, mock_environment)
+            mock_file_transferred_to.assert_called_with(
+                environment=mock_environment,
+                source=basepath,
+                file_path=file,
+                rsync_basepath=Path(""),
+            )
+            assert len(context._drift_correction_images) == num_lamellae
+
+            for i in range(num_lamellae):
+                lamella_num = i + 1
+
+                # The output file should point to 'grid_2' for a positive x stage position
+                output_file = (
+                    tmp_path
+                    / "fib"
+                    / "data"
+                    / "current_year"
+                    / visit_name
+                    / "processed"
+                    / project_name
+                    / "grid_2"
+                    / "drift_correction"
+                    / f"lamella_{lamella_num}.gif"
+                )
+
+                # Check it made its way through to 'capture_post'
+                mock_capture_post.assert_any_call(
+                    base_url="dummy",
+                    router_name="workflow_fib.router",
+                    function_name="make_gif",
+                    token=context._token,
+                    instrument_name="dummy",
+                    data={
+                        "lamella_number": lamella_num,
+                        "images": [
+                            str(file)
+                            for file in context._drift_correction_images[
+                                lamella_num
+                            ].images
+                        ],
+                        "output_file": str(output_file),
+                    },
+                    session_id=1,
+                )
+                assert (
+                    context._drift_correction_images[lamella_num].output_file
+                    == output_file
+                )
+            # 'capture_post' should be called for every image
+            assert mock_capture_post.call_count == len(destination_files)
 
 
-def test_fib_manual_autotem_context_projectdata(
+@pytest.mark.parametrize(
+    "test_params",
+    (  # Manual or automated? | Identifier
+        (True, "Sites/Site #1/DCImages/dummy.png"),
+        (True, "Sites/Site #1/LamellaEvaluationImages/dummy.png"),
+        (False, "Sites/Lamella/DCImages/dummy.png"),
+    ),
+)
+def test_fib_autotem_context(
     mocker: MockerFixture,
     visit_dir: Path,
+    test_params: tuple[bool, str],
     mock_machine_config: dict,
 ):
-    # Mock the ProjectData.dat file
-    mock_projectdata = create_fib_autotem_project_data(
-        visit_dir=visit_dir,
-        project_name=f"AutoTEM_200101-1200_{project_name}",
-        site_prefix="Site",
-    )
+    # Unpack test params
+    is_manual, trigger = test_params
+
+    # Create list of files to pass through to FIBContext
+    if is_manual:
+        projects = [
+            visit_dir / path
+            for path in (  # ProjectData.dat will be recorded and stored
+                f"autotem/AutoTEM_201231-1230_{visit_name}_waffle1/ProjectData.dat",
+                f"autotem/AutoTEM_201231-1230_{visit_name}_waffle2/ProjectData.dat",
+                f"autotem/AutoTEM_201231-1230_{visit_name}_waffle3/ProjectData.dat",
+                f"autotem/AutoTEM_201231-1230_{visit_name}_waffle4/ProjectData.dat",
+            )
+        ]
+        target_project = (
+            visit_dir
+            / f"autotem/AutoTEM_201231-1230_{visit_name}_waffle5/ProjectData.dat"
+        )
+        trigger_file = (
+            visit_dir / f"autotem/AutoTEM_201231-1230_{visit_name}_waffle5/{trigger}"
+        )
+    else:
+        projects = []
+        target_project = visit_dir / f"autotem/{visit_name}/ProjectData.dat"
+        trigger_file = visit_dir / f"autotem/{visit_name}/{trigger}"
 
     # Mock the Murfey environment
     mock_environment = MagicMock()
-    mock_environment.visit = visit_name
-
-    # Patch the '_parse_autotem_metadata' class function
-    mock_parse = mocker.patch.object(FIBContext, "_parse_autotem_metadata")
 
     # Mock the functions used in 'post_transfer'
-    mock_capture_post = mocker.patch("murfey.client.contexts.fib.capture_post")
+    mock_handle_metadata = mocker.patch.object(FIBContext, "_handle_autotem_metadata")
+    mock_drift_correction_gif = mocker.patch.object(
+        FIBContext, "_make_drift_correction_gif"
+    )
 
     # Initialise the FIBContext
     basepath = visit_dir
@@ -862,10 +918,30 @@ def test_fib_manual_autotem_context_projectdata(
         token="",
     )
 
-    # Pass file to FIBContext and check that it behaves as expected
-    context.post_transfer(mock_projectdata, environment=mock_environment)
-    mock_parse.assert_not_called()
-    mock_capture_post.assert_not_called()
+    # Pass files to FIBContext and check that it behaves as expected
+    for file in [*projects, target_project]:
+        if not file.exists():
+            file.parent.mkdir(parents=True)
+            file.touch()
+        context.post_transfer(file, environment=mock_environment)
+    # All the ProjectData files should have been noted
+    assert len(context._project_data) == len(projects) + 1
+
+    # Pass the trigger file in
+    context.post_transfer(trigger_file, mock_environment)
+    # If a DCImage was used, '_make_drift_correction_gif' should be called
+    if "DCImages" in trigger_file.parts:
+        mock_drift_correction_gif.assert_called_with(trigger_file, mock_environment)
+    # Target project will have been identified
+    assert _get_project_name(target_project) in context._target_projects
+    # '_handle_metadata' will have been called
+    mock_handle_metadata.assert_called_with(target_project, mock_environment)
+
+    # Create a dummy 'site_info' entry and parse "ProjectData.dat"
+    context._site_info[1] = LamellaSiteInfo()
+    context.post_transfer(target_project, mock_environment)
+    # '_handle_metadata' should now be called normally
+    mock_handle_metadata.assert_called_with(target_project, mock_environment)
 
 
 def test_fib_maps_context(
