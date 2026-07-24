@@ -545,7 +545,10 @@ class FIBContext(Context):
                     ),
                 )
                 slot_number = get_slot_number(
-                    stage_values, rotation_offset=rotation_offset
+                    x=stage_values.x,
+                    y=stage_values.y,
+                    rotation=stage_values.rotation,
+                    rotation_offset=rotation_offset,
                 )
                 break
         # Early exit if no slot number
