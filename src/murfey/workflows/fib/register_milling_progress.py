@@ -3,12 +3,14 @@ from __future__ import annotations
 import json
 import logging
 from importlib.metadata import entry_points
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from sqlmodel import Session as SQLModelSession, select
 
 import murfey.util.db as MurfeyDB
 from murfey.server import _transport_object
+from murfey.util.config import get_machine_config
+from murfey.util.fib import get_slot_number
 from murfey.util.models import (
     GridSquareParameters,
     LamellaSiteInfo,
@@ -344,10 +346,6 @@ def run(message: dict[str, Any], murfey_db: SQLModelSession):
             "Could not construct lookup tags; no stage position information found"
         )
         return {"success": False, "requeue": False}
-    if latest_stage_position.slot_number is None:
-        logger.error("Could not construct lookup tags; 'slot_number' is missing")
-        return {"success": False, "requeue": False}
-    slot_number = latest_stage_position.slot_number
 
     # Milling step information
     if site_info.steps is None:
@@ -364,6 +362,20 @@ def run(message: dict[str, Any], murfey_db: SQLModelSession):
             ).one()
             visit_name = murfey_session.visit
             instrument_name = murfey_session.instrument_name
+
+            # Load the machine config
+            machine_config = get_machine_config(instrument_name)[instrument_name]
+            rotation_offset = cast(
+                float, machine_config.calibrations.get("rotation_offset", 0)
+            )
+
+            # Calculate the slot number
+            slot_number = get_slot_number(latest_stage_position, rotation_offset)
+            if slot_number is None:
+                logger.error(
+                    "Could not construct lookup tags; 'slot_number' is missing"
+                )
+                return {"success": False, "requeue": False}
         except Exception:
             logger.error(
                 "Exception encountered while querying Murfey database", exc_info=True
