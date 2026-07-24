@@ -322,6 +322,19 @@ def test_run_with_db(
     murfey_db_session.add(session_entry)
     murfey_db_session.commit()
 
+    # Mock the MachineConfig
+    mock_machine_config = MagicMock(
+        calibrations={
+            "rotation_offset": -75,
+        }
+    )
+    mocker.patch(
+        "murfey.workflows.fib.register_atlas.get_machine_config",
+        return_value={
+            instrument_name: mock_machine_config,
+        },
+    )
+
     # Mock the ISPyB connection where the TransportManager class is located
     mock_security_config = MagicMock()
     mock_security_config.ispyb_credentials = mock_ispyb_credentials
