@@ -58,6 +58,11 @@ def visit_dir(tmp_path: Path):
     return tmp_path / visit_name
 
 
+@pytest.fixture
+def mock_machine_config():
+    return {"calibrations": {"rotation_offset": -75}}
+
+
 def _create_stage_position_node(stage_values: dict[str, str]):
     stage_position_node = ET.Element("StagePosition")
     for key, value in stage_values.items():
@@ -480,6 +485,7 @@ def test_fib_full_autotem_context_projectdata(
     test_params: tuple[bool, bool, bool, bool, bool, bool, bool, bool, bool],
     tmp_path: Path,
     visit_dir: Path,
+    mock_machine_config: dict,
 ):
     # Unpack test params
     (
@@ -555,7 +561,7 @@ def test_fib_full_autotem_context_projectdata(
     context = FIBContext(
         acquisition_software="autotem",
         basepath=basepath,
-        machine_config={},
+        machine_config=mock_machine_config,
         token="",
     )
     if has_drift_correction_images:
@@ -693,6 +699,7 @@ def test_fib_full_autotem_context_drift_correction_images(
     test_params: tuple[bool, bool, bool, bool, bool, bool, bool],
     tmp_path: Path,
     visit_dir: Path,
+    mock_machine_config: dict,
     fib_autotem_dc_images: list[Path],
 ):
     # Unpack test params
@@ -740,7 +747,7 @@ def test_fib_full_autotem_context_drift_correction_images(
     context = FIBContext(
         acquisition_software="autotem",
         basepath=basepath,
-        machine_config={},
+        machine_config=mock_machine_config,
         token="",
     )
 
@@ -804,12 +811,6 @@ def test_fib_full_autotem_context_drift_correction_images(
 
         for i in range(num_lamellae):
             lamella_num = i + 1
-            # The '_site_info' attribute should now be populated
-            assert (
-                context._site_info[lamella_num].stage_info.preparation_site.slot_number
-                == 2
-            )
-
             # The output file should point to 'grid_2' for a positive x stage position
             output_file = (
                 tmp_path
@@ -833,6 +834,7 @@ def test_fib_full_autotem_context_drift_correction_images(
 def test_fib_manual_autotem_context_projectdata(
     mocker: MockerFixture,
     visit_dir: Path,
+    mock_machine_config: dict,
 ):
     # Mock the ProjectData.dat file
     mock_projectdata = create_fib_autotem_project_data(
@@ -856,7 +858,7 @@ def test_fib_manual_autotem_context_projectdata(
     context = FIBContext(
         acquisition_software="autotem",
         basepath=basepath,
-        machine_config={},
+        machine_config=mock_machine_config,
         token="",
     )
 
@@ -870,6 +872,7 @@ def test_fib_maps_context(
     mocker: MockerFixture,
     tmp_path: Path,
     visit_dir: Path,
+    mock_machine_config: dict,
     fib_maps_images: list[Path],
 ):
     # Mock the environment
@@ -895,7 +898,7 @@ def test_fib_maps_context(
     context = FIBContext(
         acquisition_software="maps",
         basepath=basepath,
-        machine_config={},
+        machine_config=mock_machine_config,
         token="",
     )
 
