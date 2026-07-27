@@ -290,6 +290,27 @@ class FIBContext(Context):
                 ):
                     self._make_drift_correction_gif(transferred_file, environment)
                     return None
+                # Register lamella evaluation images
+                elif (
+                    "LamellaEvaluationImages" in transferred_file.parts
+                    and transferred_file.suffix == ".png"
+                ):
+                    source = _get_source(transferred_file, environment)
+                    if source is None:
+                        logger.warning(f"No source found for file {transferred_file}")
+                        return None
+                    destination_file = _file_transferred_to(
+                        environment=environment,
+                        source=source,
+                        file_path=transferred_file,
+                        rsync_basepath=Path(
+                            self._machine_config.get("rsync_basepath", "")
+                        ),
+                    )
+                    self._register_lamella_evaluation_image(
+                        destination_file, environment
+                    )
+                    return None
 
         # -----------------------------------------------------------------------------
         # Maps
@@ -649,6 +670,34 @@ class FIBContext(Context):
             return True
         except Exception:
             logger.error(f"Could not submit GIF for site {lamella_number}")
+            return False
+
+    def _register_lamella_evaluation_image(
+        self,
+        file: Path,
+        environment: MurfeyInstanceEnvironment,
+    ):
+        """
+        Helper function to construct and submit a POST request to the backend register
+        a lamella evaluation image with.
+        """
+        try:
+            capture_post(
+                base_url=str(environment.url.geturl()),
+                router_name="workflow_fib.router",
+                function_name="register_lamella_evaluation_image",
+                token=self._token,
+                instrument_name=environment.instrument_name,
+                data={"file": str(file)},
+                # Endpoint kwargs
+                session_id=environment.murfey_session,
+            )
+            logger.info(f"Registering lamella evaluation image {file.name!r}")
+            return True
+        except Exception as e:
+            logger.error(
+                f"Error encountered registering lamella evaluation image {file.name}:\n{e}"
+            )
             return False
 
     def _register_atlas(self, file: Path, environment: MurfeyInstanceEnvironment):
