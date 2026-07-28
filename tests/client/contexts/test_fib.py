@@ -1040,8 +1040,13 @@ def test_fib_autotem_context(
     mock_handle_metadata.assert_called_with(target_project, mock_environment)
 
 
+@pytest.mark.parametrize(
+    "has_source",
+    (True, False),
+)
 def test_fib_maps_context(
     mocker: MockerFixture,
+    has_source: bool,
     tmp_path: Path,
     visit_dir: Path,
     mock_machine_config: dict,
@@ -1058,10 +1063,12 @@ def test_fib_maps_context(
 
     # Mock the functions used in 'post_transfer'
     mock_get_source = mocker.patch(
-        "murfey.client.contexts.fib._get_source", return_value=tmp_path
+        "murfey.client.contexts.fib._get_source",
+        return_value=tmp_path if has_source else None,
     )
     mock_file_transferred_to = mocker.patch(
-        "murfey.client.contexts.fib._file_transferred_to", side_effect=destination_files
+        "murfey.client.contexts.fib._file_transferred_to",
+        side_effect=destination_files,
     )
     mock_capture_post = mocker.patch("murfey.client.contexts.fib.capture_post")
 
@@ -1078,21 +1085,25 @@ def test_fib_maps_context(
     for f, file in enumerate(fib_maps_images):
         context.post_transfer(file, environment=mock_environment)
         mock_get_source.assert_called_with(file, mock_environment)
-        mock_file_transferred_to.assert_called_with(
-            environment=mock_environment,
-            source=basepath,
-            file_path=file,
-            rsync_basepath=Path(""),
-        )
-        mock_capture_post.assert_called_with(
-            base_url=mock.ANY,
-            router_name="workflow_fib.router",
-            function_name="register_fib_atlas",
-            token="",
-            instrument_name=mock.ANY,
-            data={"file": str(destination_files[f])},
-            session_id=mock.ANY,
-        )
+        if has_source:
+            mock_file_transferred_to.assert_any_call(
+                environment=mock_environment,
+                source=basepath,
+                file_path=file,
+                rsync_basepath=Path(""),
+            )
+            mock_capture_post.assert_any_call(
+                base_url=mock.ANY,
+                router_name="workflow_fib.router",
+                function_name="register_fib_atlas",
+                token="",
+                instrument_name=mock.ANY,
+                data={"file": str(destination_files[f])},
+                session_id=mock.ANY,
+            )
+        else:
+            mock_file_transferred_to.assert_not_called()
+            mock_capture_post.assert_not_called()
 
 
 def test_fib_meteor_context():
