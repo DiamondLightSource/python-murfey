@@ -76,7 +76,7 @@ class SXTContext(Context):
         self._basepath = basepath
         self._machine_config = machine_config
 
-    def determined_converted_tiff_path(
+    def determine_converted_tiff_path(
         self,
         transferred_file: Path,
         environment: MurfeyInstanceEnvironment,
@@ -256,7 +256,7 @@ class SXTContext(Context):
                     transferred_file,
                     Path(self._machine_config.get("rsync_basepath", "")),
                 )
-                converted_tiff_path = self.determined_converted_tiff_path(
+                converted_tiff_path = self.determine_converted_tiff_path(
                     transferred_file, environment, source
                 )
                 thumbnail_path = converted_tiff_path.parent / (
@@ -431,7 +431,7 @@ class SXTContext(Context):
 
             if not angles or all(angles) == 0:
                 logger.info(f"All angles in {transferred_file.stem} are zero")
-                converted_tiff_path = self.determined_converted_tiff_path(
+                converted_tiff_path = self.determine_converted_tiff_path(
                     transferred_file, environment, source
                 )
                 capture_post(
