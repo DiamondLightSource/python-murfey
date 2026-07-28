@@ -855,6 +855,7 @@ def test_make_drift_correction_gif(
         (True, "Sites/Site #1/DCImages/dummy.png"),
         (True, "Sites/Site #1/LamellaEvaluationImages/dummy.png"),
         (False, "Sites/Lamella/DCImages/dummy.png"),
+        (False, "Sites/Lamella/LamellaEvaluationImages/dummy.png"),
     ),
 )
 def test_fib_autotem_context(
@@ -897,6 +898,9 @@ def test_fib_autotem_context(
     mock_drift_correction_gif = mocker.patch.object(
         FIBContext, "_make_drift_correction_gif"
     )
+    mock_lamella_evaluation_image = mocker.patch.object(
+        FIBContext, "_register_lamella_evaluation_image"
+    )
 
     # Initialise the FIBContext
     basepath = visit_dir
@@ -921,6 +925,9 @@ def test_fib_autotem_context(
     # If a DCImage was used, '_make_drift_correction_gif' should be called
     if "DCImages" in trigger_file.parts:
         mock_drift_correction_gif.assert_called_with(trigger_file, mock_environment)
+    # If a LamellaEvaluationImage was used '_register_lamella_evaluation_image' should be called
+    if "LamellaEvaluationImages" in trigger_file.parts:
+        mock_lamella_evaluation_image.assert_called_with(trigger_file, mock_environment)
     # Target project will have been identified
     assert _get_project_name(target_project) in context._target_projects
     # '_handle_metadata' will have been called
