@@ -415,3 +415,68 @@ def test_sxt_context_txrm_external_ref(mock_ole_file, mock_post, tmp_path):
         },
         headers={"Authorization": "Bearer "},
     )
+
+
+@patch("requests.post")
+@patch("murfey.client.contexts.sxt.OleFileIO")
+def test_sxt_context_txrm_zero_angles(mock_ole_file, mock_post, tmp_path):
+    mock_post().status_code = 200
+    exists_return = [False]  # False for reference, then True
+    exists_return.extend([True for i in range(20)])
+    mock_ole_file().__enter__().exists.side_effect = exists_return
+    # Motor position names
+    mock_ole_file().__enter__().openstream().read.return_value = (
+        "\x00Val1\x00\x00Energy\x00".encode()
+    )
+    # Metadata encoded arrays
+    mock_ole_file().__enter__().openstream().getvalue.side_effect = [
+        np.array([0, 0, 0, 0, 0], dtype=np.float32).tobytes(),  # Angles
+        np.array([0.01001], dtype=np.float32).tobytes(),  # Pixel size
+        np.array([1024], dtype=np.int32).tobytes(),  # Image Width
+        np.array([2048], dtype=np.int32).tobytes(),  # Image Height
+        np.array([1.5], dtype=np.float32).tobytes(),  # Exposure time
+        np.array([1000], dtype=np.float32).tobytes(),  # Mag
+        np.array([200], dtype=np.int32).tobytes(),  # Image count
+        np.array([0, 519, 2, 3], dtype=np.float32).tobytes(),  # Motor Pos (energy)
+        np.array([0], dtype=np.int32).tobytes(),  # Mosaic size
+        np.array([0], dtype=np.int32).tobytes(),  # Mosaic size
+    ]
+
+    # xrm file as reference
+    (tmp_path / "cm12345-6/grid1").mkdir(parents=True)
+    (tmp_path / "cm12345-6/grid1/ref.xrm").touch()
+
+    env = MurfeyInstanceEnvironment(
+        url=urlparse("http://localhost:8000"),
+        client_id=0,
+        sources=[tmp_path / "cm12345-6/grid1"],
+        default_destinations={f"{tmp_path}/cm12345-6/grid1": "cm12345-6/raw/grid1"},
+        instrument_name="",
+        visit="cm12345-6",
+        murfey_session=1,
+    )
+    context = SXTContext(
+        "zeiss",
+        tmp_path / "cm12345-6/grid1",
+        {"rsync_basepath": "/path/to/dest", "processed_directory_name": "processed"},
+        "",
+    )
+    context.post_transfer(
+        tmp_path / "cm12345-6/grid1/example_0.txrm",
+        required_position_files=[],
+        required_strings=["fractions"],
+        environment=env,
+    )
+
+    mock_ole_file.assert_any_call(str(tmp_path / "cm12345-6/grid1/example_0.txrm"))
+    mock_ole_file.assert_any_call(str(tmp_path / "cm12345-6/grid1/ref.xrm"))
+
+    assert mock_post.call_count == 2
+    mock_post.assert_any_call(
+        "http://localhost:8000/workflow/sxt/convert_xrm_to_tiff",
+        json={
+            "xrm_path": "/path/to/dest/cm12345-6/raw/grid1/example_0.txrm",
+            "tiff_path": "/path/to/dest/cm12345-6/processed/grid1/example_0_Annotated.tiff",
+        },
+        headers={"Authorization": "Bearer "},
+    )
