@@ -1,5 +1,6 @@
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from typing import Any
 from unittest import mock
 from unittest.mock import MagicMock
 
@@ -24,6 +25,8 @@ from murfey.util.models import LamellaSiteInfo
 num_lamellae = 5
 visit_name = "cm12345-6"
 project_name = visit_name.replace("-", "_")
+session_id = 1
+instrument_name = "fib"
 
 
 # -------------------------------------------------------------------------------------
@@ -61,7 +64,7 @@ def visit_dir(tmp_path: Path):
 
 
 @pytest.fixture
-def mock_machine_config():
+def mock_machine_config() -> dict[str, Any]:
     return {"calibrations": {"rotation_offset": -75}}
 
 
@@ -847,6 +850,103 @@ def test_make_drift_correction_gif(
                 )
             # 'capture_post' should be called for every image
             assert mock_capture_post.call_count == len(destination_files)
+
+
+@pytest.mark.parametrize(
+    "test_params",
+    (  # Has source | Is manual? | Site num | File part
+        # Successful cases
+        (True, True, 1, "Finer Milling - Electron Image.png"),
+        (True, False, 1, "Polishing 1 - Electron Image.png"),
+        (True, True, 2, "Finer Milling - Electron Image.png"),
+        (True, False, 2, "Polishing 1 - Electron Image.png"),
+        (True, True, 11, "Finer Milling - Electron Image.png"),
+        (True, False, 11, "Polishing 1 - Electron Image.png"),
+        # Early exit cases
+        (False, False, 1, "Finer Milling - Electron Image.png"),
+        (False, True, 1, "Polishing 1 - Electron Image.png"),
+    ),
+)
+def test_register_lamella_evaluation_image(
+    mocker: MockerFixture,
+    test_params: tuple[bool, bool, int, str],
+    tmp_path: Path,
+    visit_dir: Path,
+    mock_machine_config: dict[str, Any],
+):
+    # Unpack test params
+    has_source, is_manual, site_num, file_part = test_params
+
+    # Construct source and destination file names
+    if is_manual:
+        site_name = f"Site #{site_num}"
+    else:
+        site_name = "Lamella"
+        if site_num > 1:
+            site_name += f" ({site_num})"
+    transferred_file = (
+        visit_dir
+        / "autotem"
+        / (f"AutoTEM_201231-1230_{project_name}_waffle1" if is_manual else project_name)
+        / "Sites"
+        / site_name
+        / "LamellaEvaluationImages"
+        / f"2025-10-23-19-14-40_drift_corrected_image_{file_part}"
+    )
+    rsync_basepath = tmp_path / "fib" / "data"
+    destination_file = (
+        rsync_basepath / "2025" / transferred_file.relative_to(visit_dir.parent)
+    )
+
+    # Mock the environment
+    mock_environment = MagicMock(
+        instrument_name=instrument_name,
+        murfey_session=session_id,
+    )
+    # Mock '_get_source'
+    mock_get_source = mocker.patch(
+        "murfey.client.contexts.fib._get_source",
+        return_value=visit_dir if has_source else None,
+    )
+    # Mock '_file_transferred_to'
+    mock_file_transferred_to = mocker.patch(
+        "murfey.client.contexts.fib._file_transferred_to", return_value=destination_file
+    )
+    # Mock the 'capture_post' call
+    mock_capture_post = mocker.patch("murfey.client.contexts.fib.capture_post")
+
+    # Load the context and pass in the file
+    basepath = tmp_path
+    context = FIBContext(
+        "autotem",
+        basepath=basepath,
+        machine_config=mock_machine_config,
+        token="dummy",
+    )
+    context.post_transfer(transferred_file, mock_environment)
+
+    # Check that the expected calls were made
+    mock_get_source.assert_called_once_with(transferred_file, mock_environment)
+    if not has_source:
+        mock_file_transferred_to.assert_not_called()
+        mock_capture_post.assert_not_called()
+    else:
+        mock_file_transferred_to.assert_called_once_with(
+            environment=mock_environment,
+            source=visit_dir,
+            file_path=transferred_file,
+            rsync_basepath=mock.ANY,
+        )
+        mock_capture_post.assert_called_once_with(
+            base_url=mock.ANY,
+            router_name="workflow_fib.router",
+            function_name="register_lamella_evaluation_image",
+            token=context._token,
+            instrument_name=instrument_name,
+            data={"file": str(destination_file)},
+            # Endpoint kwargs
+            session_id=session_id,
+        )
 
 
 @pytest.mark.parametrize(
