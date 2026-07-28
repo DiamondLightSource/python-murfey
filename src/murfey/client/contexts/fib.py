@@ -682,12 +682,12 @@ class FIBContext(Context):
             logger.info(
                 f"Registering lamella evaluation image {transferred_file.name!r}"
             )
-            return True
+            return None
         except Exception as e:
             logger.error(
                 f"Error encountered registering lamella evaluation image {transferred_file.name}:\n{e}"
             )
-            return False
+            return None
 
     def _register_atlas(
         self,
