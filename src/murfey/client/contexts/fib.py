@@ -290,6 +290,15 @@ class FIBContext(Context):
                 ):
                     self._make_drift_correction_gif(transferred_file, environment)
                     return None
+                # Register lamella evaluation images
+                elif (
+                    "LamellaEvaluationImages" in transferred_file.parts
+                    and transferred_file.suffix == ".png"
+                ):
+                    self._register_lamella_evaluation_image(
+                        transferred_file, environment
+                    )
+                    return None
 
         # -----------------------------------------------------------------------------
         # Maps
@@ -300,19 +309,8 @@ class FIBContext(Context):
                 "Electron Snapshot" in transferred_file.name
                 and transferred_file.suffix in (".tif", ".tiff")
             ):
-                source = _get_source(transferred_file, environment)
-                if source is None:
-                    logger.warning(f"No source found for file {transferred_file}")
-                    return None
-                destination_file = _file_transferred_to(
-                    environment=environment,
-                    source=source,
-                    file_path=transferred_file,
-                    rsync_basepath=Path(self._machine_config.get("rsync_basepath", "")),
-                )
-
                 # Register image in database
-                self._register_atlas(destination_file, environment)
+                self._register_atlas(transferred_file, environment)
                 return None
 
         # -----------------------------------------------------------------------------
@@ -651,12 +649,65 @@ class FIBContext(Context):
             logger.error(f"Could not submit GIF for site {lamella_number}")
             return False
 
-    def _register_atlas(self, file: Path, environment: MurfeyInstanceEnvironment):
+    def _register_lamella_evaluation_image(
+        self,
+        transferred_file: Path,
+        environment: MurfeyInstanceEnvironment,
+    ):
+        """
+        Helper function to construct and submit a POST request to the backend register
+        a lamella evaluation image with.
+        """
+        source = _get_source(transferred_file, environment)
+        if source is None:
+            logger.warning(f"No source found for file {transferred_file}")
+            return None
+        destination_file = _file_transferred_to(
+            environment=environment,
+            source=source,
+            file_path=transferred_file,
+            rsync_basepath=Path(self._machine_config.get("rsync_basepath", "")),
+        )
+        try:
+            capture_post(
+                base_url=str(environment.url.geturl()),
+                router_name="workflow_fib.router",
+                function_name="register_lamella_evaluation_image",
+                token=self._token,
+                instrument_name=environment.instrument_name,
+                data={"file": str(destination_file)},
+                # Endpoint kwargs
+                session_id=environment.murfey_session,
+            )
+            logger.info(
+                f"Registering lamella evaluation image {transferred_file.name!r}"
+            )
+            return None
+        except Exception as e:
+            logger.error(
+                f"Error encountered registering lamella evaluation image {transferred_file.name}:\n{e}"
+            )
+            return None
+
+    def _register_atlas(
+        self,
+        transferred_file: Path,
+        environment: MurfeyInstanceEnvironment,
+    ):
         """
         Constructs the URL and dictionary to be posted to the server, which then triggers
         the processing of the electron snapshot image.
         """
-
+        source = _get_source(transferred_file, environment)
+        if source is None:
+            logger.warning(f"No source found for file {transferred_file}")
+            return None
+        destination_file = _file_transferred_to(
+            environment=environment,
+            source=source,
+            file_path=transferred_file,
+            rsync_basepath=Path(self._machine_config.get("rsync_basepath", "")),
+        )
         try:
             capture_post(
                 base_url=str(environment.url.geturl()),
@@ -664,12 +715,14 @@ class FIBContext(Context):
                 function_name="register_fib_atlas",
                 token=self._token,
                 instrument_name=environment.instrument_name,
-                data={"file": str(file)},
+                data={"file": str(destination_file)},
                 # Endpoint kwargs
                 session_id=environment.murfey_session,
             )
-            logger.info(f"Registering atlas image {file.name!r}")
-            return True
+            logger.info(f"Registering atlas image {transferred_file.name!r}")
+            return None
         except Exception as e:
-            logger.error(f"Error encountered registering atlas image {file.name}:\n{e}")
-            return False
+            logger.error(
+                f"Error encountered registering atlas image {transferred_file.name}:\n{e}"
+            )
+            return None

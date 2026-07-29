@@ -1,5 +1,6 @@
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from typing import Any
 from unittest import mock
 from unittest.mock import MagicMock
 
@@ -24,6 +25,8 @@ from murfey.util.models import LamellaSiteInfo
 num_lamellae = 5
 visit_name = "cm12345-6"
 project_name = visit_name.replace("-", "_")
+session_id = 1
+instrument_name = "fib"
 
 
 # -------------------------------------------------------------------------------------
@@ -61,7 +64,7 @@ def visit_dir(tmp_path: Path):
 
 
 @pytest.fixture
-def mock_machine_config():
+def mock_machine_config() -> dict[str, Any]:
     return {"calibrations": {"rotation_offset": -75}}
 
 
@@ -851,10 +854,108 @@ def test_make_drift_correction_gif(
 
 @pytest.mark.parametrize(
     "test_params",
+    (  # Has source | Is manual? | Site num | File part
+        # Successful cases
+        (True, True, 1, "Finer Milling - Electron Image.png"),
+        (True, False, 1, "Polishing 1 - Electron Image.png"),
+        (True, True, 2, "Finer Milling - Electron Image.png"),
+        (True, False, 2, "Polishing 1 - Electron Image.png"),
+        (True, True, 11, "Finer Milling - Electron Image.png"),
+        (True, False, 11, "Polishing 1 - Electron Image.png"),
+        # Early exit cases
+        (False, False, 1, "Finer Milling - Electron Image.png"),
+        (False, True, 1, "Polishing 1 - Electron Image.png"),
+    ),
+)
+def test_register_lamella_evaluation_image(
+    mocker: MockerFixture,
+    test_params: tuple[bool, bool, int, str],
+    tmp_path: Path,
+    visit_dir: Path,
+    mock_machine_config: dict[str, Any],
+):
+    # Unpack test params
+    has_source, is_manual, site_num, file_part = test_params
+
+    # Construct source and destination file names
+    if is_manual:
+        site_name = f"Site #{site_num}"
+    else:
+        site_name = "Lamella"
+        if site_num > 1:
+            site_name += f" ({site_num})"
+    transferred_file = (
+        visit_dir
+        / "autotem"
+        / (f"AutoTEM_201231-1230_{project_name}_waffle1" if is_manual else project_name)
+        / "Sites"
+        / site_name
+        / "LamellaEvaluationImages"
+        / f"2025-10-23-19-14-40_drift_corrected_image_{file_part}"
+    )
+    rsync_basepath = tmp_path / "fib" / "data"
+    destination_file = (
+        rsync_basepath / "2025" / transferred_file.relative_to(visit_dir.parent)
+    )
+
+    # Mock the environment
+    mock_environment = MagicMock(
+        instrument_name=instrument_name,
+        murfey_session=session_id,
+    )
+    # Mock '_get_source'
+    mock_get_source = mocker.patch(
+        "murfey.client.contexts.fib._get_source",
+        return_value=visit_dir if has_source else None,
+    )
+    # Mock '_file_transferred_to'
+    mock_file_transferred_to = mocker.patch(
+        "murfey.client.contexts.fib._file_transferred_to", return_value=destination_file
+    )
+    # Mock the 'capture_post' call
+    mock_capture_post = mocker.patch("murfey.client.contexts.fib.capture_post")
+
+    # Load the context and pass in the file
+    basepath = tmp_path
+    context = FIBContext(
+        "autotem",
+        basepath=basepath,
+        machine_config=mock_machine_config,
+        token="dummy",
+    )
+    context.post_transfer(transferred_file, mock_environment)
+
+    # Check that the expected calls were made
+    mock_get_source.assert_called_once_with(transferred_file, mock_environment)
+    if not has_source:
+        mock_file_transferred_to.assert_not_called()
+        mock_capture_post.assert_not_called()
+    else:
+        mock_file_transferred_to.assert_called_once_with(
+            environment=mock_environment,
+            source=visit_dir,
+            file_path=transferred_file,
+            rsync_basepath=mock.ANY,
+        )
+        mock_capture_post.assert_called_once_with(
+            base_url=mock.ANY,
+            router_name="workflow_fib.router",
+            function_name="register_lamella_evaluation_image",
+            token=context._token,
+            instrument_name=instrument_name,
+            data={"file": str(destination_file)},
+            # Endpoint kwargs
+            session_id=session_id,
+        )
+
+
+@pytest.mark.parametrize(
+    "test_params",
     (  # Manual or automated? | Identifier
         (True, "Sites/Site #1/DCImages/dummy.png"),
         (True, "Sites/Site #1/LamellaEvaluationImages/dummy.png"),
         (False, "Sites/Lamella/DCImages/dummy.png"),
+        (False, "Sites/Lamella/LamellaEvaluationImages/dummy.png"),
     ),
 )
 def test_fib_autotem_context(
@@ -897,6 +998,9 @@ def test_fib_autotem_context(
     mock_drift_correction_gif = mocker.patch.object(
         FIBContext, "_make_drift_correction_gif"
     )
+    mock_lamella_evaluation_image = mocker.patch.object(
+        FIBContext, "_register_lamella_evaluation_image"
+    )
 
     # Initialise the FIBContext
     basepath = visit_dir
@@ -921,6 +1025,9 @@ def test_fib_autotem_context(
     # If a DCImage was used, '_make_drift_correction_gif' should be called
     if "DCImages" in trigger_file.parts:
         mock_drift_correction_gif.assert_called_with(trigger_file, mock_environment)
+    # If a LamellaEvaluationImage was used '_register_lamella_evaluation_image' should be called
+    if "LamellaEvaluationImages" in trigger_file.parts:
+        mock_lamella_evaluation_image.assert_called_with(trigger_file, mock_environment)
     # Target project will have been identified
     assert _get_project_name(target_project) in context._target_projects
     # '_handle_metadata' will have been called
@@ -933,8 +1040,13 @@ def test_fib_autotem_context(
     mock_handle_metadata.assert_called_with(target_project, mock_environment)
 
 
+@pytest.mark.parametrize(
+    "has_source",
+    (True, False),
+)
 def test_fib_maps_context(
     mocker: MockerFixture,
+    has_source: bool,
     tmp_path: Path,
     visit_dir: Path,
     mock_machine_config: dict,
@@ -951,10 +1063,12 @@ def test_fib_maps_context(
 
     # Mock the functions used in 'post_transfer'
     mock_get_source = mocker.patch(
-        "murfey.client.contexts.fib._get_source", return_value=tmp_path
+        "murfey.client.contexts.fib._get_source",
+        return_value=tmp_path if has_source else None,
     )
     mock_file_transferred_to = mocker.patch(
-        "murfey.client.contexts.fib._file_transferred_to", side_effect=destination_files
+        "murfey.client.contexts.fib._file_transferred_to",
+        side_effect=destination_files,
     )
     mock_capture_post = mocker.patch("murfey.client.contexts.fib.capture_post")
 
@@ -971,21 +1085,25 @@ def test_fib_maps_context(
     for f, file in enumerate(fib_maps_images):
         context.post_transfer(file, environment=mock_environment)
         mock_get_source.assert_called_with(file, mock_environment)
-        mock_file_transferred_to.assert_called_with(
-            environment=mock_environment,
-            source=basepath,
-            file_path=file,
-            rsync_basepath=Path(""),
-        )
-        mock_capture_post.assert_called_with(
-            base_url=mock.ANY,
-            router_name="workflow_fib.router",
-            function_name="register_fib_atlas",
-            token="",
-            instrument_name=mock.ANY,
-            data={"file": str(destination_files[f])},
-            session_id=mock.ANY,
-        )
+        if has_source:
+            mock_file_transferred_to.assert_any_call(
+                environment=mock_environment,
+                source=basepath,
+                file_path=file,
+                rsync_basepath=Path(""),
+            )
+            mock_capture_post.assert_any_call(
+                base_url=mock.ANY,
+                router_name="workflow_fib.router",
+                function_name="register_fib_atlas",
+                token="",
+                instrument_name=mock.ANY,
+                data={"file": str(destination_files[f])},
+                session_id=mock.ANY,
+            )
+        else:
+            mock_file_transferred_to.assert_not_called()
+            mock_capture_post.assert_not_called()
 
 
 def test_fib_meteor_context():
