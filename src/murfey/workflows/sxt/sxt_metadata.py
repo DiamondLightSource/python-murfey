@@ -110,7 +110,7 @@ def register_sxt_roi(
             f"Unable to register roi {sanitise(roi.name)} position yet: "
             f"roi pixel size {sanitise(str(roi.pixel_size))}, "
             f"atlas pixel size {sanitise(str(dcg.atlas_pixel_size))}, "
-            f"roi pixel size {sanitise(str(atlas.image_pixel_size))}"
+            f"roi pixel size {sanitise(str(atlas.image_pixel_size)) if atlas else 0}"
         )
     murfey_db.add(roi)
     murfey_db.commit()
