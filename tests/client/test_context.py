@@ -1,12 +1,22 @@
 from unittest.mock import patch
 from urllib.parse import urlparse
 
+import pytest
+
 from murfey.client.context import ensure_dcg_exists
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 
+# Lamella experiment type options and experiment type ids
+lamella_types: list[tuple[str | None, int]] = [
+    (None, 36),
+    ("false", 36),
+    ("true", 49),
+]
 
+
+@pytest.mark.parametrize("lamella", lamella_types)
 @patch("murfey.client.context.capture_post")
-def test_ensure_dcg_exists_tomo(mock_capture_post, tmp_path):
+def test_ensure_dcg_exists_tomo(mock_capture_post, lamella, tmp_path):
     env = MurfeyInstanceEnvironment(
         url=urlparse("http://localhost:8000"),
         client_id=0,
@@ -25,9 +35,14 @@ def test_ensure_dcg_exists_tomo(mock_capture_post, tmp_path):
     with open(metadata_source / "Session.dm", "w") as dm_file:
         dm_file.write(
             "<TomographySession><AtlasId>"
-            r"X:\cm12345-6\atlas\atlas_metadata\Sample6\Atlas\Atlas.dm"
-            "</AtlasId></TomographySession>"
+            r"X:\cm12345-6\atlas\atlas_metadata\Sample6\Atlas\Atlas.dm</AtlasId>"
         )
+        dm_file.write(
+            rf"<LamellaWorkflow>{lamella[0]}</LamellaWorkflow>"
+            if lamella[0] is not None
+            else ""
+        )
+        dm_file.write(r"</TomographySession>")
 
     atlas_xml = tmp_path / "cm12345-6/atlas/atlas_metadata/Sample6/Atlas/Atlas_4.xml"
     atlas_xml.parent.mkdir(parents=True)
@@ -46,7 +61,7 @@ def test_ensure_dcg_exists_tomo(mock_capture_post, tmp_path):
     )
 
     dcg_data = {
-        "experiment_type_id": 36,
+        "experiment_type_id": lamella[1],
         "tag": f"{tmp_path}/metadata_folder",
         "atlas": f"{tmp_path}/destination/{atlas_xml.relative_to(tmp_path).with_suffix('.jpg')}",
         "sample": 6,
