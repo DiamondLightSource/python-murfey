@@ -124,10 +124,10 @@ def ensure_dcg_exists(
 
         if collection_type == "tomo":
             windows_path = session_data["TomographySession"]["AtlasId"]
-            lamella_workflow = session_data.get("TomographySession", {}).get(
-                "LamellaWorkflow", None
-            )
-            if lamella_workflow == "true":
+            if (
+                session_data.get("TomographySession", {}).get("LamellaWorkflow", None)
+                == "true"
+            ):
                 # Lamella tomography experiment type
                 experiment_type_id = 49
             else:
