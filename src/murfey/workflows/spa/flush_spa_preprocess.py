@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Optional
 
 from PIL import Image
+from sqlalchemy import desc
 from sqlalchemy.exc import NoResultFound
 from sqlmodel import Session, select
 
@@ -70,13 +71,15 @@ def register_grid_square(
             select(DataCollectionGroup)
             .where(DataCollectionGroup.session_id == session_id)
             .where(DataCollectionGroup.sample == grid_square_params.sample)
-        ).one()
+            .order_by(desc(DataCollectionGroup.id))
+        ).first()
     else:
         dcg = murfey_db.exec(
             select(DataCollectionGroup)
             .where(DataCollectionGroup.session_id == session_id)
             .where(DataCollectionGroup.tag == grid_square_params.tag)
-        ).one()
+            .order_by(desc(DataCollectionGroup.id))
+        ).first()
     grid_square_query = murfey_db.exec(
         select(GridSquare)
         .where(GridSquare.name == gsid)
