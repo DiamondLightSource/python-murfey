@@ -224,14 +224,15 @@ class TransportManager:
     ):
         color_flags = color_flags or {}
         # most of this is for mypy
+        pixel_size = grid_square_parameters.pixel_size
         if (
-            grid_square_parameters.pixel_size is not None
+            pixel_size is not None
             and grid_square_parameters.thumbnail_size_x is not None
             and grid_square_parameters.readout_area_x is not None
         ):
             # currently hard coding the scale factor because of difficulties with
             # guaranteeing we have the atlas jpg and mrc sizes
-            grid_square_parameters.pixel_size *= (
+            pixel_size *= (
                 grid_square_parameters.readout_area_x
                 / grid_square_parameters.thumbnail_size_x
             )
@@ -246,7 +247,7 @@ class TransportManager:
             angle=grid_square_parameters.angle,
             stageLocationX=grid_square_parameters.x_stage_position,
             stageLocationY=grid_square_parameters.y_stage_position,
-            pixelSize=grid_square_parameters.pixel_size,
+            pixelSize=pixel_size,
             mode=grid_square_parameters.collection_mode,
         )
         # Optionally insert colour flags
@@ -281,12 +282,13 @@ class TransportManager:
                     .filter(GridSquare.gridSquareId == grid_square_id)
                     .one()
                 )
+                pixel_size = grid_square_parameters.pixel_size
                 if (
-                    grid_square_parameters.pixel_size is not None
+                    pixel_size is not None
                     and grid_square_parameters.readout_area_x is not None
                     and grid_square_parameters.thumbnail_size_x is not None
                 ):
-                    grid_square_parameters.pixel_size *= (
+                    pixel_size *= (
                         grid_square_parameters.readout_area_x
                         / grid_square_parameters.thumbnail_size_x
                     )
@@ -310,8 +312,8 @@ class TransportManager:
                     grid_square.stageLocationX = grid_square_parameters.x_stage_position
                 if grid_square_parameters.y_stage_position:
                     grid_square.stageLocationY = grid_square_parameters.y_stage_position
-                if grid_square_parameters.pixel_size:
-                    grid_square.pixelSize = grid_square_parameters.pixel_size
+                if pixel_size:
+                    grid_square.pixelSize = pixel_size
                 if grid_square_parameters.collection_mode:
                     grid_square.mode = grid_square_parameters.collection_mode
                 # Optionally insert colour flags
@@ -441,45 +443,34 @@ class TransportManager:
         atlas_id: int,
         search_map_parameters: SearchMapParameters,
     ):
+        pixel_size = search_map_parameters.pixel_size
         if (
-            search_map_parameters.pixel_size
+            pixel_size
             and search_map_parameters.height
             and search_map_parameters.height_on_atlas
         ):
-            search_map_parameters.pixel_size *= (
+            pixel_size *= (
                 search_map_parameters.height / search_map_parameters.height_on_atlas
             )
-        search_map_parameters.height = (
-            int(search_map_parameters.height / 7.8)
-            if search_map_parameters.height
-            else None
-        )
-        search_map_parameters.width = (
-            int(search_map_parameters.width / 7.8)
-            if search_map_parameters.width
-            else None
-        )
-        search_map_parameters.x_location = (
-            int(search_map_parameters.x_location / 7.8)
-            if search_map_parameters.x_location
-            else None
-        )
-        search_map_parameters.y_location = (
-            int(search_map_parameters.y_location / 7.8)
-            if search_map_parameters.y_location
-            else None
-        )
         record = GridSquare(
             atlasId=atlas_id,
             gridSquareImage=search_map_parameters.image,
-            pixelLocationX=search_map_parameters.x_location,
-            pixelLocationY=search_map_parameters.y_location,
-            height=search_map_parameters.height_on_atlas,
-            width=search_map_parameters.width_on_atlas,
+            pixelLocationX=int(search_map_parameters.x_location / 7.8)
+            if search_map_parameters.x_location
+            else None,
+            pixelLocationY=int(search_map_parameters.y_location / 7.8)
+            if search_map_parameters.y_location
+            else None,
+            height=int(search_map_parameters.height / 7.8)
+            if search_map_parameters.height
+            else None,
+            width=int(search_map_parameters.width / 7.8)
+            if search_map_parameters.width
+            else None,
             angle=0,
             stageLocationX=search_map_parameters.x_stage_position,
             stageLocationY=search_map_parameters.y_stage_position,
-            pixelSize=search_map_parameters.pixel_size,
+            pixelSize=pixel_size,
         )
         try:
             with ISPyBSession() as db:
@@ -505,12 +496,13 @@ class TransportManager:
                     .filter(GridSquare.gridSquareId == search_map_id)
                     .one()
                 )
+                pixel_size = search_map_parameters.pixel_size
                 if (
-                    search_map_parameters.pixel_size
+                    pixel_size
                     and search_map_parameters.height
                     and search_map_parameters.height_on_atlas
                 ):
-                    search_map_parameters.pixel_size *= (
+                    pixel_size *= (
                         search_map_parameters.height
                         / search_map_parameters.height_on_atlas
                     )
@@ -534,8 +526,8 @@ class TransportManager:
                     grid_square.stageLocationX = search_map_parameters.x_stage_position
                 if search_map_parameters.y_stage_position:
                     grid_square.stageLocationY = search_map_parameters.y_stage_position
-                if search_map_parameters.pixel_size:
-                    grid_square.pixelSize = search_map_parameters.pixel_size
+                if pixel_size:
+                    grid_square.pixelSize = pixel_size
                 db.add(grid_square)
                 db.commit()
                 return {"success": True, "return_value": grid_square.gridSquareId}
@@ -552,31 +544,24 @@ class TransportManager:
         atlas_id: int,
         roi_parameters: SearchMapParameters,
     ):
-        if (
-            roi_parameters.pixel_size
-            and roi_parameters.height
-            and roi_parameters.height_on_atlas
-        ):
-            roi_parameters.pixel_size *= (
-                roi_parameters.height / roi_parameters.height_on_atlas
-            )
-        roi_parameters.x_location = (
-            int(roi_parameters.x_location) if roi_parameters.x_location else None
-        )
-        roi_parameters.y_location = (
-            int(roi_parameters.y_location) if roi_parameters.y_location else None
-        )
+        pixel_size = roi_parameters.pixel_size
+        if pixel_size and roi_parameters.height and roi_parameters.height_on_atlas:
+            pixel_size *= roi_parameters.height / roi_parameters.height_on_atlas
         record = GridSquare(
             atlasId=atlas_id,
             gridSquareImage=roi_parameters.image,
-            pixelLocationX=roi_parameters.x_location,
-            pixelLocationY=roi_parameters.y_location,
+            pixelLocationX=int(roi_parameters.x_location)
+            if roi_parameters.x_location
+            else None,
+            pixelLocationY=int(roi_parameters.y_location)
+            if roi_parameters.y_location
+            else None,
             height=roi_parameters.height_on_atlas,
             width=roi_parameters.width_on_atlas,
             angle=0,
             stageLocationX=roi_parameters.x_stage_position,
             stageLocationY=roi_parameters.y_stage_position,
-            pixelSize=roi_parameters.pixel_size,
+            pixelSize=pixel_size,
         )
         try:
             with ISPyBSession() as db:
@@ -598,14 +583,13 @@ class TransportManager:
                 grid_square = (
                     db.query(GridSquare).filter(GridSquare.gridSquareId == roi_id).one()
                 )
+                pixel_size = roi_parameters.pixel_size
                 if (
-                    roi_parameters.pixel_size
+                    pixel_size
                     and roi_parameters.height
                     and roi_parameters.height_on_atlas
                 ):
-                    roi_parameters.pixel_size *= (
-                        roi_parameters.height / roi_parameters.height_on_atlas
-                    )
+                    pixel_size *= roi_parameters.height / roi_parameters.height_on_atlas
                 grid_square.gridSquareImage = (
                     roi_parameters.image or grid_square.gridSquareImage
                 )
@@ -623,9 +607,7 @@ class TransportManager:
                 grid_square.stageLocationY = (
                     roi_parameters.y_stage_position or grid_square.stageLocationY
                 )
-                grid_square.pixelSize = (
-                    roi_parameters.pixel_size or grid_square.pixelSize
-                )
+                grid_square.pixelSize = pixel_size or grid_square.pixelSize
                 db.add(grid_square)
                 db.commit()
                 return {"success": True, "return_value": grid_square.gridSquareId}
