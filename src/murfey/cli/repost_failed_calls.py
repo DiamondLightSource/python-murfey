@@ -136,10 +136,19 @@ def handle_failed_posts(messages_path: list[Path], murfey_db: Session):
             for call_arg in expected_args.args:
                 call_arg_type = expected_args.annotations.get(call_arg, str)
                 if call_arg in call_kwargs.keys():
-                    function_call_dict[call_arg] = call_arg_type(call_kwargs[call_arg])
+                    function_call_dict[call_arg] = (
+                        call_arg_type(call_kwargs[call_arg])
+                        if str(call_arg_type) != "str"
+                        else call_kwargs[call_arg]
+                    )
                 elif call_arg == "db":
                     function_call_dict["db"] = murfey_db
                 else:
+                    if isinstance(call_arg_type, str):
+                        try:
+                            call_arg_type = getattr(murfey.util.models, call_arg_type)
+                        except Exception as e:
+                            print(f"Failed to find type: {e}")
                     print(call_data, call_arg_type, call_arg)
                     function_call_dict[call_arg] = call_arg_type(**call_data)
         except TypeError as e:
