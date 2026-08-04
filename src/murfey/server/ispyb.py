@@ -335,27 +335,31 @@ class TransportManager:
         scale_factor: Optional[float],
         foil_hole_parameters: FoilHoleParameters,
     ):
+        pixel_size = foil_hole_parameters.pixel_size
+        diameter = foil_hole_parameters.diameter
+        x_location = foil_hole_parameters.x_location
+        y_location = foil_hole_parameters.y_location
         if (
             foil_hole_parameters.thumbnail_size_x is not None
             and foil_hole_parameters.readout_area_x is not None
-            and foil_hole_parameters.pixel_size is not None
+            and pixel_size is not None
         ):
-            foil_hole_parameters.pixel_size *= (
+            pixel_size *= (
                 foil_hole_parameters.readout_area_x
                 / foil_hole_parameters.thumbnail_size_x
             )
         if scale_factor:
-            foil_hole_parameters.diameter = (
+            diameter = (
                 int(foil_hole_parameters.diameter * scale_factor)
                 if foil_hole_parameters.diameter
                 else None
             )
-            foil_hole_parameters.x_location = (
+            x_location = (
                 int(foil_hole_parameters.x_location * scale_factor)
                 if foil_hole_parameters.x_location
                 else None
             )
-            foil_hole_parameters.y_location = (
+            y_location = (
                 int(foil_hole_parameters.y_location * scale_factor)
                 if foil_hole_parameters.y_location
                 else None
@@ -364,12 +368,12 @@ class TransportManager:
             gridSquareId=grid_square_id,
             foilHoleLabel=foil_hole_parameters.name,
             foilHoleImage=foil_hole_parameters.image,
-            pixelLocationX=foil_hole_parameters.x_location,
-            pixelLocationY=foil_hole_parameters.y_location,
-            diameter=foil_hole_parameters.diameter,
+            pixelLocationX=x_location,
+            pixelLocationY=y_location,
+            diameter=diameter,
             stageLocationX=foil_hole_parameters.x_stage_position,
             stageLocationY=foil_hole_parameters.y_stage_position,
-            pixelSize=foil_hole_parameters.pixel_size,
+            pixelSize=pixel_size,
         )
         try:
             with ISPyBSession() as db:
