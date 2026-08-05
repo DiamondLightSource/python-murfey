@@ -58,7 +58,7 @@ class SIMContext(Context):
             capture_post(
                 base_url=str(environment.url.geturl()),
                 router_name="workflow_sim.router",
-                function_name="request_sim_processing",
+                function_name="request_sim_reconstruction",
                 token=self._token,
                 instrument_name=environment.instrument_name,
                 data={

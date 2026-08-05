@@ -176,7 +176,7 @@ def test_post_transfer(
                 mock_capture_post.assert_any_call(
                     base_url=mock.ANY,
                     router_name="workflow_sim.router",
-                    function_name="request_sim_processing",
+                    function_name="request_sim_reconstruction",
                     token=context._token,
                     instrument_name=instrument_name,
                     data={

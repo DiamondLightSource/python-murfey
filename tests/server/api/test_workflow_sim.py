@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 import pytest
 from pytest_mock import MockerFixture
 
-from murfey.server.api.workflow_sim import SIMDataFile, request_sim_processing
+from murfey.server.api.workflow_sim import SIMDataFile, request_sim_reconstruction
 from murfey.util import sanitise_path
 from murfey.util.config import MachineConfig
 
@@ -33,7 +33,7 @@ def visit_dir(tmp_path: Path):
         (True, True, True, False),  # Incorrect output dir
     ),
 )
-def test_request_sim_processing(
+def test_request_sim_reconstruction(
     mocker: MockerFixture,
     tmp_path: Path,
     visit_dir: Path,
@@ -120,7 +120,9 @@ def test_request_sim_processing(
         )
 
     # Run the function and check that the expected calls were made
-    request_sim_processing(session_id=session_id, sim_data=sim_data, murfey_db=mock_db)
+    request_sim_reconstruction(
+        session_id=session_id, sim_data=sim_data, murfey_db=mock_db
+    )
 
     # Check that the expected calls were made
     # The parameters are toggled 'False' one at a time

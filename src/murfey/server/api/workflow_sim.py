@@ -27,8 +27,8 @@ class SIMDataFile(BaseModel):
     file: Path
 
 
-@router.post("/sessions/{session_id}/process_data")
-def request_sim_processing(
+@router.post("/sessions/{session_id}/sim_recon")
+def request_sim_reconstruction(
     session_id: int,
     sim_data: SIMDataFile,
     murfey_db: SQLModelSession = murfey_db,
