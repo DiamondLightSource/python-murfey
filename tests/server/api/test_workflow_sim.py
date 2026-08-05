@@ -24,25 +24,28 @@ def visit_dir(tmp_path: Path):
 
 @pytest.mark.parametrize(
     "test_params",
-    (  # Transport object | DB query success | PySIMRecon config found | Output dir found
+    (  # Transport object | DB query success | Machine config found | PySIMRecon config found | Output dir found
         # Successful case
-        (True, True, True, True),
-        (False, True, True, True),  # No transport object
-        (True, False, True, True),  # DB query failed
-        (True, True, False, True),  # No PySIMRecon config
-        (True, True, True, False),  # Incorrect output dir
+        (True, True, True, True, True),
+        # Failure cases
+        (False, True, True, True, True),  # No transport object
+        (True, False, True, True, True),  # DB query failed
+        (True, True, False, True, True),  # Machine config error
+        (True, True, True, False, True),  # No PySIMRecon config
+        (True, True, True, True, False),  # Incorrect output dir
     ),
 )
 def test_request_sim_reconstruction(
     mocker: MockerFixture,
     tmp_path: Path,
     visit_dir: Path,
-    test_params: tuple[bool, bool, bool, bool],
+    test_params: tuple[bool, bool, bool, bool, bool],
 ):
     # Unpack test params
     (
         has_transport_object,
         db_query_success,
+        machine_config_found,
         pysimrecon_configured,
         output_dir_success,
     ) = test_params
@@ -102,7 +105,7 @@ def test_request_sim_reconstruction(
     )
     mocker.patch(
         "murfey.server.api.workflow_sim.get_machine_config",
-        return_value={instrument_name: machine_config},
+        return_value={instrument_name: machine_config} if machine_config_found else {},
     )
 
     # Mock the transport object
@@ -131,6 +134,11 @@ def test_request_sim_reconstruction(
     elif not db_query_success:
         mock_logger.error.assert_called_with(
             "Error querying session information from database", exc_info=True
+        )
+        mock_transport_object.send.assert_not_called()
+    elif not machine_config_found:
+        mock_logger.error.assert_called_with(
+            "Error loading machine config from database", exc_info=True
         )
         mock_transport_object.send.assert_not_called()
     elif not pysimrecon_configured:
