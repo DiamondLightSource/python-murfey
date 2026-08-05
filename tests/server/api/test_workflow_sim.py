@@ -6,6 +6,7 @@ import pytest
 from pytest_mock import MockerFixture
 
 from murfey.server.api.workflow_sim import SIMDataFile, request_sim_processing
+from murfey.util import sanitise_path
 from murfey.util.config import MachineConfig
 
 # Global variables
@@ -21,14 +22,37 @@ def visit_dir(tmp_path: Path):
     return visit_dir
 
 
-@pytest.mark.parametrize("has_transport_object", (True, False))
+@pytest.mark.parametrize(
+    "test_params",
+    (  # Transport object | DB query success | PySIMRecon config found | Output dir found
+        # Successful case
+        (True, True, True, True),
+        (False, True, True, True),  # No transport object
+        (True, False, True, True),  # DB query failed
+        (True, True, False, True),  # No PySIMRecon config
+        (True, True, True, False),  # Incorrect output dir
+    ),
+)
 def test_request_sim_processing(
     mocker: MockerFixture,
+    tmp_path: Path,
     visit_dir: Path,
-    has_transport_object: bool,
+    test_params: tuple[bool, bool, bool, bool],
 ):
+    # Unpack test params
+    (
+        has_transport_object,
+        db_query_success,
+        pysimrecon_configured,
+        output_dir_success,
+    ) = test_params
+
     # Set up the test file and output directory
-    test_file = visit_dir / "raw" / "grid_1" / "test_file"
+    test_file = (
+        visit_dir / "raw" / "grid_1" / "test_file"
+        if output_dir_success
+        else tmp_path / "dummy"  # Provide incorrect file path
+    )
     sim_data = SIMDataFile(**{"file": str(test_file)})
     output_dir = visit_dir / "processed" / "grid_1"
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -42,7 +66,10 @@ def test_request_sim_processing(
         visit=visit_name,
     )
     mock_db = MagicMock()
-    mock_db.exec.return_value.one.return_value = mock_murfey_session
+    if db_query_success:
+        mock_db.exec.return_value.one.return_value = mock_murfey_session
+    else:
+        mock_db.exec.return_value.one.side_effect = Exception("Something went wrong")
 
     # Mock the machine config
     blue_params = {
@@ -69,7 +96,9 @@ def test_request_sim_processing(
         "far_red": far_red_params,
     }
     machine_config = MachineConfig(
-        calibrations={"pysimrecon_config": pysimrecon_config},
+        calibrations={"pysimrecon_config": pysimrecon_config}
+        if pysimrecon_configured
+        else {},
     )
     mocker.patch(
         "murfey.server.api.workflow_sim.get_machine_config",
@@ -94,7 +123,26 @@ def test_request_sim_processing(
     request_sim_processing(session_id=session_id, sim_data=sim_data, murfey_db=mock_db)
 
     # Check that the expected calls were made
-    if has_transport_object:
+    # The parameters are toggled 'False' one at a time
+    if not has_transport_object:
+        mock_logger.error.assert_called_with("No TransportManager object was set up")
+    elif not db_query_success:
+        mock_logger.error.assert_called_with(
+            "Error querying session information from database", exc_info=True
+        )
+        mock_transport_object.send.assert_not_called()
+    elif not pysimrecon_configured:
+        mock_logger.error.assert_called_with(
+            f"No PySIMRecon configuration found for {instrument_name}"
+        )
+        mock_transport_object.send.assert_not_called()
+    elif not output_dir_success:
+        mock_logger.error.assert_called_with(
+            "Could not determine the output directory to save the cryoSIM file "
+            f"{sanitise_path(sim_data.file)} to"
+        )
+        mock_transport_object.send.assert_not_called()
+    else:
         recipe = {
             "recipes": ["sim-reconstruction"],
             "parameters": {
@@ -115,5 +163,3 @@ def test_request_sim_processing(
         mock_transport_object.send.assert_called_with(
             queue="processing_recipe", message=recipe, new_connection=True
         )
-    else:
-        mock_logger.error.assert_called_with("No TransportManager object was set up")
