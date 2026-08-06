@@ -277,7 +277,9 @@ def register_foil_hole(
             )[murfey_session.instrument_name]
             if machine_config.smartem_api_url:
                 smartem_client = SmartEMAPIClient(
-                    base_url=machine_config.smartem_api_url, logger=logger, keycloak_client=keycloak_client
+                    base_url=machine_config.smartem_api_url,
+                    logger=logger,
+                    keycloak_client=keycloak_client,
                 )
                 fh_data = SmartEMFoilHoleData(
                     id=str(foil_hole_params.name),
