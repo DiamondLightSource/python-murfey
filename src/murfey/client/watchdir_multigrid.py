@@ -67,22 +67,22 @@ class MultigridDirWatcher(Observer):
 
     def _handle_fractions(self, directory: Path):
         processing_started = False
-        for d02 in directory.glob("Images-Disc*"):
-            if d02 not in self._seen_dirs:
-                self.notify(
-                    d02,
-                    remove_files=True,
-                    analyse=self._analyse,
-                    tag="fractions",
-                )
-                self._seen_dirs.append(d02)
-            processing_started = d02 in self._seen_dirs
-        if not processing_started:
-            if (
-                directory.is_dir()
-                and directory not in self._seen_dirs
-                and list(directory.iterdir())
-            ):
+        if directory.is_dir() and directory not in self._seen_dirs:
+            # Check contents, and skip .gain files written by EPU
+            directory_children = [d for d in directory.iterdir() if d.suffix != ".gain"]
+            for d02 in directory_children:
+                # Transfer each Images-Disc folder as a separate rsyncer
+                if d02.name.startswith("Images-Disc") and d02 not in self._seen_dirs:
+                    self.notify(
+                        d02,
+                        remove_files=True,
+                        analyse=self._analyse,
+                        tag="fractions",
+                    )
+                    self._seen_dirs.append(d02)
+                processing_started = d02 in self._seen_dirs
+            if not processing_started and directory_children:
+                # Tomography case of full directory transfer if no Images-Disc1
                 self.notify(
                     directory,
                     analyse=self._analyse,
