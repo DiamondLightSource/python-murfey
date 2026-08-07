@@ -90,8 +90,15 @@ def request_sim_reconstruction(
     )
     # Construct the output directory for the PySIMRecon outputs to be saved to
     try:
-        visit_idx = sim_data.file.parent.parts.index(visit_name)
-        raw_dir = sim_data.file.parents[-(visit_idx + 2)]
+        visit_idx = sim_data.file.parts.index(visit_name)
+        raw_dir = Path(
+            "/".join(
+                ""
+                if part == "/"  # Replace root "/" with "" for Linux paths
+                else part
+                for part in sim_data.file.parts[: visit_idx + 2]
+            )
+        )
         output_dir = (
             raw_dir.parent / "processed" / sim_data.file.parent.relative_to(raw_dir)
         )
