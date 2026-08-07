@@ -27,11 +27,11 @@ def visit_dir(tmp_path: Path):
     (  # Transport object | DB query success | Machine config found | PySIMRecon config found | Output dir found
         # Successful case
         (True, True, True, True, True),
+        (True, True, True, False, True),  # No PySIMRecon config
         # Failure cases
         (False, True, True, True, True),  # No transport object
         (True, False, True, True, True),  # DB query failed
         (True, True, False, True, True),  # Machine config error
-        (True, True, True, False, True),  # No PySIMRecon config
         (True, True, True, True, False),  # Incorrect output dir
     ),
 )
@@ -77,20 +77,20 @@ def test_request_sim_reconstruction(
     # Mock the machine config
     blue_params = {
         "wavelength": 452,
-        "ls": 0.330,
+        "ls": 0.123 if pysimrecon_configured else 0.330,
         "beaddiam": 0.220,
     }
     green_params = {
         "wavelength": 525,
-        "ls": 0.394,
+        "ls": 0.234 if pysimrecon_configured else 0.394,
     }
     red_params = {
         "wavelength": 605,
-        "ls": 0.451,
+        "ls": 0.345 if pysimrecon_configured else 0.451,
     }
     far_red_params = {
         "wavelength": 655,
-        "ls": 0.521,
+        "ls": 0.456 if pysimrecon_configured else 0.521,
     }
     pysimrecon_config = {
         "blue": blue_params,
@@ -139,11 +139,6 @@ def test_request_sim_reconstruction(
     elif not machine_config_found:
         mock_logger.error.assert_called_with(
             "Error loading machine config from database", exc_info=True
-        )
-        mock_transport_object.send.assert_not_called()
-    elif not pysimrecon_configured:
-        mock_logger.error.assert_called_with(
-            f"No PySIMRecon configuration found for {instrument_name}"
         )
         mock_transport_object.send.assert_not_called()
     elif not output_dir_success:

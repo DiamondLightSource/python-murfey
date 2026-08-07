@@ -55,8 +55,31 @@ def request_sim_reconstruction(
             machine_config.calibrations.get("pysimrecon_config")
         )
         if not pysimrecon_config:
-            logger.error(f"No PySIMRecon configuration found for {instrument_name}")
-            return None
+            # If no calibration was provided, use defaults
+            # Values provided on 2026-07-16
+            pysimrecon_config = {
+                "blue": {
+                    "wavelength": 452,
+                    "ls": 0.330,
+                    "beaddiam": 0.220,
+                },
+                "green": {
+                    "wavelength": 525,
+                    "ls": 0.394,
+                },
+                "red": {
+                    "wavelength": 605,
+                    "ls": 0.451,
+                },
+                "far_red": {
+                    "wavelength": 655,
+                    "ls": 0.521,
+                },
+            }
+            logger.warning(
+                f"No PySIMRecon configuration found for {instrument_name}; "
+                f"using known defaults \n{json.dumps(pysimrecon_config, indent=2)}"
+            )
     except Exception:
         logger.error("Error loading machine config from database", exc_info=True)
         return None
