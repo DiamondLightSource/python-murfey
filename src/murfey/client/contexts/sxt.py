@@ -224,7 +224,7 @@ class SXTContext(Context):
                         _get_ole_header_value(
                             xrm_ole, "ImageInfo/PixelSize", np.float32
                         ).tolist()[0]
-                        / 1e5
+                        / 1e6
                     )
 
                 if xrm_ole.exists("ImageInfo/ImageHeight"):
@@ -279,14 +279,20 @@ class SXTContext(Context):
 
                 if (
                     metadata.get("mosaic_size", 1) > 0
-                    and metadata.get("pixel_size", 0) > 1e-6
+                    and metadata.get("pixel_size", 0) > 1e-7
                 ):
                     # Large pixel size, this is an atlas
+                    thumbnail_pixel_size = (
+                        metadata["pixel_size"]
+                        * metadata.get("height", 0)
+                        * metadata["mosaic_rows"]
+                        / 1024
+                    )
                     dcg_data = {
                         "experiment_type_id": 44,  # Atlas
                         "tag": dcg_tag,
                         "atlas": str(thumbnail_path),
-                        "atlas_pixel_size": metadata.get("pixel_size", 0),
+                        "atlas_pixel_size": thumbnail_pixel_size,
                         "atlas_x_stage_position": metadata.get("x_position", None),
                         "atlas_y_stage_position": metadata.get("y_position", None),
                         "atlas_height": int(
