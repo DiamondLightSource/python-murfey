@@ -220,9 +220,12 @@ class SXTContext(Context):
                     metadata["y_position"] = y_tiles[int(len(y_tiles) / 2)]
 
                 if xrm_ole.exists("ImageInfo/PixelSize"):
-                    metadata["pixel_size"] = _get_ole_header_value(
-                        xrm_ole, "ImageInfo/PixelSize", np.float32
-                    ).tolist()[0]
+                    metadata["pixel_size"] = (
+                        _get_ole_header_value(
+                            xrm_ole, "ImageInfo/PixelSize", np.float32
+                        ).tolist()[0]
+                        / 1e5
+                    )
 
                 if xrm_ole.exists("ImageInfo/ImageHeight"):
                     metadata["height"] = _get_ole_header_value(
@@ -276,14 +279,14 @@ class SXTContext(Context):
 
                 if (
                     metadata.get("mosaic_size", 1) > 0
-                    and metadata.get("pixel_size", 0) > 0.1
+                    and metadata.get("pixel_size", 0) > 1e-6
                 ):
                     # Large pixel size, this is an atlas
                     dcg_data = {
                         "experiment_type_id": 44,  # Atlas
                         "tag": dcg_tag,
                         "atlas": str(thumbnail_path),
-                        "atlas_pixel_size": round(metadata.get("pixel_size", 0), 2),
+                        "atlas_pixel_size": metadata.get("pixel_size", 0),
                         "atlas_x_stage_position": metadata.get("x_position", None),
                         "atlas_y_stage_position": metadata.get("y_position", None),
                         "atlas_height": int(
@@ -317,7 +320,7 @@ class SXTContext(Context):
                             "tag": dcg_tag,
                             "x_stage_position": metadata.get("x_position", None),
                             "y_stage_position": metadata.get("y_position", None),
-                            "pixel_size": round(metadata.get("pixel_size", 0), 2),
+                            "pixel_size": metadata.get("pixel_size", 0),
                             "height": int(
                                 metadata.get("height", 0) * metadata["mosaic_rows"]
                             ),
@@ -341,6 +344,18 @@ class SXTContext(Context):
             with OleFileIO(str(transferred_file)) as txrm_ole:
                 if txrm_ole.exists("ReferenceData/Image"):
                     metadata["has_reference"] = True
+
+                if txrm_ole.exists("ImageInfo/XPosition") and txrm_ole.exists(
+                    "ImageInfo/YPosition"
+                ):
+                    x_tiles = _get_ole_header_value(
+                        txrm_ole, "ImageInfo/XPosition", np.float32
+                    ).tolist()
+                    y_tiles = _get_ole_header_value(
+                        txrm_ole, "ImageInfo/YPosition", np.float32
+                    ).tolist()
+                    metadata["x_position"] = x_tiles[int(len(x_tiles) / 2)]
+                    metadata["y_position"] = y_tiles[int(len(y_tiles) / 2)]
 
                 if txrm_ole.exists("ImageInfo/Angles"):
                     angles = _get_ole_header_value(
@@ -503,6 +518,8 @@ class SXTContext(Context):
                     "xrm_reference": str(reference_file_transferred_to)
                     if reference_file_transferred_to
                     else None,
+                    "x_stage_position": metadata.get("x_position", None),
+                    "y_stage_position": metadata.get("y_position", None),
                 },
             )
         return True
