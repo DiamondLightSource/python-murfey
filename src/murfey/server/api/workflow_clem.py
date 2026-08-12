@@ -18,7 +18,7 @@ from murfey.server import _transport_object
 from murfey.server.murfey_db import murfey_db
 
 # Set up logger
-logger = getLogger("murfey.server.api.clem")
+logger = getLogger("murfey.server.api.workflow_clem")
 
 # Create APIRouter class object
 router = APIRouter(
