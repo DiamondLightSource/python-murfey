@@ -65,7 +65,7 @@ def test_process_raw_lifs(
     # Run the function and check that the outputs are as expected
     process_raw_lifs(
         session_id=session_id,
-        lif_file=lif_file,
+        lif_info=lif_file,
         murfey_db=mock_db,
     )
 
@@ -107,22 +107,23 @@ def test_process_raw_lifs(
 
 @pytest.mark.parametrize(
     "test_params",
-    (  # Has transport object | DB query success | Visits match
+    (  # Has transport object | Has TIFF files | DB query success | Visits match
         # Successful case
-        (True, True, True),
+        (True, True, True, True),
         # Fail cases (one False at a time)
-        (False, True, True),
-        (True, False, True),
-        (True, True, False),
+        (False, True, True, True),
+        (True, False, True, True),
+        (True, True, False, True),
+        (True, True, True, False),
     ),
 )
 def test_process_raw_tiffs(
     mocker: MockerFixture,
     tmp_path: Path,
-    test_params: tuple[bool, bool, bool],
+    test_params: tuple[bool, bool, bool, bool],
 ):
     # Unpack test params
-    has_transport, query_successful, visits_match = test_params
+    has_transport, has_tiffs, query_successful, visits_match = test_params
 
     # Mock the transport object
     mock_transport = MagicMock(feedback_queue="clem")
@@ -141,19 +142,23 @@ def test_process_raw_tiffs(
     else:
         mock_db.exec.return_value.one.side_effect = Exception("Something went wrong")
 
-    # Create the test LIF file
+    # Create the test TIFF files
     visit_dir = (
         tmp_path / "data" / "some_year" / (visit_name if visits_match else "cm12345-5")
     )
     series_name = f"{visit_name}/images/grid_1/TileScan 1/Position 1"
-    tiff_files = [
-        visit_dir
-        / "images"
-        / "grid_1"
-        / "TileScan 1"
-        / f"Position 1--Z{str(i).zfill(2)}.tif"
-        for i in range(10)
-    ]
+    tiff_files = (
+        [
+            visit_dir
+            / "images"
+            / "grid_1"
+            / "TileScan 1"
+            / f"Position 1--Z{str(i).zfill(2)}.tif"
+            for i in range(10)
+        ]
+        if has_tiffs
+        else []
+    )
     metadata_file = (
         visit_dir / "images" / "grid_1" / "TileScan 1" / "Metadata" / "Position 1.xlif"
     )
@@ -177,6 +182,11 @@ def test_process_raw_tiffs(
 
     if not has_transport:
         mock_logger.error.assert_called_with("No TransportManager object was set up")
+    elif not has_tiffs:
+        mock_logger.error.assert_called_with(
+            "No TIFF files were included in the incoming message"
+        )
+        mock_transport.send.assert_not_called()
     elif not query_successful:
         mock_logger.error.assert_called_with(
             "Error querying session information from database", exc_info=True
