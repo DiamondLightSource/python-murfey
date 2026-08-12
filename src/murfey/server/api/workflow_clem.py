@@ -115,31 +115,74 @@ class TIFFSeriesInfo(BaseModel):
 def process_raw_tiffs(
     session_id: int,
     tiff_info: TIFFSeriesInfo,
-    db: Session = murfey_db,
+    murfey_db: Session = murfey_db,
 ):
+    if _transport_object is None:
+        logger.error("No TransportManager object was set up")
+        return False
+
+    # Load the visit name from the database
     try:
-        # Try and load relevant Murfey workflow
-        workflow: EntryPoint = list(
-            entry_points(group="murfey.workflows", name="clem.process_raw_tiffs")
-        )[0]
-    except IndexError:
-        raise RuntimeError("The relevant Murfey workflow was not found")
+        murfey_session = murfey_db.exec(
+            select(MurfeyDB.Session).where(MurfeyDB.Session.id == session_id)
+        ).one()
+        visit_name = murfey_session.visit
+    except Exception as e:
+        logger.error("Error querying session information from database", exc_info=True)
+        print(e)
+        return False
 
-    # Get instrument name from the database to load the correct config file
-    session_row: MurfeyDB.Session = db.exec(
-        select(MurfeyDB.Session).where(MurfeyDB.Session.id == session_id)
-    ).one()
-    instrument_name = session_row.instrument_name
+    # Find the visit directory, the raw directory name, and the job name
+    try:
+        tiff_file = tiff_info.tiff_files[0]
+        visit_idx = tiff_file.parts.index(visit_name)
+        visit_dir = Path(
+            "/".join(
+                ""
+                if part == "/"  # Replace root "/" with "" for Linux paths
+                else part
+                for part in tiff_file.parts[: visit_idx + 1]
+            )
+        )
+        raw_dir = tiff_file.parts[visit_idx + 1]
+        job_name = str(
+            (tiff_file.parent / tiff_file.stem.split("--")[0]).relative_to(
+                visit_dir.parent
+            )
+        )
+    except Exception:
+        logger.error(
+            "Could not determine the visit directory from TIFF file "
+            f"{sanitise_path(tiff_file)}",
+            exc_info=True,
+        )
+        return False
 
-    # Pass arguments to correct workflow
-    workflow.load()(
-        # Match the arguments found in murfey.workflows.clem.process_raw_tiffs
-        tiff_list=tiff_info.tiff_files,
-        root_folder="images",
-        session_id=session_id,
-        instrument_name=instrument_name,
-        metadata=tiff_info.series_metadata,
-        messenger=_transport_object,
+    # Construct recipe and submit it for processing
+    recipe = {
+        "recipes": ["clem-process-raw-tiffs"],
+        "parameters": {
+            # Job parameters
+            "tiff_list": "null",
+            "tiff_file": f"{str(tiff_file)}",
+            "root_folder": raw_dir,
+            "metadata": f"{str(tiff_info.series_metadata)}",
+            # Other recipe parameters
+            "session_dir": f"{str(visit_dir)}",
+            "session_id": session_id,
+            "job_name": job_name,
+            "feedback_queue": _transport_object.feedback_queue,
+        },
+    }
+    logger.debug(
+        f"Submitting TIFF processing request to {_transport_object.feedback_queue!r} "
+        "with the following recipe: \n"
+        f"{recipe}"
+    )
+    _transport_object.send(
+        queue="processing_recipe",
+        message=recipe,
+        new_connection=True,
     )
     return True
 
