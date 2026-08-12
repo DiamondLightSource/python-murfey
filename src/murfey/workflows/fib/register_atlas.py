@@ -338,7 +338,6 @@ def _register_dcg_and_atlas(
 
 
 class FIBAtlasRegistrationInfo(BaseModel):
-    register: str
     session_id: int
     atlas_file: Path
 
