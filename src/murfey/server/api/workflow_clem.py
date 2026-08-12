@@ -35,7 +35,7 @@ class LifFileInfo(BaseModel):
 @router.post("/sessions/{session_id}/process_raw_lifs")  # API posts to this URL
 def process_raw_lifs(
     session_id: int,
-    lif_file: LifFileInfo,
+    lif_info: LifFileInfo,
     murfey_db: Session = murfey_db,
 ):
     if _transport_object is None:
@@ -55,25 +55,25 @@ def process_raw_lifs(
 
     # Find the visit directory, the raw directory name, and the job name
     try:
-        visit_idx = lif_file.lif_file.parts.index(visit_name)
+        visit_idx = lif_info.lif_file.parts.index(visit_name)
         visit_dir = Path(
             "/".join(
                 ""
                 if part == "/"  # Replace root "/" with "" for Linux paths
                 else part
-                for part in lif_file.lif_file.parts[: visit_idx + 1]
+                for part in lif_info.lif_file.parts[: visit_idx + 1]
             )
         )
-        raw_dir = lif_file.lif_file.parts[visit_idx + 1]
+        raw_dir = lif_info.lif_file.parts[visit_idx + 1]
         job_name = str(
-            (lif_file.lif_file.parent / lif_file.lif_file.stem).relative_to(
+            (lif_info.lif_file.parent / lif_info.lif_file.stem).relative_to(
                 visit_dir.parent
             )
         )
     except Exception:
         logger.error(
             "Could not determine the visit directory from LIF file "
-            f"{sanitise_path(lif_file.lif_file)}",
+            f"{sanitise_path(lif_info.lif_file)}",
             exc_info=True,
         )
         return False
@@ -83,7 +83,7 @@ def process_raw_lifs(
         "recipes": ["clem-process-raw-lifs"],
         "parameters": {
             # Job parameters
-            "lif_file": f"{str(lif_file.lif_file)}",
+            "lif_file": f"{str(lif_info.lif_file)}",
             "root_folder": raw_dir,
             # Other recipe parameters
             "session_dir": f"{str(visit_dir)}",
@@ -119,6 +119,9 @@ def process_raw_tiffs(
 ):
     if _transport_object is None:
         logger.error("No TransportManager object was set up")
+        return False
+    if not tiff_info.tiff_files:
+        logger.error("No TIFF files were included in the incoming message")
         return False
 
     # Load the visit name from the database
