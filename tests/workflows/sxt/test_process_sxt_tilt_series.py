@@ -7,6 +7,7 @@ from murfey.util.db import (
     DataCollection,
     DataCollectionGroup,
     ProcessingJob,
+    SearchMap,
     TiltSeries,
 )
 from murfey.workflows.sxt import process_sxt_tilt_series
@@ -67,6 +68,31 @@ def set_up_db(murfey_db_session: Session):
             "pj_id": imod_pj_entry.id,
         },
     )
+    get_or_create_db_entry(
+        murfey_db_session,
+        SearchMap,
+        lookup_kwargs={
+            "id": 0,
+            "session_id": ExampleVisit.murfey_session_id,
+            "tag": "/path/to/tomogram_source",
+            "x_stage_position": 30,
+            "y_stage_position": 40,
+        },
+    )
+    get_or_create_db_entry(
+        murfey_db_session,
+        SearchMap,
+        lookup_kwargs={
+            "id": 0,
+            "session_id": ExampleVisit.murfey_session_id,
+            "tag": "/path/to/tomogram_source",
+            "x_stage_position": 10,
+            "y_stage_position": 20,
+            "height": 10,
+            "width": 5,
+            "pixel_size": 1e-6,
+        },
+    )
     return dcg_entry.id, dc_entry.id, aretomo_autoproc_entry.id, imod_autoproc_entry.id
 
 
@@ -86,6 +112,8 @@ def test_process_new_sxt_tilt_series(
         tilt_series_length=5,
         pixel_size=100,
         tilt_offset=1,
+        x_stage_position=10.1,
+        y_stage_position=20.2,
     )
 
     # Run the registration
@@ -129,6 +157,9 @@ def test_process_new_sxt_tilt_series(
                 "pixel_size": 100,
                 "manual_tilt_offset": -1,
                 "node_creator_queue": "node_creator",
+                "search_map_id": 1,
+                "x_location": int(0.1 * 1024 / 5 + 512),
+                "y_location": int(512 - 0.2 * 1024 / 10),
             },
         },
         new_connection=True,

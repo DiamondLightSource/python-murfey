@@ -99,14 +99,15 @@ def process_sxt_tilt_series(
             .where(SearchMap.tag == tilt_series.rsync_source)
         ).all()
         for roi in dcg_rois:
-            # Determine the roi which is closest to this tomogram
-            roi_distance = np.sqrt(
-                (tilt_series_info.x_stage_position - roi.x_stage_position) ** 2
-                + (tilt_series_info.y_stage_position - roi.y_stage_position) ** 2
-            )
-            if min_distance is None or roi_distance < min_distance:
-                min_distance = roi_distance
-                matching_roi = roi
+            if roi.x_stage_position is not None and roi.y_stage_position is not None:
+                # Determine the roi which is closest to this tomogram
+                roi_distance = np.sqrt(
+                    (tilt_series_info.x_stage_position - roi.x_stage_position) ** 2
+                    + (tilt_series_info.y_stage_position - roi.y_stage_position) ** 2
+                )
+                if min_distance is None or roi_distance < min_distance:
+                    min_distance = roi_distance
+                    matching_roi = roi
 
         # Calculate the position on the roi
         if (
