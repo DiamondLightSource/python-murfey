@@ -139,7 +139,7 @@ class SXTContext(Context):
                 "source": str(self._basepath),
                 "tag": tilt_series,
                 "pixel_size_on_image": str(
-                    round(data_collection_parameters.get("pixel_size", 100), 2) * 1e-10
+                    data_collection_parameters.get("pixel_size", 100) * 1e-10
                 ),  # expected in metres
                 "image_size_x": data_collection_parameters.get("image_size_x", 0),
                 "image_size_y": data_collection_parameters.get("image_size_y", 0),
@@ -292,7 +292,7 @@ class SXTContext(Context):
                         "experiment_type_id": 44,  # Atlas
                         "tag": dcg_tag,
                         "atlas": str(thumbnail_path),
-                        "atlas_pixel_size": thumbnail_pixel_size,
+                        "atlas_pixel_size": float(thumbnail_pixel_size),
                         "atlas_x_stage_position": metadata.get("x_position", None),
                         "atlas_y_stage_position": metadata.get("y_position", None),
                         "atlas_height": int(
@@ -513,9 +513,7 @@ class SXTContext(Context):
                 data={
                     "tag": tilt_series_tag,
                     "source": destination_search_dir,
-                    "pixel_size": round(
-                        metadata.get("pixel_size", 100), 2
-                    ),  # angstroms
+                    "pixel_size": metadata.get("pixel_size", 100),  # angstroms
                     "tilt_offset": midpoint(angles),
                     "tilt_series_length": metadata.get(
                         "tilt_series_length", len(angles)

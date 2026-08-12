@@ -80,6 +80,7 @@ def register_sxt_roi(
             atlas.image_pixels_y,
         ]
     ):
+        # Pixel size of full-size mosaic in metres
         original_atlas_pixel_size = atlas.image_pixel_size * 1024 / atlas.image_pixels_x
 
         # Convert from stage position to pixel locations

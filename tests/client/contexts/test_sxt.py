@@ -83,9 +83,9 @@ def test_sxt_context_xrm_atlas(mock_ole_file, mock_post, tmp_path):
             "experiment_type_id": 44,
             "tag": f"{tmp_path}/cm12345-6/grid1",
             "atlas": "/path/to/dest/cm12345-6/processed/grid1/example_atlas_Annotated_thumbnail.jpg",
-            "atlas_pixel_size": 0.3,
-            "atlas_x_stage_position": 1,
-            "atlas_y_stage_position": -1,
+            "atlas_pixel_size": float(float(np.float32(0.3)) / 1e6 * 1000 * 6 / 1024),
+            "atlas_x_stage_position": 1.0,
+            "atlas_y_stage_position": -1.0,
             "atlas_height": 6000,
             "atlas_width": 4500,
         },
@@ -161,9 +161,9 @@ def test_sxt_context_xrm_roi(mock_ole_file, mock_post, tmp_path):
         "http://localhost:8000/workflow/sxt/sessions/1/sxt_roi/example_roi",
         json={
             "tag": f"{tmp_path}/cm12345-6/grid1",
-            "x_stage_position": 1,
-            "y_stage_position": -1,
-            "pixel_size": 0.03,
+            "x_stage_position": 1.0,
+            "y_stage_position": -1.0,
+            "pixel_size": float(np.float32(0.03)) * 1e-6,
             "height": 6000,
             "width": 4500,
             "image": "/path/to/dest/cm12345-6/processed/grid1/example_roi_Annotated_thumbnail.jpg",
@@ -183,6 +183,8 @@ def test_sxt_context_txrm(mock_ole_file, mock_post, tmp_path):
     )
     # Metadata encoded arrays
     mock_ole_file().__enter__().openstream().getvalue.side_effect = [
+        np.array([0.01], dtype=np.float32).tobytes(),  # X position
+        np.array([0.02], dtype=np.float32).tobytes(),  # Y position
         np.array([-55, -25, 5, 35, 65], dtype=np.float32).tobytes(),  # Angles
         np.array([0.01001], dtype=np.float32).tobytes(),  # Pixel size
         np.array([1024], dtype=np.int32).tobytes(),  # Image Width
@@ -218,8 +220,8 @@ def test_sxt_context_txrm(mock_ole_file, mock_post, tmp_path):
     )
 
     mock_ole_file.assert_any_call(str(tmp_path / "cm12345-6/grid1/example.txrm"))
-    assert mock_ole_file().__enter__().exists.call_count == 10
-    assert mock_ole_file().__enter__().openstream.call_count == 11  # 9 + 2 above
+    assert mock_ole_file().__enter__().exists.call_count == 12
+    assert mock_ole_file().__enter__().openstream.call_count == 13  # 11 + 2 above
     mock_ole_file().__enter__().exists.assert_any_call("ReferenceData/Image")
     for field_name in [
         "ImageInfo/Angles",
@@ -254,7 +256,7 @@ def test_sxt_context_txrm(mock_ole_file, mock_post, tmp_path):
             "data_collection_tag": "example",
             "source": f"{tmp_path}/cm12345-6/grid1",
             "tag": "example",
-            "pixel_size_on_image": str(100.1 * 1e-10),
+            "pixel_size_on_image": str(float(np.float32(0.01001)) * 1e-6),
             "image_size_x": 1024,
             "image_size_y": 2048,
             "magnification": 1000,
@@ -281,11 +283,13 @@ def test_sxt_context_txrm(mock_ole_file, mock_post, tmp_path):
         json={
             "tag": "example",
             "source": f"{tmp_path}/cm12345-6/grid1",
-            "pixel_size": 100.1,
+            "pixel_size": float(np.float32(0.01001)) * 1e4,
             "tilt_offset": 5,
             "tilt_series_length": 200,
             "txrm": str(tmp_path / "destination/cm12345-6/grid1/example.txrm"),
             "xrm_reference": None,
+            "x_stage_position": float(np.float32(0.01)),
+            "y_stage_position": float(np.float32(0.02)),
         },
         headers={"Authorization": "Bearer "},
     )
@@ -304,6 +308,8 @@ def test_sxt_context_txrm_external_ref(mock_ole_file, mock_post, tmp_path):
     )
     # Metadata encoded arrays
     mock_ole_file().__enter__().openstream().getvalue.side_effect = [
+        np.array([0.01], dtype=np.float32).tobytes(),  # X position
+        np.array([0.02], dtype=np.float32).tobytes(),  # Y position
         np.array([-55, -25, 5, 35, 65], dtype=np.float32).tobytes(),  # Angles
         np.array([0.01001], dtype=np.float32).tobytes(),  # Pixel size
         np.array([1024], dtype=np.int32).tobytes(),  # Image Width
@@ -368,7 +374,7 @@ def test_sxt_context_txrm_external_ref(mock_ole_file, mock_post, tmp_path):
             "data_collection_tag": "example",
             "source": f"{tmp_path}/cm12345-6/grid1",
             "tag": "example",
-            "pixel_size_on_image": str(100.1 * 1e-10),
+            "pixel_size_on_image": str(float(np.float32(0.01001)) * 1e-6),
             "image_size_x": 1024,
             "image_size_y": 2048,
             "magnification": 1000,
@@ -405,13 +411,15 @@ def test_sxt_context_txrm_external_ref(mock_ole_file, mock_post, tmp_path):
         json={
             "tag": "example",
             "source": f"{tmp_path}/cm12345-6/grid1",
-            "pixel_size": 100.1,
+            "pixel_size": float(np.float32(0.01001)) * 1e4,
             "tilt_offset": 5,
             "tilt_series_length": 200,
             "txrm": str(
                 tmp_path / "destination/cm12345-6/grid1/example_-60to60@0.5.txrm"
             ),
             "xrm_reference": str(tmp_path / "destination/cm12345-6/grid1/ref.xrm"),
+            "x_stage_position": float(np.float32(0.01)),
+            "y_stage_position": float(np.float32(0.02)),
         },
         headers={"Authorization": "Bearer "},
     )
@@ -430,6 +438,8 @@ def test_sxt_context_txrm_zero_angles(mock_ole_file, mock_post, tmp_path):
     )
     # Metadata encoded arrays
     mock_ole_file().__enter__().openstream().getvalue.side_effect = [
+        np.array([0.01], dtype=np.float32).tobytes(),  # X position
+        np.array([0.02], dtype=np.float32).tobytes(),  # Y position
         np.array([0, 0, 0, 0, 0], dtype=np.float32).tobytes(),  # Angles
         np.array([0.01001], dtype=np.float32).tobytes(),  # Pixel size
         np.array([1024], dtype=np.int32).tobytes(),  # Image Width
