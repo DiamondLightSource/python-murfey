@@ -73,6 +73,7 @@ def set_up_db(murfey_db_session: Session):
         SearchMap,
         lookup_kwargs={
             "id": 0,
+            "name": "0",
             "session_id": ExampleVisit.murfey_session_id,
             "tag": "/path/to/tomogram_source",
             "x_stage_position": 30,
@@ -83,7 +84,8 @@ def set_up_db(murfey_db_session: Session):
         murfey_db_session,
         SearchMap,
         lookup_kwargs={
-            "id": 0,
+            "id": 1,
+            "name": "1",
             "session_id": ExampleVisit.murfey_session_id,
             "tag": "/path/to/tomogram_source",
             "x_stage_position": 10,
