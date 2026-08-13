@@ -30,8 +30,15 @@ try:
         MicrographManifest as SmartEMMicrographManifest,
     )
 
+    from murfey.util.config import get_security_config
+
     keycloak_client = KeycloakClient(
-        load_keycloak_config(Path(os.getenv("SMARTEM_KEYCLOAK_CONFIGURATION") or ""))
+        load_keycloak_config(
+            Path(
+                os.getenv("SMARTEM_KEYCLOAK_CONFIGURATION")
+                or get_security_config().smartem_keycloak_config
+            )
+        )
     )
     SMARTEM_ACTIVE = True
 except ImportError:
