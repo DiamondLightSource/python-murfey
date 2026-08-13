@@ -210,6 +210,7 @@ class SXTContext(Context):
                 if xrm_ole.exists("ImageInfo/XPosition") and xrm_ole.exists(
                     "ImageInfo/YPosition"
                 ):
+                    # Get stage locations in microns
                     x_tiles = _get_ole_header_value(
                         xrm_ole, "ImageInfo/XPosition", np.float32
                     ).tolist()
@@ -220,6 +221,7 @@ class SXTContext(Context):
                     metadata["y_position"] = y_tiles[int(len(y_tiles) / 2)]
 
                 if xrm_ole.exists("ImageInfo/PixelSize"):
+                    # Pixel size in microns, convert to metres
                     metadata["pixel_size"] = (
                         _get_ole_header_value(
                             xrm_ole, "ImageInfo/PixelSize", np.float32
@@ -354,6 +356,7 @@ class SXTContext(Context):
                 if txrm_ole.exists("ImageInfo/XPosition") and txrm_ole.exists(
                     "ImageInfo/YPosition"
                 ):
+                    # Get stage locations in microns
                     x_tiles = _get_ole_header_value(
                         txrm_ole, "ImageInfo/XPosition", np.float32
                     ).tolist()
@@ -371,6 +374,7 @@ class SXTContext(Context):
                     metadata["maximum_angle"] = max(angles)
 
                 if txrm_ole.exists("ImageInfo/PixelSize"):
+                    # Pixel size in microns, converted to angstroms
                     pixel_size_txrm = _get_ole_header_value(
                         txrm_ole, "ImageInfo/PixelSize", np.float32
                     ).tolist()

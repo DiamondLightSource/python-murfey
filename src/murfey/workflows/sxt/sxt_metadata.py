@@ -84,6 +84,7 @@ def register_sxt_roi(
         original_atlas_pixel_size = atlas.image_pixel_size * 1024 / atlas.image_pixels_x
 
         # Convert from stage position to pixel locations
+        # Stage position in microns, pixel size in metres
         roi.x_location = (
             (roi.x_stage_position - atlas.pos_x) / original_atlas_pixel_size / 1e6
         )
@@ -94,6 +95,8 @@ def register_sxt_roi(
         # Scaling from different pixel size of atlas and roi, and atlas thumbnail size
         roi_parameters.x_location = roi.x_location * (512 / atlas.image_pixels_x) + 256
         roi_parameters.y_location = 256 - roi.y_location * (512 / atlas.image_pixels_y)
+        # Find size in terms of atlas pixels
+        # Factor of 512 to account for thumbnailing assumption in pato
         roi_parameters.width_on_atlas = int(
             round(
                 roi.width

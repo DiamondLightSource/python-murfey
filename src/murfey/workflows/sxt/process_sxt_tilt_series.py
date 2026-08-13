@@ -119,6 +119,7 @@ def process_sxt_tilt_series(
             and matching_roi.pixel_size
         ):
             # Convert from stage position to pixel locations
+            # Stage position in microns, pixel size in metres
             x_location_centered = (
                 (tilt_series_info.x_stage_position - matching_roi.x_stage_position)
                 / matching_roi.pixel_size
