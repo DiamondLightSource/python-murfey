@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import FileResponse
 from ispyb.sqlalchemy import AutoProcProgram as ISPyBAutoProcProgram
 from pydantic import BaseModel
-from sqlalchemy import func
+from sqlalchemy import desc, func
 from sqlmodel import select
 
 try:
@@ -396,6 +396,16 @@ def register_atlas(
                     .where(DataCollectionGroup.session_id == session_id)
                     .where(DataCollectionGroup.tag == atlas_registration_data.tag)
                 ).one_or_none()
+                if dcg is None:
+                    sample = int(
+                        atlas_registration_data.tag.split("Sample")[1].split("/")[0]
+                    )
+                    dcg = db.exec(
+                        select(DataCollectionGroup)
+                        .where(DataCollectionGroup.session_id == session_id)
+                        .where(DataCollectionGroup.sample == sample)
+                        .order_by(desc(DataCollectionGroup.id))
+                    ).first()
                 grid_uuid = dcg.smartem_grid_uuid
             else:
                 possible_grids = smartem_client.get_acquisition_grids(
