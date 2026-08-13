@@ -15,8 +15,14 @@ logger = getLogger("murfey.workflows.spa.ctf_estimation")
 try:
     from smartem_backend.api_client import SmartEMAPIClient
     from smartem_backend.keycloak_client import KeycloakClient, load_keycloak_config
-    from smartem_backend.model.http_request import MicrographUpdateRequest
-    from smartem_backend.model.http_response import MicrographResponse
+    from smartem_backend.model.http_request import (
+        CtfEstimationRegisteredRequest,
+        MicrographUpdateRequest,
+    )
+    from smartem_backend.model.http_response import (
+        MicrographResponse,
+        ProcessingFeedbackPublishResponse,
+    )
     from smartem_common.entity_status import MicrographStatus
 
     from murfey.util.config import get_security_config
@@ -61,6 +67,15 @@ def ctf_estimated(message: dict, murfey_db: Session) -> dict[str, bool]:
                     f"micrographs/{movie.smartem_uuid}",
                     update,
                     MicrographResponse,
+                )
+                registered_request = CtfEstimationRegisteredRequest(
+                    quality=True, metric_name="ctfmaxresolution"
+                )  # True is a placeholder until we figure out the best way to calculate this
+                smartem_client._request(
+                    "post",
+                    f"micrographs/{movie.smartem_uuid}/ctf_estimation/registered",
+                    registered_request,
+                    ProcessingFeedbackPublishResponse,
                 )
         except Exception:
             logger.warning(
