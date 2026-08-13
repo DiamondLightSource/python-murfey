@@ -247,6 +247,8 @@ class Security(BaseModel):
 
     # ISPyB settings
     ispyb_credentials: Optional[Path] = None
+    expeye_url: str = ""
+    expeye_token: str = ""
 
     # Murfey server connection settings
     auth_url: str = ""

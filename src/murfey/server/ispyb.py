@@ -32,6 +32,7 @@ from pydantic import BaseModel
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
+import murfey.server.expeye as expeye
 from murfey.util import sanitise
 from murfey.util.config import get_security_config
 from murfey.util.models import (
@@ -390,6 +391,19 @@ class TransportManager:
                 exc_info=True,
             )
         return {"success": False, "return_value": None}
+
+    def do_insert_foil_holes(
+        self,
+        grid_square_id: int,
+        scale_factor: Optional[float],
+        foil_hole_parameters: list[FoilHoleParameters],
+    ) -> dict:
+        expeye_response = expeye.insert_foil_holes(
+            grid_square_id, scale_factor, foil_hole_parameters
+        )
+        if expeye_response is None:
+            return {"success": False, "return_value": None}
+        return {"success": True, "return_value": expeye_response}
 
     def do_update_foil_hole(
         self,
