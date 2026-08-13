@@ -398,6 +398,16 @@ class TransportManager:
         scale_factor: Optional[float],
         foil_hole_parameters: list[FoilHoleParameters],
     ) -> dict:
+        if self.ispyb is not None:
+            result = []
+            successes = []
+            for fhp in foil_hole_parameters:
+                insert_response = self.do_insert_foil_hole(
+                    grid_square_id, scale_factor, fhp
+                )
+                result.append(insert_response["return_value"])
+                successes.append(insert_response["success"])
+            return {"success": all(successes), "return_value": result}
         expeye_response = expeye.insert_foil_holes(
             grid_square_id, scale_factor, foil_hole_parameters
         )
