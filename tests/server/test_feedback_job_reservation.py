@@ -54,9 +54,9 @@ def _read_counter(pipeline_dir) -> int:
 def test_reserve_advances_counter_and_returns_base(feedback, tmp_path):
     _make_pipeline(tmp_path, job_counter=12)
 
-    base = feedback._reserve_pipeline_job_numbers(str(tmp_path), 3)
+    base = feedback._reserve_pipeline_job_numbers(str(tmp_path), 3, 1)
 
-    assert base == 12
+    assert base == 15
     # The counter is consumed now, not when the job later registers.
     assert _read_counter(tmp_path) == 15
 
@@ -64,29 +64,31 @@ def test_reserve_advances_counter_and_returns_base(feedback, tmp_path):
 def test_reserve_blocks_are_contiguous_and_non_overlapping(feedback, tmp_path):
     _make_pipeline(tmp_path, job_counter=12)
 
-    first = feedback._reserve_pipeline_job_numbers(str(tmp_path), 2)
-    second = feedback._reserve_pipeline_job_numbers(str(tmp_path), 2)
+    first = feedback._reserve_pipeline_job_numbers(str(tmp_path), 2, 1)
+    second = feedback._reserve_pipeline_job_numbers(str(tmp_path), 2, 1)
 
-    assert first == 12
-    assert second == 14  # strictly after the first block — never reused
+    assert first == 14
+    assert second == 16  # strictly after the first block — never reused
     assert _read_counter(tmp_path) == 16
 
 
-def test_reserve_floors_at_first_feedback_job(feedback, tmp_path):
+def test_reserve_floors_at_input(feedback, tmp_path):
     # Counter still in the preprocessing range (Extract=5/Select=6 not yet
     # registered). A Class2D job must never be handed 5 or 6.
     _make_pipeline(tmp_path, job_counter=5)
 
-    base = feedback._reserve_pipeline_job_numbers(str(tmp_path), 2)
+    base = feedback._reserve_pipeline_job_numbers(str(tmp_path), 2, 7)
 
-    assert base == feedback.FIRST_FEEDBACK_JOB == 7
+    assert base == 9
     assert _read_counter(tmp_path) == 9
 
 
 def test_reserve_missing_pipeline_falls_back_without_creating(feedback, tmp_path):
-    base = feedback._reserve_pipeline_job_numbers(str(tmp_path), 2)
+    base = feedback._reserve_pipeline_job_numbers(
+        str(tmp_path), 2, feedback.FIRST_FEEDBACK_JOB
+    )
 
-    assert base == feedback.FIRST_FEEDBACK_JOB
+    assert base == feedback.FIRST_FEEDBACK_JOB + 2
     assert not (tmp_path / "default_pipeline.star").exists()
 
 
@@ -94,7 +96,7 @@ def test_reserve_rejects_non_positive_block(feedback, tmp_path):
     _make_pipeline(tmp_path, job_counter=10)
 
     with pytest.raises(ValueError):
-        feedback._reserve_pipeline_job_numbers(str(tmp_path), 0)
+        feedback._reserve_pipeline_job_numbers(str(tmp_path), 0, 10)
 
 
 @pytest.mark.parametrize(
@@ -123,7 +125,7 @@ def test_reserve_2d_classification_block(
         # First batch reserves Class2D (+IceBreaker) + autoselect + shared combine.
         base1 = feedback._reserve_2d_classification_jobs(str(tmp_path), fp)
         assert base1 == 10
-        assert fp.next_job == 10
+        assert fp.next_job == 10 + first_block
         assert fp.star_combination_job == 10 + combine_offset
         assert _read_counter(tmp_path) == 10 + first_block
 
