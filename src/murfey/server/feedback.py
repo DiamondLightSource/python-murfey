@@ -1251,12 +1251,6 @@ def _resize_initial_model(
                 f"\n {comp_proc.stdout} \n {comp_proc.stderr}"
             )
             raise RuntimeError(f"Resizing initial model {input_path} failed")
-        with mrcfile.open(output_path) as rescaled_mrc:
-            rescaled_mrc.header.cella = (
-                downscaled_pixel_size,
-                downscaled_pixel_size,
-                downscaled_pixel_size,
-            )
     return None
 
 

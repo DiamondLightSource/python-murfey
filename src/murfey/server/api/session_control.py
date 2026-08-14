@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 from logging import getLogger
 from pathlib import Path
@@ -13,10 +14,15 @@ from sqlmodel import select
 
 try:
     from smartem_backend.api_client import SmartEMAPIClient
+    from smartem_backend.keycloak_client import KeycloakClient, load_keycloak_config
     from smartem_common.schemas import AtlasData
 
+    keycloak_client = KeycloakClient(
+        load_keycloak_config(Path(os.getenv("SMARTEM_KEYCLOAK_CONFIGURATION") or ""))
+    )
     SMARTEM_ACTIVE = True
 except ImportError:
+    keycloak_client = None
     SMARTEM_ACTIVE = False
 
 import murfey.server
@@ -381,7 +387,9 @@ def register_atlas(
         ]
         if machine_config.smartem_api_url:
             smartem_client = SmartEMAPIClient(
-                base_url=machine_config.smartem_api_url, logger=logger
+                base_url=machine_config.smartem_api_url,
+                logger=logger,
+                keycloak_client=keycloak_client,
             )
             grid_uuid = None
             if atlas_registration_data.tag:
@@ -400,6 +408,14 @@ def register_atlas(
                         grid_uuid = grid.uuid
                         break
             if grid_uuid is not None:
+                existing_atlas = smartem_client.get_grid_atlas(grid_uuid)
+                if (
+                    existing_atlas.name == atlas_registration_data.name
+                    and existing_atlas.storage_folder
+                    == atlas_registration_data.storage_folder
+                ):
+                    # there is a question here of whether the grid should be registered if specified
+                    return
                 atlas_data = AtlasData(
                     id=atlas_registration_data.name,
                     acquisition_date=datetime.now(),
@@ -451,7 +467,9 @@ def register_square(
             ]
             if machine_config.smartem_api_url:
                 smartem_client = SmartEMAPIClient(
-                    base_url=machine_config.smartem_api_url, logger=logger
+                    base_url=machine_config.smartem_api_url,
+                    logger=logger,
+                    keycloak_client=keycloak_client,
                 )
                 smartem_client.gridsquare_registered(
                     smartem_uuid, count=square_registration_data.count

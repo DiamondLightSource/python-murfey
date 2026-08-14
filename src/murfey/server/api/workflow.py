@@ -1,4 +1,5 @@
 import asyncio
+import os
 from datetime import datetime
 from logging import getLogger
 from pathlib import Path
@@ -23,6 +24,7 @@ import murfey.server
 
 try:
     from smartem_backend.api_client import SmartEMAPIClient
+    from smartem_backend.keycloak_client import KeycloakClient, load_keycloak_config
     from smartem_common.schemas import (
         AcquisitionData as SmartEMAcquisitionData,
         GridData as SmartEMGridData,
@@ -30,8 +32,12 @@ try:
         MicrographManifest as SmartEMMicrographManifest,
     )
 
+    keycloak_client = KeycloakClient(
+        load_keycloak_config(Path(os.getenv("SMARTEM_KEYCLOAK_CONFIGURATION") or ""))
+    )
     SMARTEM_ACTIVE = True
 except ImportError:
+    keycloak_client = None
     SMARTEM_ACTIVE = False
 
 import murfey.server.prometheus as prom
@@ -134,7 +140,9 @@ def register_dc_group(
         if machine_config.smartem_api_url:
             try:
                 smartem_client = SmartEMAPIClient(
-                    base_url=machine_config.smartem_api_url, logger=logger
+                    base_url=machine_config.smartem_api_url,
+                    logger=logger,
+                    keycloak_client=keycloak_client,
                 )
                 grid_data = SmartEMGridData(
                     data_dir=Path(dcg_params.tag),
@@ -639,7 +647,9 @@ async def request_spa_preprocessing(
                     fh, gs = fh_with_gs
                     if fh.smartem_uuid:
                         smartem_client = SmartEMAPIClient(
-                            base_url=machine_config.smartem_api_url, logger=logger
+                            base_url=machine_config.smartem_api_url,
+                            logger=logger,
+                            keycloak_client=keycloak_client,
                         )
                         movie_path = Path(proc_file.path)
                         micrograph_manifest = SmartEMMicrographManifest(

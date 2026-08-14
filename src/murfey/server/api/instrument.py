@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import datetime
 import logging
+import os
 from pathlib import Path
 from typing import Annotated, Any, List, Optional
 from urllib.parse import quote
@@ -14,11 +15,16 @@ from sqlmodel import select
 from werkzeug.utils import secure_filename
 
 try:
-    from smartem_backend.api_client import EntityConverter
+    from smartem_backend.api_client import SmartEMAPIClient
+    from smartem_backend.keycloak_client import KeycloakClient, load_keycloak_config
     from smartem_common.schemas import AcquisitionData, MicroscopeData
 
+    keycloak_client = KeycloakClient(
+        load_keycloak_config(Path(os.getenv("SMARTEM_KEYCLOAK_CONFIGURATION") or ""))
+    )
     SMARTEM_ACTIVE = True
 except ImportError:
+    keycloak_client = None
     SMARTEM_ACTIVE = False
 
 import murfey.server.prometheus as prom
@@ -156,32 +162,47 @@ async def setup_multigrid_watcher(
         session = db.exec(select(Session).where(Session.id == session_id)).one()
         visit = session.visit
         async with aiohttp.ClientSession() as clientsession:
-            acquisition_uuid = None
-            if SMARTEM_ACTIVE and machine_config.smartem_api_url:
+            acquisition_uuid = session.smartem_acquisition_uuid
+            if (
+                SMARTEM_ACTIVE
+                and machine_config.smartem_api_url
+                and acquisition_uuid is None
+            ):
                 log.info("registering an acquisition with smartem")
                 try:
                     microscope_data = MicroscopeData(instrument_id=instrument_name)
-                    acquisition_data = EntityConverter.acquisition_to_request(
-                        AcquisitionData(
-                            name=visit,
-                            id=visit,
-                            instrument=microscope_data,
-                            storage_path=str(secure_path(watcher_spec.source / visit)),
-                            start_time=datetime.datetime.now(),
-                        )
+                    smartem_client = SmartEMAPIClient(
+                        base_url=machine_config.smartem_api_url,
+                        logger=log,
+                        keycloak_client=keycloak_client,
                     )
-                    async with clientsession.post(
-                        f"{machine_config.smartem_api_url}/acquisitions",
-                        json=acquisition_data.model_dump(mode="json"),
-                    ) as response:
-                        acquisition_response_data = await response.json()
-                    acquisition_uuid = acquisition_response_data["uuid"]
+                    acquisition_data = AcquisitionData(
+                        name=visit,
+                        id=visit,
+                        instrument=microscope_data,
+                        storage_path=str(secure_path(watcher_spec.source / visit)),
+                        start_time=datetime.datetime.now(),
+                    )
+                    acquisition_response_data = smartem_client.create_acquisition(
+                        acquisition_data
+                    )
+                    acquisition_uuid = acquisition_response_data.uuid
                 except Exception:
                     log.warning(
                         "failed to register acquisition with smartem", exc_info=True
                     )
             else:
                 log.info("smartem not configured")
+            if acquisition_uuid is not None:
+                async with clientsession.post(
+                    f"{machine_config.instrument_server_url}{url_path_for('api.router', 'update_session', session_id=session_id)}",
+                    parameters={"smartem_acquisition_uuid": acquisition_uuid},
+                    headers={
+                        "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
+                    },
+                ) as resp:
+                    await resp.json()
+
             async with clientsession.post(
                 f"{machine_config.instrument_server_url}{url_path_for('api.router', 'setup_multigrid_watcher', session_id=session_id)}",
                 json={

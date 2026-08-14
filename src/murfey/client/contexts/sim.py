@@ -35,11 +35,7 @@ class SIMContext(Context):
         # These have no extensions, and end with one of the listed suffixes
         if not transferred_file.suffix and transferred_file.stem.endswith(
             (
-                # Fluorescent SIM raw data files end as follows
-                "_BR",
-                "_BFR",
-                "_GR",
-                "_GFR",
+                # Only SIM raw data files ending with '_FL' should be processed
                 "_BR_FL",
                 "_BFR_FL",
                 "_GR_FL",
@@ -62,7 +58,7 @@ class SIMContext(Context):
             capture_post(
                 base_url=str(environment.url.geturl()),
                 router_name="workflow_sim.router",
-                function_name="request_sim_processing",
+                function_name="request_sim_reconstruction",
                 token=self._token,
                 instrument_name=environment.instrument_name,
                 data={

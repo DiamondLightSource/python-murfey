@@ -124,6 +124,14 @@ def ensure_dcg_exists(
 
         if collection_type == "tomo":
             windows_path = session_data["TomographySession"]["AtlasId"]
+            if (
+                session_data.get("TomographySession", {}).get("LamellaWorkflow", None)
+                == "true"
+            ):
+                # Lamella tomography experiment type
+                experiment_type_id = 49
+            else:
+                logger.warning("Cannot find tomography Session.dm file")
         else:
             windows_path = session_data["EpuSessionXml"]["Samples"]["_items"][
                 "SampleXml"

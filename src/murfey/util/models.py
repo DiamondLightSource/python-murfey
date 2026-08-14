@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, computed_field, field_validator
+from pydantic import BaseModel, field_validator
 
 """
 =======================================================================================
@@ -108,12 +108,6 @@ class StagePositionValues(BaseModel):
     # Angles are in degrees
     rotation: float | None = None
     tilt_alpha: float | None = None
-
-    @computed_field
-    def slot_number(self) -> int | None:
-        if self.x is None:
-            return None
-        return 1 if self.x < 0 else 2
 
 
 class StagePositionInfo(BaseModel):

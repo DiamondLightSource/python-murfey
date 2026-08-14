@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
 
+import numpy as np
 from pydantic import BaseModel
 from sqlmodel import select
 from sqlmodel.orm.session import Session as SQLModelSession
@@ -15,6 +16,7 @@ from murfey.util.db import (
     DataCollection,
     DataCollectionGroup,
     ProcessingJob,
+    SearchMap,
     Session,
     TiltSeries,
 )
@@ -30,6 +32,8 @@ class SXTTiltSeriesInfo(BaseModel):
     pixel_size: float
     tilt_offset: int
     xrm_reference: str | None
+    x_stage_position: float | None = None
+    y_stage_position: float | None = None
 
 
 def process_sxt_tilt_series(
@@ -48,7 +52,6 @@ def process_sxt_tilt_series(
         tilt_series = tilt_series_query[0]
         if tilt_series.processing_requested:
             logger.info(f"Tilt series {tilt_series.tag} has already been processed")
-            return {"success": True}
     else:
         tilt_series = TiltSeries(
             session_id=session_id,
@@ -82,6 +85,63 @@ def process_sxt_tilt_series(
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
+
+    # Determine pixel location on a roi for display
+    min_distance: float | None = None
+    matching_roi: SearchMap | None = None
+    x_pixel_location: int | None = None
+    y_pixel_location: int | None = None
+    if tilt_series_info.x_stage_position and tilt_series_info.y_stage_position:
+        # Find all rois for this grid
+        dcg_rois = murfey_db.exec(
+            select(SearchMap)
+            .where(SearchMap.session_id == session_id)
+            .where(SearchMap.tag == tilt_series.rsync_source)
+        ).all()
+        for roi in dcg_rois:
+            if roi.x_stage_position is not None and roi.y_stage_position is not None:
+                # Determine the roi which is closest to this tomogram
+                roi_distance = np.sqrt(
+                    (tilt_series_info.x_stage_position - roi.x_stage_position) ** 2
+                    + (tilt_series_info.y_stage_position - roi.y_stage_position) ** 2
+                )
+                if min_distance is None or roi_distance < min_distance:
+                    min_distance = roi_distance
+                    matching_roi = roi
+
+        # Calculate the position on the roi
+        if (
+            matching_roi is not None
+            and matching_roi.x_stage_position is not None
+            and matching_roi.y_stage_position is not None
+            and matching_roi.height
+            and matching_roi.width
+            and matching_roi.pixel_size
+        ):
+            # Convert from stage position to pixel locations
+            # Stage position in microns, pixel size in metres
+            x_location_centered = (
+                (tilt_series_info.x_stage_position - matching_roi.x_stage_position)
+                / matching_roi.pixel_size
+                / 1e6
+            )
+            y_location_centered = (
+                (tilt_series_info.y_stage_position - matching_roi.y_stage_position)
+                / matching_roi.pixel_size
+                / 1e6
+            )
+
+            # Scaling from different pixel size of atlas and roi, and atlas thumbnail size
+            x_pixel_location = int(
+                x_location_centered * 1024 / matching_roi.width + 512
+            )
+            y_pixel_location = int(
+                512 - y_location_centered * 1024 / matching_roi.height
+            )
+        else:
+            logger.warning(
+                f"Cannot match ROI {matching_roi.id if matching_roi else None} for {tilt_series_info.tag}"
+            )
 
     # Find the visit folder and any subfolders needed
     parts = [secure_filename(p) for p in Path(tilt_series_info.txrm).parts]
@@ -120,6 +180,9 @@ def process_sxt_tilt_series(
                 "pixel_size": tilt_series_info.pixel_size,
                 "manual_tilt_offset": -tilt_series_info.tilt_offset,
                 "node_creator_queue": machine_config.node_creator_queue,
+                "search_map_id": matching_roi.id if matching_roi else None,
+                "x_location": x_pixel_location,
+                "y_location": y_pixel_location,
             },
         }
         if murfey.server._transport_object:

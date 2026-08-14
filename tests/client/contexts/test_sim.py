@@ -29,6 +29,7 @@ def sim_data(visit_dir: Path):
         "raw/SR002_G1/20260707_112417_SR002G1_F1F_BFR",
         "raw/44drug_G2/20260703_114348_44drug_G2_E2DR_GR",
         "raw/44drug_G2/20260703_113142_44drug_G2_E2DR_GFR",
+        # To be processed
         "raw/SR002_G1/20260707_112417_SR002G1_F1F_BR_FL",
         "raw/SR002_G1/20260707_112417_SR002G1_F1F_BFR_FL",
         "raw/44drug_G2/20260703_114348_44drug_G2_E2DR_GR_FL",
@@ -132,7 +133,7 @@ def test_post_transfer(
     destination_files = [
         destination_dir / file.relative_to(visit_dir)
         for file in sim_data
-        if not file.stem.endswith("_BF")
+        if file.stem.endswith("_FL")
     ]
 
     # Mock the functions used in 'post_transfer'
@@ -162,7 +163,7 @@ def test_post_transfer(
         mock_logger.warning.assert_called_with(f"No source found for file {file}")
     else:
         for src, dst in zip(sim_data, [Path(""), *destination_files]):
-            if src.stem.endswith("_BF"):
+            if not src.stem.endswith("_FL"):
                 continue
             else:
                 mock_get_source.assert_any_call(src, mock_environment)
@@ -175,7 +176,7 @@ def test_post_transfer(
                 mock_capture_post.assert_any_call(
                     base_url=mock.ANY,
                     router_name="workflow_sim.router",
-                    function_name="request_sim_processing",
+                    function_name="request_sim_reconstruction",
                     token=context._token,
                     instrument_name=instrument_name,
                     data={
@@ -184,4 +185,4 @@ def test_post_transfer(
                     # Endpoint kwargs
                     session_id=session_id,
                 )
-        assert mock_capture_post.call_count == len(sim_data) - 1
+        assert mock_capture_post.call_count == 4

@@ -198,10 +198,14 @@ def create_session(
 
 @router.post("/sessions/{session_id}")
 def update_session(
-    session_id: MurfeySessionID, process: bool = True, db: Session = murfey_db
+    session_id: MurfeySessionID,
+    process: bool = True,
+    smartem_acquisition_uuid: str | None = None,
+    db: Session = murfey_db,
 ) -> None:
     session = db.exec(select(Session).where(Session.id == session_id)).one()
     session.process = process
+    session.smartem_acquisition_uuid = smartem_acquisition_uuid
     db.add(session)
     db.commit()
     return None

@@ -17,14 +17,14 @@ router = APIRouter(
 )
 
 
-class FIBAtlasFile(BaseModel):
+class File(BaseModel):
     file: Path
 
 
 @router.post("/sessions/{session_id}/register_atlas")
 def register_fib_atlas(
     session_id: int,
-    fib_atlas: FIBAtlasFile,
+    fib_atlas: File,
 ):
     if murfey.server._transport_object is None:
         logger.error("No TransportManager object was set up")
@@ -35,6 +35,24 @@ def register_fib_atlas(
             "register": "fib.register_atlas",
             "session_id": session_id,
             "atlas_file": str(fib_atlas.file),
+        },
+    )
+
+
+@router.post("/sessions/{session_id}/register_lamella_evaluation_image")
+def register_lamella_evaluation_image(
+    session_id: int,
+    lamella_image: File,
+):
+    if murfey.server._transport_object is None:
+        logger.error("No TransportManager object was set up")
+        return None
+    murfey.server._transport_object.send(
+        murfey.server._transport_object.feedback_queue,
+        {
+            "register": "fib.register_lamella_evaluation_image",
+            "session_id": session_id,
+            "lamella_image_file": str(lamella_image.file),
         },
     )
 

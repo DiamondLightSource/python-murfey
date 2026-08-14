@@ -5,9 +5,10 @@ import pytest
 from pytest_mock import MockerFixture
 
 from murfey.server.api.workflow_fib import (
-    FIBAtlasFile,
+    File,
     make_gif,
     register_fib_atlas,
+    register_lamella_evaluation_image,
 )
 from murfey.util.models import FIBGIFParameters
 
@@ -26,7 +27,7 @@ def test_register_fib_atlas(
 ):
     # Set up the variables
     session_id = 1
-    fib_atlas = FIBAtlasFile(**{"file": str(tmp_path / "dummy")})
+    fib_atlas = File(**{"file": str(tmp_path / "dummy")})
 
     # Mock the logger
     mock_logger = mocker.patch("murfey.server.api.workflow_fib.logger")
@@ -53,6 +54,59 @@ def test_register_fib_atlas(
                 "register": "fib.register_atlas",
                 "session_id": session_id,
                 "atlas_file": str(fib_atlas.file),
+            },
+        )
+    else:
+        mock_logger.error.assert_called_with("No TransportManager object was set up")
+
+
+@pytest.mark.parametrize(
+    "has_transport_object",
+    (
+        True,
+        False,
+    ),
+)
+def test_register_lamella_evaluation_image(
+    mocker: MockerFixture,
+    tmp_path: Path,
+    has_transport_object: bool,
+):
+    # Set up the variables
+    session_id = 1
+    lamella_image = File(**{"file": str(tmp_path / "dummy")})
+
+    # Mock the logger
+    mock_logger = mocker.patch("murfey.server.api.workflow_fib.logger")
+
+    # Mock the transport object
+    if has_transport_object:
+        mock_transport_object = MagicMock()
+        mock_transport_object.feedback_queue = "dummy"
+        mocker.patch(
+            "murfey.server.api.workflow_fib._transport_object",
+            mock_transport_object,
+        )
+    else:
+        mocker.patch(
+            "murfey.server.api.workflow_fib._transport_object",
+            None,
+        )
+
+    # Run the function and check that the expected calls were made
+    register_lamella_evaluation_image(
+        session_id=session_id,
+        lamella_image=lamella_image,
+    )
+
+    # Check that the expected calls were made
+    if has_transport_object:
+        mock_transport_object.send.assert_called_with(
+            "dummy",
+            {
+                "register": "fib.register_lamella_evaluation_image",
+                "session_id": session_id,
+                "lamella_image_file": str(lamella_image.file),
             },
         )
     else:

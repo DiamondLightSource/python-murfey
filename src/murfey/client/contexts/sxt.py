@@ -76,6 +76,38 @@ class SXTContext(Context):
         self._basepath = basepath
         self._machine_config = machine_config
 
+    def determine_converted_tiff_path(
+        self,
+        transferred_file: Path,
+        environment: MurfeyInstanceEnvironment,
+        source: Path,
+    ):
+        """Find the output path of a converted txrm file in the processed directory"""
+        if environment.visit in Path(environment.default_destinations[source]).parts:
+            # Split either side of the raw directory
+            visit_idx = Path(environment.default_destinations[source]).parts.index(
+                environment.visit
+            )
+            destination_base = "/".join(
+                Path(environment.default_destinations[source]).parts[: visit_idx + 1]
+            )
+            destination_extra = "/".join(
+                Path(environment.default_destinations[source]).parts[visit_idx + 2 :]
+            )
+        else:
+            destination_base = str(
+                Path(environment.default_destinations[source]) / environment.visit
+            )
+            destination_extra = ""
+        return (
+            Path(self._machine_config.get("rsync_basepath", ""))
+            / destination_base
+            / self._machine_config.get("processed_directory_name", "")
+            / self._machine_config.get("processed_extra_directory", "")
+            / destination_extra
+            / f"{transferred_file.relative_to(source).stem}_Annotated.tiff"
+        )
+
     def register_sxt_data_collection(
         self,
         tilt_series: str,
@@ -107,7 +139,7 @@ class SXTContext(Context):
                 "source": str(self._basepath),
                 "tag": tilt_series,
                 "pixel_size_on_image": str(
-                    round(data_collection_parameters.get("pixel_size", 100), 2) * 1e-10
+                    data_collection_parameters.get("pixel_size", 100) * 1e-10
                 ),  # expected in metres
                 "image_size_x": data_collection_parameters.get("image_size_x", 0),
                 "image_size_y": data_collection_parameters.get("image_size_y", 0),
@@ -178,6 +210,7 @@ class SXTContext(Context):
                 if xrm_ole.exists("ImageInfo/XPosition") and xrm_ole.exists(
                     "ImageInfo/YPosition"
                 ):
+                    # Get stage locations in microns
                     x_tiles = _get_ole_header_value(
                         xrm_ole, "ImageInfo/XPosition", np.float32
                     ).tolist()
@@ -188,9 +221,13 @@ class SXTContext(Context):
                     metadata["y_position"] = y_tiles[int(len(y_tiles) / 2)]
 
                 if xrm_ole.exists("ImageInfo/PixelSize"):
-                    metadata["pixel_size"] = _get_ole_header_value(
-                        xrm_ole, "ImageInfo/PixelSize", np.float32
-                    ).tolist()[0]
+                    # Pixel size in microns, convert to metres
+                    metadata["pixel_size"] = (
+                        _get_ole_header_value(
+                            xrm_ole, "ImageInfo/PixelSize", np.float32
+                        ).tolist()[0]
+                        / 1e6
+                    )
 
                 if xrm_ole.exists("ImageInfo/ImageHeight"):
                     metadata["height"] = _get_ole_header_value(
@@ -224,37 +261,8 @@ class SXTContext(Context):
                     transferred_file,
                     Path(self._machine_config.get("rsync_basepath", "")),
                 )
-                if (
-                    environment.visit
-                    in Path(environment.default_destinations[source]).parts
-                ):
-                    # Split either side of the raw directory
-                    visit_idx = Path(
-                        environment.default_destinations[source]
-                    ).parts.index(environment.visit)
-                    destination_base = "/".join(
-                        Path(environment.default_destinations[source]).parts[
-                            : visit_idx + 1
-                        ]
-                    )
-                    destination_extra = "/".join(
-                        Path(environment.default_destinations[source]).parts[
-                            visit_idx + 2 :
-                        ]
-                    )
-                else:
-                    destination_base = str(
-                        Path(environment.default_destinations[source])
-                        / environment.visit
-                    )
-                    destination_extra = ""
-                converted_tiff_path = (
-                    Path(self._machine_config.get("rsync_basepath", ""))
-                    / destination_base
-                    / self._machine_config.get("processed_directory_name", "")
-                    / self._machine_config.get("processed_extra_directory", "")
-                    / destination_extra
-                    / f"{transferred_file.relative_to(source).stem}_Annotated.tiff"
+                converted_tiff_path = self.determine_converted_tiff_path(
+                    transferred_file, environment, source
                 )
                 thumbnail_path = converted_tiff_path.parent / (
                     converted_tiff_path.stem + "_thumbnail.jpg"
@@ -273,14 +281,20 @@ class SXTContext(Context):
 
                 if (
                     metadata.get("mosaic_size", 1) > 0
-                    and metadata.get("pixel_size", 0) > 0.1
+                    and metadata.get("pixel_size", 0) > 1e-7
                 ):
                     # Large pixel size, this is an atlas
+                    thumbnail_pixel_size = (
+                        metadata["pixel_size"]
+                        * metadata.get("height", 0)
+                        * metadata["mosaic_rows"]
+                        / 1024
+                    )
                     dcg_data = {
                         "experiment_type_id": 44,  # Atlas
                         "tag": dcg_tag,
                         "atlas": str(thumbnail_path),
-                        "atlas_pixel_size": round(metadata.get("pixel_size", 0), 2),
+                        "atlas_pixel_size": float(thumbnail_pixel_size),
                         "atlas_x_stage_position": metadata.get("x_position", None),
                         "atlas_y_stage_position": metadata.get("y_position", None),
                         "atlas_height": int(
@@ -314,7 +328,7 @@ class SXTContext(Context):
                             "tag": dcg_tag,
                             "x_stage_position": metadata.get("x_position", None),
                             "y_stage_position": metadata.get("y_position", None),
-                            "pixel_size": round(metadata.get("pixel_size", 0), 2),
+                            "pixel_size": metadata.get("pixel_size", 0),
                             "height": int(
                                 metadata.get("height", 0) * metadata["mosaic_rows"]
                             ),
@@ -339,6 +353,19 @@ class SXTContext(Context):
                 if txrm_ole.exists("ReferenceData/Image"):
                     metadata["has_reference"] = True
 
+                if txrm_ole.exists("ImageInfo/XPosition") and txrm_ole.exists(
+                    "ImageInfo/YPosition"
+                ):
+                    # Get stage locations in microns
+                    x_tiles = _get_ole_header_value(
+                        txrm_ole, "ImageInfo/XPosition", np.float32
+                    ).tolist()
+                    y_tiles = _get_ole_header_value(
+                        txrm_ole, "ImageInfo/YPosition", np.float32
+                    ).tolist()
+                    metadata["x_position"] = x_tiles[int(len(x_tiles) / 2)]
+                    metadata["y_position"] = y_tiles[int(len(y_tiles) / 2)]
+
                 if txrm_ole.exists("ImageInfo/Angles"):
                     angles = _get_ole_header_value(
                         txrm_ole, "ImageInfo/Angles", np.float32
@@ -347,6 +374,7 @@ class SXTContext(Context):
                     metadata["maximum_angle"] = max(angles)
 
                 if txrm_ole.exists("ImageInfo/PixelSize"):
+                    # Pixel size in microns, converted to angstroms
                     pixel_size_txrm = _get_ole_header_value(
                         txrm_ole, "ImageInfo/PixelSize", np.float32
                     ).tolist()
@@ -416,6 +444,34 @@ class SXTContext(Context):
             else:
                 reference_file = None
 
+            logger.info(
+                f"The following tilt series will be processed: {transferred_file.stem}"
+            )
+            file_transferred_to = _file_transferred_to(
+                environment,
+                source,
+                transferred_file,
+                Path(self._machine_config.get("rsync_basepath", "")),
+            )
+
+            if not angles or all(angles) == 0:
+                logger.info(f"All angles in {transferred_file.stem} are zero")
+                converted_tiff_path = self.determine_converted_tiff_path(
+                    transferred_file, environment, source
+                )
+                capture_post(
+                    base_url=str(environment.url.geturl()),
+                    router_name="workflow_sxt.router",
+                    function_name="convert_xrm_to_tiff",
+                    token=self._token,
+                    instrument_name=environment.instrument_name,
+                    data={
+                        "xrm_path": str(file_transferred_to),
+                        "tiff_path": str(converted_tiff_path),
+                    },
+                )
+                return True
+
             if "@" in transferred_file.stem:
                 tilt_series_tag = "_".join(
                     transferred_file.stem.split("@")[0].split("_")[:-1]
@@ -441,15 +497,6 @@ class SXTContext(Context):
                 environment=environment,
             )
 
-            logger.info(
-                f"The following tilt series will be processed: {transferred_file.stem}"
-            )
-            file_transferred_to = _file_transferred_to(
-                environment,
-                source,
-                transferred_file,
-                Path(self._machine_config.get("rsync_basepath", "")),
-            )
             if reference_file:
                 reference_file_transferred_to = _file_transferred_to(
                     environment,
@@ -470,9 +517,7 @@ class SXTContext(Context):
                 data={
                     "tag": tilt_series_tag,
                     "source": destination_search_dir,
-                    "pixel_size": round(
-                        metadata.get("pixel_size", 100), 2
-                    ),  # angstroms
+                    "pixel_size": metadata.get("pixel_size", 100),  # angstroms
                     "tilt_offset": midpoint(angles),
                     "tilt_series_length": metadata.get(
                         "tilt_series_length", len(angles)
@@ -481,6 +526,8 @@ class SXTContext(Context):
                     "xrm_reference": str(reference_file_transferred_to)
                     if reference_file_transferred_to
                     else None,
+                    "x_stage_position": metadata.get("x_position", None),
+                    "y_stage_position": metadata.get("y_position", None),
                 },
             )
         return True

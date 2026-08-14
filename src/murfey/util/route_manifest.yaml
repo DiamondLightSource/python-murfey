@@ -1431,6 +1431,13 @@ murfey.server.api.workflow_fib.router:
         type: int
     methods:
       - POST
+  - path: /workflow/fib/sessions/{session_id}/register_lamella_evaluation_image
+    function: register_lamella_evaluation_image
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
   - path: /workflow/fib/sessions/{session_id}/register_milling_progress
     function: register_fib_milling_progress
     path_params:
@@ -1446,8 +1453,8 @@ murfey.server.api.workflow_fib.router:
     methods:
       - POST
 murfey.server.api.workflow_sim.router:
-  - path: /workflow/sim/sessions/{session_id}/process_data
-    function: request_sim_processing
+  - path: /workflow/sim/sessions/{session_id}/sim_recon
+    function: request_sim_reconstruction
     path_params:
       - name: session_id
         type: int

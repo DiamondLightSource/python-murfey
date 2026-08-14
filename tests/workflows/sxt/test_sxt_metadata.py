@@ -33,7 +33,7 @@ def set_up_db(murfey_db_session: Session):
             "site_name": "site",
             "pos_x": 2,
             "pos_y": 3,
-            "image_pixel_size": 0.5,
+            "image_pixel_size": 0.5 * 400 / 1024 / 1e6,
             "image_pixels_x": 400,
             "image_pixels_y": 500,
         },
@@ -111,8 +111,8 @@ def test_update_sxt_roi(mock_transport, murfey_db_session: Session, tmp_path):
     # Check the second update
     roi_params.x_location = 16 * 512 / 400 + 256
     roi_params.y_location = 256 - 34 * 512 / 500
-    roi_params.width_on_atlas = int(round(200 * 0.05 * 512 / 400))
-    roi_params.height_on_atlas = int(round(400 * 0.05 * 512 / 500))
+    roi_params.width_on_atlas = int(round(200 * 0.05 * 512 / 400 * 1e6))
+    roi_params.height_on_atlas = int(round(400 * 0.05 * 512 / 500 * 1e6))
     mock_transport.do_update_sxt_roi.assert_any_call(1, roi_params)
 
     # Check the database insert
