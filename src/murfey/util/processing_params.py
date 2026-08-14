@@ -95,7 +95,7 @@ def motion_corrected_mrc(
             / _DEFAULT_MOTIONCORR_FALLBACK
             / "Movies"
             / ppath.parent.relative_to(core / sub_dataset)
-            / str(ppath.stem + "_motion_corrected.mrc")
+            / str(input_movie.stem + "_motion_corrected.mrc")
         )
     return Path("/".join(secure_filename(p) for p in mrc_out.parts))
 

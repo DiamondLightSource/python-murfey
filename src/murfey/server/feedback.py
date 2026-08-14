@@ -861,7 +861,6 @@ def _register_complete_2d_batch(message: dict, _db):
         # Reserve Class2D + autoselect (+ combine on the first batch) up front so
         # the numbers cannot be reused before the jobs are registered.
         visit_name = _visit_name_for_session(message["session_id"], _db)
-        _reserve_2d_classification_jobs(visit_name, feedback_params)
         if _db.exec(
             select(func.count(db.Class2DParameters.particles_file))
             .where(db.Class2DParameters.pj_id == pj_id)
@@ -869,6 +868,14 @@ def _register_complete_2d_batch(message: dict, _db):
                 db.Class2DParameters.particles_file == class2d_message["particles_file"]
             )
         ).one():
+            # The incomplete batch is now complete and will run the autoselect Select
+            # plus the one-off shared combine Select job. The Class2D job re-uses
+            # its existing (already reserved) directory (message["job_dir"]), so
+            # reserve only the trailing jobs: combine goes at the end and the
+            # autoselect job is combine - 1 (see select_classes).
+            trailing = 3 if default_spa_parameters.do_icebreaker_jobs else 2
+            base = _reserve_pipeline_job_numbers(visit_name, trailing)
+            feedback_params.star_combination_job = base + (trailing - 1)
             class_uuids = _2d_class_murfey_ids(
                 class2d_message["particles_file"], _app_id(pj_id, _db), _db
             )
@@ -885,6 +892,8 @@ def _register_complete_2d_batch(message: dict, _db):
                 .murfey_id
             )
         else:
+            # No previous 2D batch has run for this particles file, so register freshly
+            _reserve_2d_classification_jobs(visit_name, feedback_params)
             class_uuids = {
                 str(i + 1): m
                 for i, m in enumerate(
@@ -1308,7 +1317,7 @@ def _register_3d_batch(message: dict, _db):
         other_options["initial_model"] = str(rescaled_initial_model_path)
         # Reserve the InitialModel (base) + Class3D (base + 1) job up front so
         # the Class3D number cannot be reused before the job is registered.
-        feedback_params.next_job = _reserve_pipeline_job_numbers(visit_name, 2)
+        feedback_params.next_job = _reserve_pipeline_job_numbers(visit_name, 1)
         class3d_dir = (
             f"{class3d_message['class3d_dir']}{(feedback_params.next_job + 1):03}"
         )
@@ -1656,7 +1665,11 @@ def _register_refinement(message: dict, _db):
             # Select (base) + Extract (base + 1), Refine3D (base + 2),
             # MaskCreate (base + 3) and PostProcess (base + 4).
             visit_name = _visit_name_for_session(message["session_id"], _db)
-            feedback_params.next_job = _reserve_pipeline_job_numbers(visit_name, 5)
+            if relion_options["symmetry"] == "C1":
+                # Needs extra Refine, Mask, PostProcess for determined symmetry
+                feedback_params.next_job = _reserve_pipeline_job_numbers(visit_name, 8)
+            else:
+                feedback_params.next_job = _reserve_pipeline_job_numbers(visit_name, 5)
             refine_dir = f"{message['refine_dir']}{(feedback_params.next_job + 2):03}"
             refined_grp_uuid = _murfey_id(message["program_id"], _db)[0]
             refined_class_uuid = _murfey_id(message["program_id"], _db)[0]

@@ -84,12 +84,12 @@ def test_register_lamella_evaluation_image(
         mock_transport_object = MagicMock()
         mock_transport_object.feedback_queue = "dummy"
         mocker.patch(
-            "murfey.server.api.workflow_fib._transport_object",
+            "murfey.server._transport_object",
             mock_transport_object,
         )
     else:
         mocker.patch(
-            "murfey.server.api.workflow_fib._transport_object",
+            "murfey.server._transport_object",
             None,
         )
 
