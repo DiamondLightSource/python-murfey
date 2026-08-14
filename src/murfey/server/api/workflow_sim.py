@@ -127,7 +127,7 @@ def request_sim_reconstruction(
         "Will submit the following message to 'processing_recipe':\n"
         f"{json.dumps(recipe, indent=2, default=str)}"
     )
-    # Disabled for now; will submit message once recipe and service have been set up
-    # murfey.server._transport_object.send(
-    #     queue="processing_recipe", message=recipe, new_connection=True
-    # )
+    # Submit message for processing
+    murfey.server._transport_object.send(
+        queue="processing_recipe", message=recipe, new_connection=True
+    )

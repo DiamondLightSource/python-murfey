@@ -584,10 +584,8 @@ async def request_spa_preprocessing(
             .where(ProcessingJob.recipe == "em-spa-preprocess")
         ).one()
         # SPARelionParameters is an ORM row, but the recipe parameters below are
-        # read by key, so convert to a dict. (April refactor dropped this
-        # dict() wrap and left the dict-style access, raising "'SPARelionParameters'
-        # object is not subscriptable" on every micrograph.)
-        proc_params: Optional[dict] = dict(
+        # read by key, so convert to a dict.
+        proc_params: dict | None = dict(
             db.exec(
                 select(SPARelionParameters).where(
                     SPARelionParameters.pj_id == collected_ids[2].id
