@@ -727,12 +727,12 @@ def _register_incomplete_2d_batch(message: dict, _db):
     # enough; reserving advances the Pipeliner counter now so the next batch
     # cannot be handed the same number before this job is registered.
     visit_name = _visit_name_for_session(message["session_id"], _db)
+    class2d_job = _current_pipeline_job_counter(visit_name, FIRST_FEEDBACK_JOB)
     feedback_params.next_job = _reserve_pipeline_job_numbers(
         visit_name, 1, FIRST_FEEDBACK_JOB
     )
     feedback_params.hold_class2d = True
     relion_options = dict(relion_params)
-    other_options = dict(feedback_params)
     _db.add(feedback_params)
     _db.commit()
     _db.expunge(feedback_params)
@@ -762,7 +762,7 @@ def _register_incomplete_2d_batch(message: dict, _db):
     zocalo_message: dict = {
         "parameters": {
             "particles_file": class2d_message["particles_file"],
-            "class2d_dir": f"{class2d_message['class2d_dir']}{other_options['next_job']:03}",
+            "class2d_dir": f"{class2d_message['class2d_dir']}{class2d_job:03}",
             "batch_is_complete": False,
             "particle_diameter": relion_options["particle_diameter"],
             "combine_star_job_number": -1,
@@ -1307,7 +1307,6 @@ def _register_3d_batch(message: dict, _db):
             db.ClassificationFeedbackParameters.pj_id == pj_id_params
         )
     ).one()
-    other_options = dict(feedback_params)
 
     visit_name = (
         _db.exec(select(db.Session).where(db.Session.id == message["session_id"]))
@@ -1333,7 +1332,6 @@ def _register_3d_batch(message: dict, _db):
                 machine_config.external_environment,
             )
         feedback_params.initial_model = str(rescaled_initial_model_path)
-        other_options["initial_model"] = str(rescaled_initial_model_path)
         # Reserve the Class3D (base) job up front so
         # the Class3D number cannot be reused before the job is registered.
         class3d_job = _current_pipeline_job_counter(
@@ -1450,7 +1448,7 @@ def _register_3d_batch(message: dict, _db):
                 "particle_diameter": relion_options["particle_diameter"],
                 "mask_diameter": relion_options["mask_diameter"] or 0,
                 "do_initial_model": False,
-                "initial_model_file": other_options["initial_model"],
+                "initial_model_file": feedback_params.initial_model,
                 "class_uuids": _3d_class_murfey_ids(
                     class3d_params.particles_file, _app_id(pj_id, _db), _db
                 ),
