@@ -7,7 +7,7 @@ import requests
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
-from sqlmodel import select
+from sqlmodel import Session as SQLModelSession, select
 
 import murfey.server
 import murfey.server.api.websocket as ws
@@ -44,7 +44,7 @@ from murfey.util.db import (
     Movie,
     ProcessingJob,
     RsyncInstance,
-    Session,
+    Session as MurfeySession,
     SessionProcessingParameters,
     SPARelionParameters,
     Tilt,
@@ -131,7 +131,9 @@ def all_visit_info(
 
 
 @router.get("/sessions/{session_id}/rsyncers", response_model=List[RsyncInstance])
-def get_rsyncers_for_client(session_id: MurfeySessionID, db: Session = murfey_db):
+def get_rsyncers_for_client(
+    session_id: MurfeySessionID, db: SQLModelSession = murfey_db
+):
     rsync_instances = db.exec(
         select(RsyncInstance).where(RsyncInstance.session_id == session_id)
     )
@@ -139,15 +141,15 @@ def get_rsyncers_for_client(session_id: MurfeySessionID, db: Session = murfey_db
 
 
 class SessionClients(BaseModel):
-    session: Session
+    session: MurfeySession
     clients: List[ClientEnvironment]
 
 
 @router.get("/sessions/{session_id}")
 async def get_session(
-    session_id: MurfeySessionID, db: Session = murfey_db
+    session_id: MurfeySessionID, db: SQLModelSession = murfey_db
 ) -> SessionClients:
-    session = db.exec(select(Session).where(Session.id == session_id)).one()
+    session = db.exec(select(MurfeySession).where(MurfeySession.id == session_id)).one()
     clients = db.exec(
         select(ClientEnvironment).where(ClientEnvironment.session_id == session_id)
     ).all()
@@ -155,8 +157,8 @@ async def get_session(
 
 
 @router.get("/sessions")
-async def get_sessions(db: Session = murfey_db):
-    sessions = db.exec(select(Session)).all()
+async def get_sessions(db: SQLModelSession = murfey_db):
+    sessions = db.exec(select(MurfeySession)).all()
     clients = db.exec(select(ClientEnvironment)).all()
     res = []
     for sess in sessions:
@@ -178,9 +180,9 @@ def create_session(
     visit: str,
     name: str,
     visit_end_time: VisitEndTime,
-    db: Session = murfey_db,
+    db: SQLModelSession = murfey_db,
 ) -> int:
-    s = Session(
+    s = MurfeySession(
         name=name,
         visit=visit,
         instrument_name=instrument_name,
@@ -201,9 +203,9 @@ def update_session(
     session_id: MurfeySessionID,
     process: bool = True,
     smartem_acquisition_uuid: str | None = None,
-    db: Session = murfey_db,
+    db: SQLModelSession = murfey_db,
 ) -> None:
-    session = db.exec(select(Session).where(Session.id == session_id)).one()
+    session = db.exec(select(MurfeySession).where(MurfeySession.id == session_id)).one()
     session.process = process
     session.smartem_acquisition_uuid = smartem_acquisition_uuid
     db.add(session)
@@ -212,35 +214,37 @@ def update_session(
 
 
 @router.delete("/sessions/{session_id}")
-def remove_session(session_id: MurfeySessionID, db: Session = murfey_db):
+def remove_session(session_id: MurfeySessionID, db: SQLModelSession = murfey_db):
     remove_session_by_id(session_id, db)
 
 
 @router.get("/instruments/{instrument_name}/visits/{visit_name}/sessions")
 def get_sessions_with_visit(
-    instrument_name: MurfeyInstrumentName, visit_name: str, db: Session = murfey_db
-) -> List[Session]:
+    instrument_name: MurfeyInstrumentName,
+    visit_name: str,
+    db: SQLModelSession = murfey_db,
+) -> List[MurfeySession]:
     sessions = db.exec(
-        select(Session)
-        .where(Session.instrument_name == instrument_name)
-        .where(Session.visit == visit_name)
+        select(MurfeySession)
+        .where(MurfeySession.instrument_name == instrument_name)
+        .where(MurfeySession.visit == visit_name)
     ).all()
     return sessions
 
 
 @router.get("/instruments/{instrument_name}/sessions")
 async def get_sessions_by_instrument_name(
-    instrument_name: MurfeyInstrumentName, db: Session = murfey_db
-) -> List[Session]:
+    instrument_name: MurfeyInstrumentName, db: SQLModelSession = murfey_db
+) -> List[MurfeySession]:
     sessions = db.exec(
-        select(Session).where(Session.instrument_name == instrument_name)
+        select(MurfeySession).where(MurfeySession.instrument_name == instrument_name)
     ).all()
     return sessions
 
 
 @router.get("/sessions/{session_id}/data_collection_groups")
 def get_dc_groups(
-    session_id: MurfeySessionID, db: Session = murfey_db
+    session_id: MurfeySessionID, db: SQLModelSession = murfey_db
 ) -> Dict[str, DataCollectionGroup]:
     data_collection_groups = db.exec(
         select(DataCollectionGroup).where(DataCollectionGroup.session_id == session_id)
@@ -250,7 +254,7 @@ def get_dc_groups(
 
 @router.get("/sessions/{session_id}/data_collection_groups/{dcgid}/data_collections")
 def get_data_collections(
-    session_id: MurfeySessionID, dcgid: int, db: Session = murfey_db
+    session_id: MurfeySessionID, dcgid: int, db: SQLModelSession = murfey_db
 ) -> List[DataCollection]:
     data_collections = db.exec(
         select(DataCollection).where(DataCollection.dcg_id == dcgid)
@@ -259,7 +263,7 @@ def get_data_collections(
 
 
 @router.get("/clients")
-async def get_clients(db: Session = murfey_db):
+async def get_clients(db: SQLModelSession = murfey_db):
     clients = db.exec(select(ClientEnvironment)).all()
     return clients
 
@@ -270,9 +274,11 @@ class CurrentGainRef(BaseModel):
 
 @router.put("/sessions/{session_id}/current_gain_ref")
 def update_current_gain_ref(
-    session_id: MurfeySessionID, new_gain_ref: CurrentGainRef, db: Session = murfey_db
+    session_id: MurfeySessionID,
+    new_gain_ref: CurrentGainRef,
+    db: SQLModelSession = murfey_db,
 ):
-    session = db.exec(select(Session).where(Session.id == session_id)).one()
+    session = db.exec(select(MurfeySession).where(MurfeySession.id == session_id)).one()
     session.current_gain_ref = new_gain_ref.path
     db.add(session)
 
@@ -393,7 +399,7 @@ class ProcessingDetails(BaseModel):
 
 @spa_router.get("/sessions/{session_id}/spa_processing_parameters")
 def get_spa_proc_param_details(
-    session_id: MurfeySessionID, db: Session = murfey_db
+    session_id: MurfeySessionID, db: SQLModelSession = murfey_db
 ) -> Optional[List[ProcessingDetails]]:
     params = db.exec(
         select(
@@ -442,7 +448,7 @@ def get_spa_proc_param_details(
     "/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares/{gsid}/foil_holes/{fhid}/num_movies"
 )
 def get_number_of_movies_from_foil_hole(
-    session_id: int, dcgid: int, gsid: int, fhid: int, db: Session = murfey_db
+    session_id: int, dcgid: int, gsid: int, fhid: int, db: SQLModelSession = murfey_db
 ) -> int:
     movies = db.exec(
         select(Movie, FoilHole, GridSquare, DataCollectionGroup)
@@ -458,13 +464,13 @@ def get_number_of_movies_from_foil_hole(
 
 
 @spa_router.get("/sessions/{session_id}/grid_squares")
-def get_grid_squares(session_id: MurfeySessionID, db: Session = murfey_db):
+def get_grid_squares(session_id: MurfeySessionID, db: SQLModelSession = murfey_db):
     return _get_grid_squares(session_id, db)
 
 
 @spa_router.get("/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares")
 def get_grid_squares_from_dcg(
-    session_id: MurfeySessionID, dcgid: int, db: Session = murfey_db
+    session_id: MurfeySessionID, dcgid: int, db: SQLModelSession = murfey_db
 ) -> List[GridSquare]:
     return _get_grid_squares_from_dcg(session_id, dcgid, db)
 
@@ -473,14 +479,14 @@ def get_grid_squares_from_dcg(
     "/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares/{gsid}/foil_holes"
 )
 def get_foil_holes_from_grid_square(
-    session_id: MurfeySessionID, dcgid: int, gsid: int, db: Session = murfey_db
+    session_id: MurfeySessionID, dcgid: int, gsid: int, db: SQLModelSession = murfey_db
 ) -> List[FoilHole]:
     return _get_foil_holes_from_grid_square(session_id, dcgid, gsid, db)
 
 
 @spa_router.get("/sessions/{session_id}/foil_hole/{fh_name}")
 def get_foil_hole(
-    session_id: MurfeySessionID, fh_name: int, db: Session = murfey_db
+    session_id: MurfeySessionID, fh_name: int, db: SQLModelSession = murfey_db
 ) -> Dict[str, int]:
     return _get_foil_hole(session_id, fh_name, db)
 
@@ -494,7 +500,7 @@ tomo_router = APIRouter(
 
 @tomo_router.get("/sessions/{session_id}/tilt_series/{tilt_series_tag}/tilts")
 def get_tilts(
-    session_id: MurfeySessionID, tilt_series_tag: str, db: Session = murfey_db
+    session_id: MurfeySessionID, tilt_series_tag: str, db: SQLModelSession = murfey_db
 ) -> Dict[str, List[str]]:
     res = db.exec(
         select(TiltSeries, Tilt)
@@ -519,7 +525,9 @@ correlative_router = APIRouter(
 
 
 @correlative_router.get("/sessions/{session_id}/upstream_visits")
-async def find_upstream_visits(session_id: MurfeySessionID, db: Session = murfey_db):
+async def find_upstream_visits(
+    session_id: MurfeySessionID, db: SQLModelSession = murfey_db
+):
     return _find_upstream_visits(session_id=session_id, db=db)
 
 
@@ -530,7 +538,7 @@ async def gather_upstream_files(
     visit_name: str,
     session_id: MurfeySessionID,
     upstream_file_request: UpstreamFileRequestInfo,
-    db: Session = murfey_db,
+    db: SQLModelSession = murfey_db,
 ):
     return _gather_upstream_files(
         session_id=session_id,
@@ -548,7 +556,7 @@ async def get_upstream_file(
     visit_name: str,
     session_id: MurfeySessionID,
     upstream_file_path: Path,
-    db: Session = murfey_db,
+    db: SQLModelSession = murfey_db,
 ):
     upstream_file = _get_upstream_file(upstream_file_path)
     return (
@@ -560,7 +568,7 @@ async def get_upstream_file(
     "/visits/{visit_name}/sessions/{session_id}/upstream_tiff_paths"
 )
 async def gather_upstream_tiffs(
-    visit_name: str, session_id: int, db: Session = murfey_db
+    visit_name: str, session_id: int, db: SQLModelSession = murfey_db
 ):
     return _gather_upstream_tiffs(visit_name=visit_name, session_id=session_id, db=db)
 
@@ -569,7 +577,7 @@ async def gather_upstream_tiffs(
     "/visits/{visit_name}/sessions/{session_id}/upstream_tiff/{tiff_path:path}"
 )
 async def get_tiff_file(
-    visit_name: str, session_id: int, tiff_path: str, db: Session = murfey_db
+    visit_name: str, session_id: int, tiff_path: str, db: SQLModelSession = murfey_db
 ):
     tiff_file = _get_tiff_file(
         visit_name=visit_name, session_id=session_id, tiff_path=tiff_path, db=db
