@@ -5,7 +5,9 @@
 FROM docker.io/library/python:3.12-slim-bookworm AS base
 
 # Install Vim in base image
-RUN apt-get update && \
+RUN \
+    echo "Setting up base image..." && \
+    apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
         rsync \
@@ -17,8 +19,11 @@ RUN apt-get update && \
 
 # Build Murfey in a branch image
 FROM base as build
-COPY ./ /python-murfey/
-RUN apt-get update && \
+
+RUN \
+    --mount=type=bind,source=.,target=/mnt/python-murfey,U \
+    echo "Installing build dependencies..." && \
+    apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
         build-essential \
@@ -27,12 +32,14 @@ RUN apt-get update && \
         libpq-dev \
         && \
     busybox --install && \
+    echo "Installing Murfey..." && \
+    cp -r /mnt/python-murfey /tmp/python-murfey && \
     python -m venv /venv && \
     /venv/bin/python -m pip install --upgrade \
         pip \
         build \
         importlib-metadata && \
-    /venv/bin/python -m pip install /python-murfey[sxt]
+    /venv/bin/python -m pip install /tmp/python-murfey[sxt]
 
 
 # Transfer completed Murfey build to base image
@@ -44,10 +51,10 @@ ARG groupname
 ARG userid
 
 # Copy completed Murfey build across and set user and group permissions
-COPY --from=build /venv/ /venv/
-RUN groupadd -r -g "${groupid}" "${groupname}" && \
+COPY --from=build --chown="${userid}":"${groupid}" /venv/ /venv/
+RUN \
+    groupadd -r -g "${groupid}" "${groupname}" && \
     useradd -r -M "${groupname}" -u "${userid}" -g "${groupname}" && \
-    chown -R "${userid}":"${groupid}" /venv && \
     chmod -R a+x /venv
 ENV PATH=/venv/bin:$PATH
 USER "${userid}":"${groupid}"
