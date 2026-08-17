@@ -17,7 +17,7 @@ from ispyb.sqlalchemy import (
 )
 from pydantic import BaseModel
 from sqlalchemy.exc import NoResultFound, OperationalError
-from sqlmodel import col, select
+from sqlmodel import Session as SQLModelSession, col, select
 from werkzeug.utils import secure_filename
 
 import murfey.server
@@ -68,7 +68,7 @@ from murfey.util.db import (
     PreprocessStash,
     ProcessingJob,
     SearchMap,
-    Session,
+    Session as MurfeySession,
     SessionProcessingParameters,
     SPARelionParameters,
     Tilt,
@@ -119,13 +119,15 @@ def register_dc_group(
     visit_name: str,
     session_id: MurfeySessionID,
     dcg_params: DCGroupParameters,
-    db: Session = murfey_db,
+    db: SQLModelSession = murfey_db,
 ):
     ispyb_proposal_code = visit_name[:2]
     ispyb_proposal_number = visit_name.split("-")[0][2:]
     ispyb_visit_number = visit_name.split("-")[-1]
     instrument_name = (
-        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+        db.exec(select(MurfeySession).where(MurfeySession.id == session_id))
+        .one()
+        .instrument_name
     )
     logger.info(f"Registering data collection group on microscope {instrument_name}")
     machine_config = get_machine_config(instrument_name=instrument_name)[
@@ -365,13 +367,15 @@ def start_dc(
     visit_name: str,
     session_id: MurfeySessionID,
     dc_params: DCParameters,
-    db: Session = murfey_db,
+    db: SQLModelSession = murfey_db,
 ):
     ispyb_proposal_code = visit_name[:2]
     ispyb_proposal_number = visit_name.split("-")[0][2:]
     ispyb_visit_number = visit_name.split("-")[-1]
     instrument_name = (
-        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+        db.exec(select(MurfeySession).where(MurfeySession.id == session_id))
+        .one()
+        .instrument_name
     )
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
@@ -437,7 +441,7 @@ def register_proc(
     visit_name: str,
     session_id: MurfeySessionID,
     proc_params: ProcessingJobParameters,
-    db: Session = murfey_db,
+    db: SQLModelSession = murfey_db,
 ):
     proc_parameters: dict = {
         "session_id": session_id,
@@ -489,7 +493,7 @@ spa_router = APIRouter(
 def register_spa_proc_params(
     session_id: MurfeySessionID,
     proc_params: ProcessingParametersSPA,
-    db: Session = murfey_db,
+    db: SQLModelSession = murfey_db,
 ):
     session_processing_parameters = db.exec(
         select(SessionProcessingParameters).where(
@@ -527,7 +531,10 @@ class Tag(BaseModel):
 
 @spa_router.post("/visits/{visit_name}/sessions/{session_id}/flush_spa_processing")
 def flush_spa_processing(
-    visit_name: str, session_id: MurfeySessionID, tag: Tag, db: Session = murfey_db
+    visit_name: str,
+    session_id: MurfeySessionID,
+    tag: Tag,
+    db: SQLModelSession = murfey_db,
 ):
     zocalo_message = {
         "register": "spa.flush_spa_preprocess",
@@ -564,10 +571,12 @@ async def request_spa_preprocessing(
     visit_name: str,
     session_id: MurfeySessionID,
     proc_file: SPAProcessFile,
-    db: Session = murfey_db,
+    db: SQLModelSession = murfey_db,
 ):
     instrument_name = (
-        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+        db.exec(select(MurfeySession).where(MurfeySession.id == session_id))
+        .one()
+        .instrument_name
     )
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
@@ -759,7 +768,7 @@ tomo_router = APIRouter(
 def register_tomo_proc_params(
     session_id: MurfeySessionID,
     proc_params: ProcessingParametersTomo,
-    db: Session = murfey_db,
+    db: SQLModelSession = murfey_db,
 ):
     session_processing_parameters = db.exec(
         select(SessionProcessingParameters).where(
@@ -795,7 +804,7 @@ def flush_tomography_processing(
     visit_name: str,
     session_id: MurfeySessionID,
     rsync_source: Source,
-    db: Session = murfey_db,
+    db: SQLModelSession = murfey_db,
 ):
     zocalo_message = {
         "register": "flush_tomography_preprocess",
@@ -818,7 +827,7 @@ class TiltSeriesInfo(BaseModel):
 
 @tomo_router.post("/visits/{visit_name}/tilt_series")
 def register_tilt_series(
-    visit_name: str, tilt_series_info: TiltSeriesInfo, db: Session = murfey_db
+    visit_name: str, tilt_series_info: TiltSeriesInfo, db: SQLModelSession = murfey_db
 ):
     session_id = tilt_series_info.session_id
     if db.exec(
@@ -847,7 +856,7 @@ class TiltSeriesGroupInfo(BaseModel):
 def register_tilt_series_length(
     session_id: int,
     tilt_series_group: TiltSeriesGroupInfo,
-    db: Session = murfey_db,
+    db: SQLModelSession = murfey_db,
 ):
     tilt_series_db = db.exec(
         select(TiltSeries)
@@ -885,10 +894,12 @@ async def request_tomography_preprocessing(
     visit_name: str,
     session_id: MurfeySessionID,
     proc_file: TomoProcessFile,
-    db: Session = murfey_db,
+    db: SQLModelSession = murfey_db,
 ):
     instrument_name = (
-        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+        db.exec(select(MurfeySession).where(MurfeySession.id == session_id))
+        .one()
+        .instrument_name
     )
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
@@ -1000,7 +1011,7 @@ def register_completed_tilt_series(
     visit_name: str,
     session_id: MurfeySessionID,
     tilt_series_group: TiltSeriesGroupInfo,
-    db: Session = murfey_db,
+    db: SQLModelSession = murfey_db,
 ):
     tilt_series_db = db.exec(
         select(TiltSeries)
@@ -1035,7 +1046,7 @@ def register_completed_tilt_series(
                 .where(ProcessingJob.recipe == "em-tomo-align")
             ).one()
             instrument_name = (
-                db.exec(select(Session).where(Session.id == session_id))
+                db.exec(select(MurfeySession).where(MurfeySession.id == session_id))
                 .one()
                 .instrument_name
             )
@@ -1102,7 +1113,7 @@ def register_completed_tilt_series(
 
 @tomo_router.post("/visits/{visit_name}/rerun_tilt_series")
 def register_tilt_series_for_rerun(
-    visit_name: str, tilt_series_info: TiltSeriesInfo, db: Session = murfey_db
+    visit_name: str, tilt_series_info: TiltSeriesInfo, db: SQLModelSession = murfey_db
 ):
     """Set processing to false for cases where an extra tilt is found for a series"""
     session_id = tilt_series_info.session_id
@@ -1130,7 +1141,7 @@ async def register_tilt(
     visit_name: str,
     session_id: MurfeySessionID,
     tilt_info: TiltInfo,
-    db: Session = murfey_db,
+    db: SQLModelSession = murfey_db,
 ):
     def _add_tilt():
         tilt_series_id = (
