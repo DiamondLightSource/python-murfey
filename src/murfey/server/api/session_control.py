@@ -415,7 +415,7 @@ def register_atlas(
                         .where(DataCollectionGroup.sample == sample)
                         .order_by(desc(DataCollectionGroup.id))
                     ).first()
-                grid_uuid = dcg.smartem_grid_uuid
+                grid_uuid = dcg.smartem_grid_uuid if dcg is not None else None
             else:
                 possible_grids = smartem_client.get_acquisition_grids(
                     atlas_registration_data.acquisition_uuid
