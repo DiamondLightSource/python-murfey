@@ -261,6 +261,9 @@ class Security(BaseModel):
     session_token_timeout: Optional[int] = None
     allow_origins: list[str] = ["*"]
 
+    # SmartEM keycloak config file
+    smartem_keycloak_config: str = ""
+
     # RabbitMQ settings
     rabbitmq_credentials: Path
     feedback_queue: str = "murfey_feedback"
