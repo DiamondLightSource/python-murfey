@@ -245,42 +245,68 @@ def test_register_grid_square():
 
 @pytest.mark.parametrize(
     "test_params",
-    (  # Colors
-        (["gray"],),
-        (["gray", "green"],),
-        (["red", "green", "blue"],),
-        (["cyan", "magenta", "blue"],),
+    (  # Has transport | Colors
+        # Success cases
+        (
+            True,
+            ["gray"],
+        ),
+        (
+            True,
+            ["gray", "green"],
+        ),
+        (
+            True,
+            ["red", "green", "blue"],
+        ),
+        (
+            True,
+            ["cyan", "magenta", "blue"],
+        ),
+        # Fail cases
+        (
+            False,
+            ["gray"],
+        ),
+        (
+            True,
+            [],
+        ),
     ),
 )
 def test_run(
     mocker: MockerFixture,
     rsync_basepath: Path,
-    test_params: tuple[list[str]],
+    test_params: tuple[bool, list[str]],
 ):
     # Unpack test params
-    (colors,) = test_params
+    has_transport, colors = test_params
+
+    # Mock the transport object
+    mock_transport = MagicMock()
+    mocker.patch(
+        "murfey.server._transport_object",
+        mock_transport if has_transport else None,
+    )
 
     # Mock the MurfeyDB connection
     mock_murfey_session_entry = MagicMock()
     mock_murfey_session_entry.instrument_name = ExampleVisit.instrument_name
     mock_murfey_session_entry.visit = visit_name
     mock_murfey_db = MagicMock()
-    mock_murfey_db.exec().return_value.one.return_value = mock_murfey_session_entry
+    mock_murfey_db.exec.return_value.one.return_value = mock_murfey_session_entry
 
     # Mock the registration helper functions
-    mock_register_clem_series = mocker.patch(
-        "murfey.workflows.clem.register_preprocessing_results._register_clem_imaging_site"
+    mock_clem_img_site = MagicMock()
+    mock_register_clem_imaging_site = mocker.patch(
+        "murfey.workflows.clem.register_preprocessing_results._register_clem_imaging_site",
+        return_value=mock_clem_img_site,
     )
     mock_register_dcg_and_atlas = mocker.patch(
         "murfey.workflows.clem.register_preprocessing_results._register_dcg_and_atlas"
     )
     mock_register_grid_square = mocker.patch(
         "murfey.workflows.clem.register_preprocessing_results._register_grid_square"
-    )
-
-    # Mock the align and merge workflow call
-    mock_align_and_merge_call = mocker.patch(
-        "murfey.workflows.clem.register_preprocessing_results.run_align_and_merge"
     )
 
     preprocessing_messages = generate_preprocessing_messages(
@@ -290,18 +316,22 @@ def test_run(
         denoising_suffix="_Lng_LVCC",
     )
     for message in preprocessing_messages:
-        result = run(
+        run(
             message=message,
             murfey_db=mock_murfey_db,
         )
-        assert result == {"success": True}
-    assert mock_register_clem_series.call_count == len(preprocessing_messages)
-    assert mock_register_dcg_and_atlas.call_count == len(preprocessing_messages)
-    assert mock_register_grid_square.call_count == len(preprocessing_messages)
-    if ("gray" not in colors) or ("gray" in colors and len(colors) == 1):
-        assert mock_align_and_merge_call.call_count == len(preprocessing_messages)
+    if not has_transport or not colors:
+        mock_register_clem_imaging_site.assert_not_called()
+        mock_register_dcg_and_atlas.assert_not_called()
+        mock_register_grid_square.assert_not_called()
     else:
-        assert mock_align_and_merge_call.call_count == len(preprocessing_messages) * 3
+        assert mock_register_clem_imaging_site.call_count == len(preprocessing_messages)
+        assert mock_register_dcg_and_atlas.call_count == len(preprocessing_messages)
+        assert mock_register_grid_square.call_count == len(preprocessing_messages)
+        if ("gray" not in colors) or ("gray" in colors and len(colors) == 1):
+            assert mock_transport.send.call_count == len(preprocessing_messages)
+        else:
+            assert mock_transport.send.call_count == len(preprocessing_messages) * 3
 
 
 @pytest.mark.parametrize(
@@ -357,14 +387,12 @@ def test_run_with_db(
         return_value=ispyb_db_session,
     )
 
-    # Mock the align and merge workflow call
-    mock_align_and_merge_call = mocker.patch(
-        "murfey.workflows.clem.register_preprocessing_results.run_align_and_merge"
-    )
-
     # Patch the TransportManager object in the workflows called
     from murfey.server.ispyb import TransportManager
 
+    mock_send = mocker.patch.object(TransportManager, "send")
+    transport_object = TransportManager("PikaTransport")
+    transport_object.feedback_queue = "murfey_feedback"
     mocker.patch(
         "murfey.server._transport_object", new=TransportManager("PikaTransport")
     )
@@ -388,9 +416,9 @@ def test_run_with_db(
     # Each message should call the align-and-merge workflow thrice
     # if gray and colour channels are both present
     if ("gray" not in colors) or ("gray" in colors and len(colors) == 1):
-        assert mock_align_and_merge_call.call_count == len(preprocessing_messages)
+        assert mock_send.call_count == len(preprocessing_messages)
     else:
-        assert mock_align_and_merge_call.call_count == len(preprocessing_messages) * 3
+        assert mock_send.call_count == len(preprocessing_messages) * 3
 
     # Murfey's DataCollectionGroup should have an entry
     murfey_dcg_search = murfey_db_session.exec(

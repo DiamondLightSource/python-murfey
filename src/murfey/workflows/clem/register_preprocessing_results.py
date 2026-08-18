@@ -25,7 +25,6 @@ from murfey.util.models import GridSquareParameters
 from murfey.util.processing_params import (
     default_clem_processing_parameters as processing_params,
 )
-from murfey.workflows.clem.align_and_merge import run as run_align_and_merge
 
 logger = logging.getLogger("murfey.workflows.clem.register_preprocessing_results")
 
@@ -558,12 +557,14 @@ def _register_grid_square(
 
 
 def run(message: dict, murfey_db: Session) -> dict[str, bool]:
-    session_id: int = (
-        int(message["session_id"])
-        if not isinstance(message["session_id"], int)
-        else message["session_id"]
-    )
+    # Early exit if no TransportManager object is configured
+    if not murfey.server._transport_object:
+        logger.error("No TransportManager object was set up")
+        return {"success": False, "requeue": False}
+
+    # Parse the incoming message
     try:
+        session_id = int(message["session_id"])
         if isinstance(message["result"], str):
             json_obj: dict = json.loads(message["result"])
             result = CLEMPreprocessingResult(**json_obj)
@@ -579,6 +580,10 @@ def run(message: dict, murfey_db: Session) -> dict[str, bool]:
             "Exception encountered when parsing TIFF preprocessing result: \n"
             f"{traceback.format_exc()}"
         )
+
+    # Check that output files were included
+    if not result.output_files:
+        logger.error("No files were provided in the incoming message")
         return {"success": False, "requeue": False}
 
     # Outer try-finally block for tidying up database-related section of function
@@ -588,6 +593,8 @@ def run(message: dict, murfey_db: Session) -> dict[str, bool]:
             murfey_session = murfey_db.exec(
                 select(MurfeyDB.Session).where(MurfeyDB.Session.id == session_id)
             ).one()
+            instrument_name = murfey_session.instrument_name
+            visit_name = murfey_session.visit
         except Exception:
             logger.error(
                 "Exception encountered when loading Murfey session information: \n",
@@ -612,8 +619,8 @@ def run(message: dict, murfey_db: Session) -> dict[str, bool]:
             # Register data collection group and atlas in ISPyB
             _register_dcg_and_atlas(
                 session_id=session_id,
-                instrument_name=murfey_session.instrument_name,
-                visit_name=murfey_session.visit,
+                instrument_name=instrument_name,
+                visit_name=visit_name,
                 imaging_site=clem_img_site,
                 murfey_db=murfey_db,
             )
@@ -662,15 +669,39 @@ def run(message: dict, murfey_db: Session) -> dict[str, bool]:
             )
 
         # Request for image alignment and processing for the requested combinations
+        try:
+            ref_file = list(result.output_files.values())[0]
+            visit_idx = ref_file.parts.index(visit_name)
+            visit_dir = Path(
+                "/".join(
+                    ""
+                    if part == "/"  # Replace root "/" with "" for Linux paths
+                    else part
+                    for part in ref_file.parts[: visit_idx + 1]
+                )
+            )
+        except Exception:
+            logger.error("Could not construct visit directory", exc_info=True)
+            return {"success": False, "requeue": False}
         for image_combo in image_combos_to_process:
             try:
-                run_align_and_merge(
-                    session_id=session_id,
-                    instrument_name=murfey_session.instrument_name,
-                    series_name=result.series_name,
-                    images=image_combo,
-                    metadata=result.metadata,
-                    messenger=murfey.server._transport_object,
+                murfey.server._transport_object.send(
+                    "processing_recipe",
+                    {
+                        "recipes": ["clem-align-and-merge"],
+                        "parameters": {
+                            # Job parameters
+                            "series_name": result.series_name,
+                            "images": [str(file) for file in image_combo],
+                            "metadata": str(result.metadata),
+                            # Other recipe parameters
+                            "session_dir": str(visit_dir),
+                            "session_id": session_id,
+                            "job_name": result.series_name,
+                            "feedback_queue": murfey.server._transport_object.feedback_queue,
+                        },
+                    },
+                    new_connection=True,
                 )
             except Exception:
                 logger.error(

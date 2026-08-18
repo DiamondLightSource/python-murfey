@@ -9,16 +9,24 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import FileResponse
 from ispyb.sqlalchemy import AutoProcProgram as ISPyBAutoProcProgram
 from pydantic import BaseModel
-from sqlalchemy import func
+from sqlalchemy import desc, func
 from sqlmodel import select
 
 try:
+    from smartem_agent.fs_parser import EpuParser
     from smartem_backend.api_client import SmartEMAPIClient
     from smartem_backend.keycloak_client import KeycloakClient, load_keycloak_config
-    from smartem_common.schemas import AtlasData
+    from smartem_common.schemas import AtlasTileGridSquarePositionData
+
+    from murfey.util.config import get_security_config
 
     keycloak_client = KeycloakClient(
-        load_keycloak_config(Path(os.getenv("SMARTEM_KEYCLOAK_CONFIGURATION") or ""))
+        load_keycloak_config(
+            Path(
+                os.getenv("SMARTEM_KEYCLOAK_CONFIGURATION")
+                or get_security_config().smartem_keycloak_config
+            )
+        )
     )
     SMARTEM_ACTIVE = True
 except ImportError:
@@ -392,13 +400,24 @@ def register_atlas(
                 keycloak_client=keycloak_client,
             )
             grid_uuid = None
+            atlas_path = None
             if atlas_registration_data.tag:
                 dcg = db.exec(
                     select(DataCollectionGroup)
                     .where(DataCollectionGroup.session_id == session_id)
                     .where(DataCollectionGroup.tag == atlas_registration_data.tag)
                 ).one_or_none()
-                grid_uuid = dcg.smartem_grid_uuid
+                if dcg is None:
+                    sample = int(
+                        atlas_registration_data.tag.split("Sample")[1].split("/")[0]
+                    )
+                    dcg = db.exec(
+                        select(DataCollectionGroup)
+                        .where(DataCollectionGroup.session_id == session_id)
+                        .where(DataCollectionGroup.sample == sample)
+                        .order_by(desc(DataCollectionGroup.id))
+                    ).first()
+                grid_uuid = dcg.smartem_grid_uuid if dcg is not None else None
             else:
                 possible_grids = smartem_client.get_acquisition_grids(
                     atlas_registration_data.acquisition_uuid
@@ -406,8 +425,9 @@ def register_atlas(
                 for grid in possible_grids:
                     if grid.name == atlas_registration_data.name.replace("_atlas", ""):
                         grid_uuid = grid.uuid
+                        atlas_path = Path(grid.atlas_dir).parent
                         break
-            if grid_uuid is not None:
+            if grid_uuid is not None and atlas_path is not None:
                 existing_atlas = smartem_client.get_grid_atlas(grid_uuid)
                 if (
                     existing_atlas.name == atlas_registration_data.name
@@ -416,16 +436,29 @@ def register_atlas(
                 ):
                     # there is a question here of whether the grid should be registered if specified
                     return
-                atlas_data = AtlasData(
-                    id=atlas_registration_data.name,
-                    acquisition_date=datetime.now(),
-                    storage_folder=atlas_registration_data.storage_folder,
-                    name=atlas_registration_data.name,
-                    tiles=[],
-                    gridsquare_positions=None,
-                    grid_uuid=grid_uuid,
+                parser = EpuParser()
+                atlas_data = parser.parse_atlas_manifest(
+                    str(atlas_path / "Atlas.dm"), grid_uuid
                 )
+                atlas_data.acquisition_date = atlas_data.acquisition_date.replace(
+                    tzinfo=None
+                )  # timezone information is not consistently provided so drop it
                 smartem_client.create_grid_atlas(atlas_data)
+                registered_squares = smartem_client.get_grid_gridsquares(grid_uuid)
+                gs_uuid_map = {gs.gridsquare_id: gs.uuid for gs in registered_squares}
+                for atlastile in atlas_data.tiles:
+                    pos_data_for_tile = []
+                    for gsid, gs_tile_pos in atlastile.gridsquare_positions.items():
+                        for pos in gs_tile_pos:
+                            pos_data_for_tile.append(
+                                AtlasTileGridSquarePositionData(
+                                    gridsquare_uuid=gs_uuid_map[gsid],
+                                    tile_uuid=atlastile.uuid,
+                                    position=pos.position,
+                                    size=pos.size,
+                                )
+                            )
+                    smartem_client.link_atlas_tile_and_gridsquares(pos_data_for_tile)
                 if atlas_registration_data.register_grid:
                     smartem_client.grid_registered(grid_uuid)
     else:

@@ -5,12 +5,13 @@
 FROM docker.io/library/python:3.12-slim-bookworm AS base
 
 # Install Vim and PostgreSQL dependencies in base image
-RUN apt-get update && \
+RUN \
+    echo "Setting up base image..." && \
+    apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
         libpq-dev \
-        vim \
-        && \
+        vim && \
     apt-get autoremove && \
     rm -rf /var/lib/apt/lists/*
 
@@ -18,35 +19,38 @@ RUN apt-get update && \
 # Build Murfey and IMOD in a branch image
 FROM base as build
 
-# Set up build argumentss for this stage
 ARG IMOD_INSTALLER=imod_5.1.9_RHEL8-64_CUDA12.0.sh
-
-COPY ./ /python-murfey/
-RUN apt-get update && \
+RUN \
+    --mount=type=bind,source=.,target=/mnt/python-murfey,U \
+    echo "Installing build dependencies..." && \
+    apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
         build-essential \
         busybox \
         curl \
-        net-tools \
-        && \
+        net-tools && \
     busybox --install && \
+    echo "Installing Murfey..." && \
+    cp -r /mnt/python-murfey /tmp/python-murfey && \
     python -m venv /venv && \
     /venv/bin/python -m pip install --upgrade \
         pip \
         build \
         importlib-metadata \
-        psycopg2-binary \
-        && \
-    /venv/bin/python -m pip install /python-murfey[server] && \
-    if [ ! -f /python-murfey/installers/${IMOD_INSTALLER} ]; then \
+        psycopg2-binary && \
+    /venv/bin/python -m pip install /tmp/python-murfey[server] && \
+    echo "Installing IMOD..." && \
+    mkdir /imod && \
+    if [ -f /mnt/python-murfey/installers/${IMOD_INSTALLER} ]; then \
+        bash "/mnt/python-murfey/installers/${IMOD_INSTALLER}" -dir /imod -skip -y; \
+    else \
         echo "IMOD installer not found; downloading..."; \
-        curl https://bio3d.colorado.edu/imod/AMD64-RHEL5/${IMOD_INSTALLER} > /python-murfey/installers/${IMOD_INSTALLER}; \
-    fi && \
-    chmod +x /python-murfey/installers/${IMOD_INSTALLER} && \
-    mkdir imod && \
-    /python-murfey/installers/${IMOD_INSTALLER} -dir imod -skip -y
-
+        curl -L \
+            -o "/tmp/${IMOD_INSTALLER}" \
+            https://bio3d.colorado.edu/imod/AMD64-RHEL5/${IMOD_INSTALLER}; \
+        bash "/tmp/${IMOD_INSTALLER}" -dir /imod -skip -y; \
+    fi
 
 # Transfer completed builds to base image
 FROM base
@@ -57,12 +61,12 @@ ARG groupname
 ARG userid
 
 # Copy completed Murfey and IMOD builds across and set user and group permissions
-COPY --from=build /venv/ /venv/
-COPY --from=build /imod/ /imod/
-RUN groupadd -r -g "${groupid}" "${groupname}" && \
+COPY --from=build --chown="${userid}":"${groupid}" /venv/ /venv/
+COPY --from=build --chown="${userid}":"${groupid}" /imod/ /imod/
+RUN \
+    groupadd -r -g "${groupid}" "${groupname}" && \
     useradd -r -M "${groupname}" -u "${userid}" -g "${groupname}" && \
-    chown -R "${userid}":"${groupid}" /venv && \
-    chmod -R a+x /venv
+    chmod -R a+x /venv /imod
 ENV PATH=/venv/bin:/imod/IMOD/bin:$PATH
 ENV IMOD_DIR=/imod/IMOD
 USER "${userid}":"${groupid}"

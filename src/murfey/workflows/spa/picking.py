@@ -38,8 +38,15 @@ try:
     from smartem_backend.model.http_response import MicrographResponse
     from smartem_common.entity_status import MicrographStatus
 
+    from murfey.util.config import get_security_config
+
     keycloak_client = KeycloakClient(
-        load_keycloak_config(Path(os.getenv("SMARTEM_KEYCLOAK_CONFIGURATION") or ""))
+        load_keycloak_config(
+            Path(
+                os.getenv("SMARTEM_KEYCLOAK_CONFIGURATION")
+                or get_security_config().smartem_keycloak_config
+            )
+        )
     )
     SMARTEM_ACTIVE = True
 except ImportError:
