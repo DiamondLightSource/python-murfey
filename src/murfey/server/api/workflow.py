@@ -529,7 +529,6 @@ def register_spa_proc_params(
             f"Pre-processing was requested for {sanitise(str(session_id))} "
             "but no Zocalo transport object was found"
         )
-        return proc_params
 
 
 class Tag(BaseModel):
@@ -599,15 +598,12 @@ async def request_spa_preprocessing(
             .where(AutoProcProgram.pj_id == ProcessingJob.id)
             .where(ProcessingJob.recipe == "em-spa-preprocess")
         ).one()
-        # SPARelionParameters is an ORM row, but the recipe parameters below are
-        # read by key, so convert to a dict.
-        proc_params: dict | None = dict(
-            db.exec(
-                select(SPARelionParameters).where(
-                    SPARelionParameters.pj_id == collected_ids[2].id
-                )
-            ).one()
-        )
+        # SPARelionParameters is an ORM row
+        proc_params = db.exec(
+            select(SPARelionParameters).where(
+                SPARelionParameters.pj_id == collected_ids[2].id
+            )
+        ).one_or_none()
     except sqlalchemy.exc.NoResultFound:
         proc_params = None
     try:
@@ -709,24 +705,24 @@ async def request_spa_preprocessing(
             "parameters": {
                 "node_creator_queue": machine_config.node_creator_queue,
                 "dcid": detached_ids[1],
-                "kv": proc_params["voltage"],
+                "kv": proc_params.voltage,
                 "autoproc_program_id": detached_ids[3],
                 "movie": proc_file.path,
                 "mrc_out": str(mrc_out),
-                "pixel_size": proc_params["angpix"],
+                "pixel_size": proc_params.angpix,
                 "image_number": proc_file.image_number,
                 "microscope": instrument_name,
                 "mc_uuid": murfey_ids[0],
                 "foil_hole_id": foil_hole_id,
-                "ft_bin": proc_params["motion_corr_binning"],
-                "fm_dose": proc_params["dose_per_frame"],
-                "gain_ref": proc_params["gain_ref"],
+                "ft_bin": proc_params.motion_corr_binning,
+                "fm_dose": proc_params.dose_per_frame,
+                "gain_ref": proc_params.gain_ref,
                 "picker_uuid": murfey_ids[1],
                 "session_id": session_id,
-                "particle_diameter": proc_params["particle_diameter"] or 0,
+                "particle_diameter": proc_params.particle_diameter or 0,
                 "fm_int_file": (
-                    proc_params["eer_fractionation_file"]
-                    if proc_params["eer_fractionation_file"]
+                    proc_params.eer_fractionation_file
+                    if proc_params.eer_fractionation_file
                     else proc_file.eer_fractionation_file
                 ),
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
