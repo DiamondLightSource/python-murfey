@@ -32,6 +32,7 @@ from sqlalchemy.exc import (
 )
 from sqlalchemy.orm.exc import ObjectDeletedError
 from sqlmodel import Session, create_engine, select
+from workflows import Disconnected
 
 import murfey.server
 import murfey.server.prometheus as prom
@@ -2203,3 +2204,13 @@ def feedback_listen():
             feedback_callback,
             acknowledgement=True,
         )
+        while True:
+            if not murfey.server._transport_object.transport.is_connected():
+                try:
+                    murfey.server._transport_object.reconnect()
+                    if murfey.server._transport_object._connection_callback:
+                        murfey.server._transport_object._connection_callback()
+                    logger.warning("RabbitMQ has been reconnected")
+                except Disconnected:
+                    logger.warning("RabbitMQ is not connected")
+                    time.sleep(30)
