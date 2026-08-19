@@ -112,15 +112,9 @@ def test_request_sim_reconstruction(
     if has_transport_object:
         mock_transport_object = MagicMock()
         mock_transport_object.feedback_queue = "dummy"
-        mocker.patch(
-            "murfey.server.api.workflow_sim._transport_object",
-            mock_transport_object,
-        )
+        mocker.patch("murfey.server._transport_object", mock_transport_object)
     else:
-        mocker.patch(
-            "murfey.server.api.workflow_sim._transport_object",
-            None,
-        )
+        mocker.patch("murfey.server._transport_object", None)
 
     # Run the function and check that the expected calls were made
     request_sim_reconstruction(

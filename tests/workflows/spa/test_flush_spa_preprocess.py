@@ -8,7 +8,7 @@ from murfey.workflows.spa import flush_spa_preprocess
 from tests.conftest import ExampleVisit
 
 
-@mock.patch("murfey.workflows.spa.flush_spa_preprocess._transport_object")
+@mock.patch("murfey.server._transport_object")
 def test_register_grid_square_update_add_locations(
     mock_transport, murfey_db_session: Session
 ):
@@ -60,7 +60,7 @@ def test_register_grid_square_update_add_locations(
     )
 
 
-@mock.patch("murfey.workflows.spa.flush_spa_preprocess._transport_object")
+@mock.patch("murfey.server._transport_object")
 def test_register_grid_square_update_add_nothing(
     mock_transport, murfey_db_session: Session
 ):
@@ -106,7 +106,7 @@ def test_register_grid_square_update_add_nothing(
     assert grid_square_final_parameters.y_stage_position == 0.4
 
 
-@mock.patch("murfey.workflows.spa.flush_spa_preprocess._transport_object")
+@mock.patch("murfey.server._transport_object")
 def test_register_grid_square_insert_with_ispyb(
     mock_transport, murfey_db_session: Session, tmp_path
 ):

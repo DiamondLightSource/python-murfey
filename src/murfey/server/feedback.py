@@ -12,7 +12,6 @@ import math
 import subprocess
 import time
 from datetime import datetime
-from functools import partial
 from importlib.metadata import (
     EntryPoint,  # For type hinting only
     entry_points,
@@ -22,6 +21,9 @@ from typing import Dict, List, NamedTuple, Tuple
 
 import mrcfile
 import numpy as np
+from gemmi import cif
+from pipeliner.project_graph import ProjectGraph
+from pipeliner.star_keys import GENERAL_BLOCK, JOB_COUNTER
 from sqlalchemy import func
 from sqlalchemy.exc import (
     InvalidRequestError,
@@ -49,6 +51,136 @@ from murfey.util.processing_params import default_spa_parameters, motion_correct
 from murfey.util.tomo import midpoint
 
 logger = logging.getLogger("murfey.server.feedback")
+
+
+# The first job number available to dynamic SPA feedback jobs. Jobs 1..6 are
+# the fixed preprocessing jobs (Import, MotionCorr, CtfFind, AutoPick, Extract,
+# Select). Also optionally 3 extra IceBreaker jobs.
+# Class2D and everything downstream start here. Used as a floor when
+# allocating so a feedback job is never handed a preprocessing job's number even
+# if it is scheduled before Extract/Select have been registered by the node
+# creator (which only happens once compute has finished).
+FIRST_FEEDBACK_JOB = 10 if default_spa_parameters.do_icebreaker_jobs else 7
+
+
+def _current_pipeline_job_counter(visit_name: str, next_known_job: int) -> int:
+    """Return the next jobNNN Pipeliner will allocate for visit_name.
+
+    Reads the JOB_COUNTER value from default_pipeline.star so that
+    SPA feedback decisions are anchored to Pipeliner's actual state instead
+    of an independent integer counter that drifts.
+
+    Falls back to ``FIRST_FEEDBACK_JOB`` if the file is missing — this preserves
+    the previous behaviour for non Doppio runs.
+
+    NOTE: this is a non-reserving read. It is only safe when the result is used
+    immediately and no other feedback job will be scheduled before the read
+    value is registered in the pipeline. For job *allocation* use
+    ``_reserve_pipeline_job_numbers`` instead, which advances the counter under
+    the project lock so the numbers cannot be reused.
+    """
+    pipeline_file = Path(visit_name) / "default_pipeline.star"
+    if not pipeline_file.is_file():
+        return next_known_job
+    try:
+        dp = cif.read_file(str(pipeline_file))
+        block = dp.find_block(GENERAL_BLOCK)
+        if block is None:
+            return next_known_job
+        return int(block.find_value(JOB_COUNTER))
+    except Exception:
+        logger.warning(
+            "Failed to read JOB_COUNTER from %s — falling back to legacy job number",
+            pipeline_file,
+            exc_info=True,
+        )
+        return next_known_job
+
+
+def _reserve_pipeline_job_numbers(
+    visit_name: str, n_jobs: int, next_known_job: int
+) -> int:
+    """Atomically reserve ``n_jobs`` job numbers.
+
+    Opens default_pipeline.star read/write under the project's ``.relion_lock``
+    and advances ``_rlnPipeLineJobCounter`` by ``n_jobs ``. Because the counter
+    is consumed *now* — rather than when the job later completes and is
+    registered by the node creator — two feedback jobs (or a feedback job and a
+    manually launched job) can no longer be handed the same number during the
+    window between scheduling a job and its registration.
+
+    The reserved block must cover every job the scheduling step will create
+    (e.g. InitialModel + Class3D), so the next allocation starts strictly after
+    them. The node creator's ``adjust_job_counter`` keeps the on-disk counter to
+    ``max(disk, job_number + 1)``, so a correctly sized block leaves the
+    counter exactly where this function set it (no gaps, no double counting).
+
+    Falls back to ``next_known_job`` without reserving when the pipeline file
+    does not yet exist (non Doppio runs / before the first job is registered).
+
+    Returns the next job number which can be registered
+    """
+    project_dir = Path(visit_name)
+    pipeline_file = project_dir / "default_pipeline.star"
+    if not pipeline_file.is_file():
+        return next_known_job + n_jobs
+    if n_jobs < 1:
+        raise ValueError("Must reserve at least one job number")
+    try:
+        with ProjectGraph(
+            read_only=False, pipeline_dir=str(project_dir), name="default"
+        ) as project:
+            base = max(project.job_counter, next_known_job)
+            project.job_counter = base + n_jobs
+        return base + n_jobs
+    except Exception:
+        logger.warning(
+            "Failed to reserve %d job number(s) in %s — falling back to a "
+            "non-reserving counter read",
+            n_jobs,
+            pipeline_file,
+            exc_info=True,
+        )
+        return _current_pipeline_job_counter(visit_name, next_known_job) + n_jobs
+
+
+def _reserve_2d_classification_jobs(
+    visit_name: str, feedback_params: db.ClassificationFeedbackParameters
+) -> int:
+    """Reserve the Pipeliner jobs for one complete 2D batch.
+
+    A complete batch runs Class2D, then the autoselect Select job, and (the
+    first time only) the shared combine Select job that all batches feed into.
+    With icebreaker enabled an extra IceBreaker job sits between Class2D and
+    autoselect. This reserves them up front, sets ``feedback_params.next_job`` to
+    the Class2D number, and fills in ``star_combination_job`` (the combine
+    number) the first time it is called. The autoselect job is always
+    ``star_combination_job - 1`` (see select_classes).
+
+    Returns the reserved Class2D job number.
+    """
+    # Class2D (+ IceBreaker) + autoselect Select
+    class2d_job = _current_pipeline_job_counter(visit_name, feedback_params.next_job)
+    per_batch_jobs = 3 if default_spa_parameters.do_icebreaker_jobs else 2
+    if not feedback_params.star_combination_job:
+        # First batch starts from the default feedback job if no pipeline file exists.
+        # Also reserve the one-off shared combine Select job, one after the
+        # autoselect job.
+        feedback_params.next_job = _reserve_pipeline_job_numbers(
+            visit_name, per_batch_jobs + 1, FIRST_FEEDBACK_JOB
+        )
+        feedback_params.star_combination_job = feedback_params.next_job - 1
+    else:
+        feedback_params.next_job = _reserve_pipeline_job_numbers(
+            visit_name, per_batch_jobs, feedback_params.next_job
+        )
+    return class2d_job
+
+
+def _visit_name_for_session(session_id: int, _db) -> str:
+    """Return the visit (project directory) for a Murfey session id."""
+    session_row = _db.exec(select(db.Session).where(db.Session.id == session_id)).one()
+    return session_row.visit
 
 
 try:
@@ -323,10 +455,6 @@ def _get_spa_params(
 
 def _release_2d_hold(message: dict, _db):
     relion_params, feedback_params = _get_spa_params(message["program_id"], _db)
-    if not feedback_params.star_combination_job:
-        feedback_params.star_combination_job = feedback_params.next_job + (
-            3 if default_spa_parameters.do_icebreaker_jobs else 2
-        )
     pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-class2d")
     if feedback_params.rerun_class2d:
         first_class2d = _db.exec(
@@ -340,6 +468,18 @@ def _release_2d_hold(message: dict, _db):
         machine_config = get_machine_config(instrument_name=instrument_name)[
             instrument_name
         ]
+        if first_class2d.complete and not feedback_params.star_combination_job:
+            # The held batch is now complete and will run the autoselect Select
+            # plus the one-off shared combine Select job. The Class2D job re-uses
+            # its existing (already reserved) directory (message["job_dir"]), so
+            # reserve only the trailing jobs: combine goes at the end and the
+            # autoselect job is combine - 1 (see select_classes).
+            visit_name = _visit_name_for_session(message["session_id"], _db)
+            trailing = 3 if default_spa_parameters.do_icebreaker_jobs else 2
+            feedback_params.next_job = _reserve_pipeline_job_numbers(
+                visit_name, trailing, feedback_params.next_job
+            )
+            feedback_params.star_combination_job = feedback_params.next_job - 1
         zocalo_message: dict = {
             "parameters": {
                 "particles_file": first_class2d.particles_file,
@@ -374,10 +514,6 @@ def _release_2d_hold(message: dict, _db):
             },
             "recipes": [machine_config.recipes.get("em-spa-class2d", "em-spa-class2d")],
         }
-        if first_class2d.complete:
-            feedback_params.next_job += (
-                4 if default_spa_parameters.do_icebreaker_jobs else 3
-            )
         feedback_params.rerun_class2d = False
         _db.add(feedback_params)
         if first_class2d.complete:
@@ -587,10 +723,17 @@ def _register_incomplete_2d_batch(message: dict, _db):
         _db.commit()
         _db.close()
         return
-    feedback_params.next_job = 10 if default_spa_parameters.do_icebreaker_jobs else 7
+    # Reserve the single Class2D job this incomplete batch will create. An
+    # incomplete batch runs Class2D only (no autoselect/combine), so one job is
+    # enough; reserving advances the Pipeliner counter now so the next batch
+    # cannot be handed the same number before this job is registered.
+    visit_name = _visit_name_for_session(message["session_id"], _db)
+    class2d_job = _current_pipeline_job_counter(visit_name, FIRST_FEEDBACK_JOB)
+    feedback_params.next_job = _reserve_pipeline_job_numbers(
+        visit_name, 1, FIRST_FEEDBACK_JOB
+    )
     feedback_params.hold_class2d = True
     relion_options = dict(relion_params)
-    other_options = dict(feedback_params)
     _db.add(feedback_params)
     _db.commit()
     _db.expunge(feedback_params)
@@ -620,7 +763,7 @@ def _register_incomplete_2d_batch(message: dict, _db):
     zocalo_message: dict = {
         "parameters": {
             "particles_file": class2d_message["particles_file"],
-            "class2d_dir": f"{class2d_message['class2d_dir']}{other_options['next_job']:03}",
+            "class2d_dir": f"{class2d_message['class2d_dir']}{class2d_job:03}",
             "batch_is_complete": False,
             "particle_diameter": relion_options["particle_diameter"],
             "combine_star_job_number": -1,
@@ -730,19 +873,9 @@ def _register_complete_2d_batch(message: dict, _db):
                 murfey_ids, class2d_message["particles_file"], _app_id(pj_id, _db), _db
             )
     elif not feedback_params.class_selection_score:
-        # For the first batch, start a container and set the database to wait
-        job_number_after_first_batch = (
-            10 if default_spa_parameters.do_icebreaker_jobs else 7
-        )
-        if (
-            feedback_params.next_job is not None
-            and feedback_params.next_job < job_number_after_first_batch
-        ):
-            feedback_params.next_job = job_number_after_first_batch
-        if not feedback_params.star_combination_job:
-            feedback_params.star_combination_job = feedback_params.next_job + (
-                3 if default_spa_parameters.do_icebreaker_jobs else 2
-            )
+        # Reserve Class2D + autoselect (+ combine on the first batch) up front so
+        # the numbers cannot be reused before the jobs are registered.
+        visit_name = _visit_name_for_session(message["session_id"], _db)
         if _db.exec(
             select(func.count(db.Class2DParameters.particles_file))
             .where(db.Class2DParameters.pj_id == pj_id)
@@ -750,6 +883,19 @@ def _register_complete_2d_batch(message: dict, _db):
                 db.Class2DParameters.particles_file == class2d_message["particles_file"]
             )
         ).one():
+            # The incomplete batch is now complete and will run the autoselect Select
+            # plus the one-off shared combine Select job. The Class2D job re-uses
+            # its existing (already reserved) directory (message["job_dir"]), so
+            # reserve only the trailing jobs: combine goes at the end and the
+            # autoselect job is combine - 1 (see select_classes).
+            trailing = 3 if default_spa_parameters.do_icebreaker_jobs else 2
+            class2d_job = _current_pipeline_job_counter(
+                visit_name, feedback_params.next_job
+            )
+            feedback_params.next_job = _reserve_pipeline_job_numbers(
+                visit_name, trailing, feedback_params.next_job
+            )
+            feedback_params.star_combination_job = feedback_params.next_job - 1
             class_uuids = _2d_class_murfey_ids(
                 class2d_message["particles_file"], _app_id(pj_id, _db), _db
             )
@@ -766,6 +912,8 @@ def _register_complete_2d_batch(message: dict, _db):
                 .murfey_id
             )
         else:
+            # No previous 2D batch has run for this particles file, so register freshly
+            class2d_job = _reserve_2d_classification_jobs(visit_name, feedback_params)
             class_uuids = {
                 str(i + 1): m
                 for i, m in enumerate(
@@ -780,7 +928,7 @@ def _register_complete_2d_batch(message: dict, _db):
         zocalo_message: dict = {
             "parameters": {
                 "particles_file": class2d_message["particles_file"],
-                "class2d_dir": f"{class2d_message['class2d_dir']}{feedback_params.next_job:03}",
+                "class2d_dir": f"{class2d_message['class2d_dir']}{class2d_job:03}",
                 "batch_is_complete": True,
                 "particle_diameter": relion_params.particle_diameter,
                 "mask_diameter": relion_params.mask_diameter or 0,
@@ -810,14 +958,14 @@ def _register_complete_2d_batch(message: dict, _db):
                 "processing_recipe", zocalo_message, new_connection=True
             )
         feedback_params.hold_class2d = True
-        feedback_params.next_job += (
-            4 if default_spa_parameters.do_icebreaker_jobs else 3
-        )
         _db.add(feedback_params)
         _db.commit()
         _db.close()
     else:
-        # Send all other messages on to a container
+        # star_combination_job is already set by now, so this reserves just the
+        # Class2D + autoselect jobs for this batch.
+        visit_name = _visit_name_for_session(message["session_id"], _db)
+        class2d_job = _reserve_2d_classification_jobs(visit_name, feedback_params)
         if _db.exec(
             select(func.count(db.Class2DParameters.particles_file))
             .where(db.Class2DParameters.pj_id == pj_id)
@@ -855,7 +1003,7 @@ def _register_complete_2d_batch(message: dict, _db):
         zocalo_message = {
             "parameters": {
                 "particles_file": class2d_message["particles_file"],
-                "class2d_dir": f"{class2d_message['class2d_dir']}{feedback_params.next_job:03}",
+                "class2d_dir": f"{class2d_message['class2d_dir']}{class2d_job:03}",
                 "batch_is_complete": True,
                 "particle_diameter": relion_params.particle_diameter,
                 "mask_diameter": relion_params.mask_diameter or 0,
@@ -884,9 +1032,7 @@ def _register_complete_2d_batch(message: dict, _db):
             murfey.server._transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
-        feedback_params.next_job += (
-            3 if default_spa_parameters.do_icebreaker_jobs else 2
-        )
+        feedback_params.hold_class2d = False
         _db.add(feedback_params)
         _db.commit()
         _db.close()
@@ -931,21 +1077,18 @@ def _flush_class2d(
         .where(db.Class2DParameters.pj_id == pj_id)
         .where(db.Class2DParameters.complete)
     ).all()
-    if not feedback_params.next_job:
-        feedback_params.next_job = (
-            10 if default_spa_parameters.do_icebreaker_jobs else 7
-        )
-    if not feedback_params.star_combination_job:
-        feedback_params.star_combination_job = feedback_params.next_job + (
-            3 if default_spa_parameters.do_icebreaker_jobs else 2
-        )
+    # Reserve each batch's Class2D + autoselect jobs (and the shared combine
+    # job the first time) as it is dispatched, so queued batches never share a
+    # number and the counter is advanced under the project lock.
+    visit_name = _visit_name_for_session(session_id, _db)
     for saved_message in class2d_db:
         # Send all held Class2D messages on with the selection score added
         _db.expunge(saved_message)
+        class2d_job = _reserve_2d_classification_jobs(visit_name, feedback_params)
         zocalo_message: dict = {
             "parameters": {
                 "particles_file": saved_message.particles_file,
-                "class2d_dir": f"{saved_message.class2d_dir}{feedback_params.next_job:03}",
+                "class2d_dir": f"{saved_message.class2d_dir}{class2d_job:03}",
                 "batch_is_complete": True,
                 "batch_size": saved_message.batch_size,
                 "particle_diameter": relion_params.particle_diameter,
@@ -974,9 +1117,6 @@ def _flush_class2d(
             murfey.server._transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
-        feedback_params.next_job += (
-            3 if default_spa_parameters.do_icebreaker_jobs else 2
-        )
         _db.delete(saved_message)
     _db.add(feedback_params)
     _db.commit()
@@ -1168,7 +1308,6 @@ def _register_3d_batch(message: dict, _db):
             db.ClassificationFeedbackParameters.pj_id == pj_id_params
         )
     ).one()
-    other_options = dict(feedback_params)
 
     visit_name = (
         _db.exec(select(db.Session).where(db.Session.id == message["session_id"]))
@@ -1194,11 +1333,15 @@ def _register_3d_batch(message: dict, _db):
                 machine_config.external_environment,
             )
         feedback_params.initial_model = str(rescaled_initial_model_path)
-        other_options["initial_model"] = str(rescaled_initial_model_path)
-        class3d_dir = (
-            f"{class3d_message['class3d_dir']}{(feedback_params.next_job + 1):03}"
+        # Reserve the Class3D (base) job up front so
+        # the Class3D number cannot be reused before the job is registered.
+        class3d_job = _current_pipeline_job_counter(
+            visit_name, feedback_params.next_job
         )
-        feedback_params.next_job += 1
+        feedback_params.next_job = _reserve_pipeline_job_numbers(
+            visit_name, 1, feedback_params.next_job
+        )
+        class3d_dir = f"{class3d_message['class3d_dir']}{class3d_job:03}"
         _db.add(feedback_params)
         _db.commit()
 
@@ -1232,11 +1375,15 @@ def _register_3d_batch(message: dict, _db):
         _db.commit()
         _db.close()
     elif not feedback_params.initial_model:
-        # For the first batch, start a container and set the database to wait
-        next_job = feedback_params.next_job
-        class3d_dir = (
-            f"{class3d_message['class3d_dir']}{(feedback_params.next_job + 1):03}"
+        # For the first batch, start a container and set the database to wait.
+        # Reserve the InitialModel (base) + Class3D (base + 1) jobs.
+        class3d_job = (
+            _current_pipeline_job_counter(visit_name, feedback_params.next_job) + 1
         )
+        feedback_params.next_job = _reserve_pipeline_job_numbers(
+            visit_name, 2, feedback_params.next_job
+        )
+        class3d_dir = f"{class3d_message['class3d_dir']}{(class3d_job):03}"
         class3d_grp_uuid = _murfey_id(message["program_id"], _db)[0]
         class_uuids = _murfey_id(message["program_id"], _db, number=4)
         class3d_params = db.Class3DParameters(
@@ -1253,8 +1400,6 @@ def _register_3d_batch(message: dict, _db):
         )
 
         feedback_params.hold_class3d = True
-        next_job += 2
-        feedback_params.next_job = next_job
         zocalo_message: dict = {
             "parameters": {
                 "particles_file": class3d_message["particles_file"],
@@ -1304,7 +1449,7 @@ def _register_3d_batch(message: dict, _db):
                 "particle_diameter": relion_options["particle_diameter"],
                 "mask_diameter": relion_options["mask_diameter"] or 0,
                 "do_initial_model": False,
-                "initial_model_file": other_options["initial_model"],
+                "initial_model_file": feedback_params.initial_model,
                 "class_uuids": _3d_class_murfey_ids(
                     class3d_params.particles_file, _app_id(pj_id, _db), _db
                 ),
@@ -1540,8 +1685,23 @@ def _register_refinement(message: dict, _db):
                 .where(db.RefineParameters.tag == "symmetry")
             ).one()
         except SQLAlchemyError:
-            next_job = feedback_params.next_job
-            refine_dir = f"{message['refine_dir']}{(feedback_params.next_job + 2):03}"
+            # Reserve the contiguous refinement block: re-extraction
+            # Select (base) + Extract (base + 1), Refine3D (base + 2),
+            # MaskCreate (base + 3) and PostProcess (base + 4).
+            visit_name = _visit_name_for_session(message["session_id"], _db)
+            refine_job = (
+                _current_pipeline_job_counter(visit_name, feedback_params.next_job) + 2
+            )
+            if relion_options["symmetry"] == "C1":
+                # Needs extra Refine, Mask, PostProcess for determined symmetry
+                feedback_params.next_job = _reserve_pipeline_job_numbers(
+                    visit_name, 8, feedback_params.next_job
+                )
+            else:
+                feedback_params.next_job = _reserve_pipeline_job_numbers(
+                    visit_name, 5, feedback_params.next_job
+                )
+            refine_dir = f"{message['refine_dir']}{refine_job:03}"
             refined_grp_uuid = _murfey_id(message["program_id"], _db)[0]
             refined_class_uuid = _murfey_id(message["program_id"], _db)[0]
             symmetry_refined_grp_uuid = _murfey_id(message["program_id"], _db)[0]
@@ -1580,14 +1740,6 @@ def _register_refinement(message: dict, _db):
                 app_id=message["program_id"],
                 _db=_db,
             )
-
-            if relion_options["symmetry"] == "C1":
-                # Extra Refine, Mask, PostProcess beyond for determined symmetry
-                next_job += 8
-            else:
-                # Select and Extract particles, then Refine, Mask, PostProcess
-                next_job += 5
-            feedback_params.next_job = next_job
 
         zocalo_message: dict = {
             "parameters": {
@@ -1978,7 +2130,7 @@ def feedback_callback(header: dict, message: dict, _db=murfey_db) -> None:
                     class_selection_score=0,
                     star_combination_job=0,
                     initial_model="",
-                    next_job=0,
+                    next_job=FIRST_FEEDBACK_JOB,
                 )
                 _db.add(params)
                 _db.add(feedback_params)
@@ -2193,12 +2345,21 @@ def feedback_listen():
                     channel_hint="", callback=None, sub_id=None
                 )
             )
-        murfey.server._transport_object._connection_callback = partial(
-            murfey.server._transport_object.transport.subscribe,
-            murfey.server._transport_object.feedback_queue,
-            feedback_callback,
-            acknowledgement=True,
-        )
+
+        # Re-subscription callback invoked by send() after reconnect() replaces
+        # _transport_object.transport. Resolve the transport at call time rather
+        # than capturing it now: a partial() bound to today's transport would
+        # re-subscribe on the old, closed connection and raise
+        # "add_callback_threadsafe() called on closed or closing connection".
+        def _resubscribe_feedback():
+            transport_manager = murfey.server._transport_object
+            transport_manager.transport.subscribe(
+                transport_manager.feedback_queue,
+                feedback_callback,
+                acknowledgement=True,
+            )
+
+        murfey.server._transport_object._connection_callback = _resubscribe_feedback
         murfey.server._transport_object.transport.subscribe(
             murfey.server._transport_object.feedback_queue,
             feedback_callback,

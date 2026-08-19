@@ -1,36 +1,102 @@
+import logging
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 
+from pipeliner.project_graph import ProjectGraph
 from pydantic import BaseModel
 from werkzeug.utils import secure_filename
 
+from murfey.util import sanitise, secure_path
 from murfey.util.config import MachineConfig, get_machine_config
+
+logger = logging.getLogger("murfey.util.processing_params")
+
+
+_DEFAULT_MOTIONCORR_FALLBACK = "job002"
+
+
+@lru_cache(maxsize=16)
+def _job_dir_for_alias_cached(
+    pipeline_file: Path, project_dir: Path, alias: str, mtime_ns: int
+) -> str | None:
+    """Read default_pipeline.star and return the jobNNN for the given alias.
+
+    Returns None on any failure (missing file, graph read error, alias
+    not found). The mtime_ns argument is a cache key — when Pipeliner rewrites
+    default_pipeline.star its mtime changes and the next call falls through
+    to a fresh read.
+    """
+    try:
+        with ProjectGraph(pipeline_dir=project_dir, read_only=True) as graph:
+            for proc in graph.process_list:
+                proc_alias = getattr(proc, "alias", None)
+                if proc_alias and proc_alias.rstrip("/").endswith(alias):
+                    # proc.name is e.g. "MotionCorr/job003/"
+                    return Path(proc.name).name
+    except Exception:
+        logger.error(
+            f"ProjectGraph read failed while looking up alias {sanitise(str(alias))} "
+            f"in {sanitise(str(pipeline_file))}",
+            exc_info=True,
+        )
+        return None
+    return None
+
+
+def _job_dir_for_alias(pipeline_file: Path, project_dir: Path, alias: str) -> str:
+    """Return the Pipeliner jobNNN for alias in the given project.
+
+    visit_name must be a path to the project directory.
+    Falls back to the positional default job002 and logs a warning so
+    drift from the live pipeline is visible in the logs instead of silent.
+    """
+    mtime_ns = pipeline_file.stat().st_mtime_ns
+    job_dir = _job_dir_for_alias_cached(pipeline_file, project_dir, alias, mtime_ns)
+    if job_dir is None:
+        logger.warning(
+            f"Alias {sanitise(str(alias))} not found in {sanitise(str(pipeline_file))} "
+            f"— falling back to {sanitise(str(_DEFAULT_MOTIONCORR_FALLBACK))}",
+        )
+        return _DEFAULT_MOTIONCORR_FALLBACK
+    return job_dir
 
 
 def motion_corrected_mrc(
     input_movie: Path, visit_name: str, machine_config: MachineConfig
 ):
-    parts = [secure_filename(p) for p in input_movie.parts]
-    visit_idx = parts.index(visit_name)
-    core = Path("/") / Path(*parts[: visit_idx + 1])
-    ppath = Path("/") / Path(*parts)
-    if machine_config.process_multiple_datasets:
-        sub_dataset = ppath.relative_to(core).parts[0]
+    project_dir = secure_path(Path(visit_name)).resolve()
+    pipeline_file = project_dir / "default_pipeline.star"
+    if pipeline_file.is_file():
+        job_dir = _job_dir_for_alias(pipeline_file, project_dir, "Live_motioncorr")
+        mrc_out = (
+            Path(visit_name)
+            / "MotionCorr"
+            / job_dir
+            / "Movies"
+            / str(input_movie.stem + "_motion_corrected.mrc")
+        )
     else:
-        sub_dataset = ""
-    extra_path = machine_config.processed_extra_directory
-    mrc_out = (
-        core
-        / machine_config.processed_directory_name
-        / sub_dataset
-        / extra_path
-        / "MotionCorr"
-        / "job002"
-        / "Movies"
-        / ppath.parent.relative_to(core / sub_dataset)
-        / str(ppath.stem + "_motion_corrected.mrc")
-    )
+        parts = [secure_filename(p) for p in input_movie.parts]
+        visit_idx = parts.index(visit_name)
+        core = Path(*parts[: visit_idx + 1])
+        ppath = Path(*parts)
+        if machine_config.process_multiple_datasets:
+            sub_dataset = ppath.relative_to(core).parts[0]
+        else:
+            sub_dataset = ""
+        extra_path = machine_config.processed_extra_directory
+        mrc_out = (
+            core
+            / machine_config.processed_directory_name
+            / sub_dataset
+            / extra_path
+            / "MotionCorr"
+            / _DEFAULT_MOTIONCORR_FALLBACK
+            / "Movies"
+            / ppath.parent.relative_to(core / sub_dataset)
+            / str(input_movie.stem + "_motion_corrected.mrc")
+        )
     return Path("/".join(secure_filename(p) for p in mrc_out.parts))
 
 

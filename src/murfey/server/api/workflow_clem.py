@@ -13,8 +13,8 @@ from fastapi import APIRouter
 from pydantic import BaseModel, field_validator
 from sqlmodel import Session, select
 
+import murfey.server
 import murfey.util.db as MurfeyDB
-from murfey.server import _transport_object
 from murfey.server.murfey_db import murfey_db
 from murfey.util import sanitise_path
 
@@ -38,7 +38,7 @@ def process_raw_lifs(
     lif_info: LifFileInfo,
     murfey_db: Session = murfey_db,
 ):
-    if _transport_object is None:
+    if murfey.server._transport_object is None:
         logger.error("No TransportManager object was set up")
         return False
 
@@ -89,15 +89,15 @@ def process_raw_lifs(
             "session_dir": f"{str(visit_dir)}",
             "session_id": session_id,
             "job_name": job_name,
-            "feedback_queue": _transport_object.feedback_queue,
+            "feedback_queue": murfey.server._transport_object.feedback_queue,
         },
     }
     logger.debug(
-        f"Submitting LIF processing request to {_transport_object.feedback_queue!r} "
+        f"Submitting LIF processing request to {murfey.server._transport_object.feedback_queue!r} "
         "with the following recipe: \n"
         f"{recipe}"
     )
-    _transport_object.send(
+    murfey.server._transport_object.send(
         queue="processing_recipe",
         message=recipe,
         new_connection=True,
@@ -117,7 +117,7 @@ def process_raw_tiffs(
     tiff_info: TIFFSeriesInfo,
     murfey_db: Session = murfey_db,
 ):
-    if _transport_object is None:
+    if murfey.server._transport_object is None:
         logger.error("No TransportManager object was set up")
         return False
     if not tiff_info.tiff_files:
@@ -174,15 +174,15 @@ def process_raw_tiffs(
             "session_dir": f"{str(visit_dir)}",
             "session_id": session_id,
             "job_name": job_name,
-            "feedback_queue": _transport_object.feedback_queue,
+            "feedback_queue": murfey.server._transport_object.feedback_queue,
         },
     }
     logger.debug(
-        f"Submitting TIFF processing request to {_transport_object.feedback_queue!r} "
+        f"Submitting TIFF processing request to {murfey.server._transport_object.feedback_queue!r} "
         "with the following recipe: \n"
         f"{recipe}"
     )
-    _transport_object.send(
+    murfey.server._transport_object.send(
         queue="processing_recipe",
         message=recipe,
         new_connection=True,
@@ -252,6 +252,6 @@ def align_and_merge_stacks(
         flatten=align_and_merge_params.flatten,
         align_across=align_and_merge_params.align_across,
         # Optional session parameters
-        messenger=_transport_object,
+        messenger=murfey.server._transport_object,
     )
     return True

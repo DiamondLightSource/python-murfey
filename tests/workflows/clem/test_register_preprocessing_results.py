@@ -285,7 +285,7 @@ def test_run(
     # Mock the transport object
     mock_transport = MagicMock()
     mocker.patch(
-        "murfey.workflows.clem.register_preprocessing_results._transport_object",
+        "murfey.server._transport_object",
         mock_transport if has_transport else None,
     )
 
@@ -394,16 +394,7 @@ def test_run_with_db(
     transport_object = TransportManager("PikaTransport")
     transport_object.feedback_queue = "murfey_feedback"
     mocker.patch(
-        "murfey.workflows.clem.register_preprocessing_results._transport_object",
-        new=transport_object,
-    )
-    mocker.patch(
-        "murfey.workflows.register_data_collection_group._transport_object",
-        new=transport_object,
-    )
-    mocker.patch(
-        "murfey.workflows.register_atlas_update._transport_object",
-        new=transport_object,
+        "murfey.server._transport_object", new=TransportManager("PikaTransport")
     )
 
     # Run the function
@@ -484,7 +475,7 @@ def test_run_with_db(
         assert getattr(ispyb_atlas, flag) == value
     assert ispyb_atlas.mode == collection_mode
 
-    # ISPyB's GrridSquare should have half the number of initial entries
+    # ISPyB's GridSquare should have half the number of initial entries
     ispyb_gs_search = (
         ispyb_db_session.execute(
             sa_select(ISPyBDB.GridSquare).where(

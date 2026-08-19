@@ -7,8 +7,8 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlmodel import Session as SQLModelSession, select
 
+import murfey.server
 import murfey.util.db as MurfeyDB
-from murfey.server import _transport_object
 from murfey.server.api.auth import validate_instrument_token
 from murfey.server.murfey_db import murfey_db
 from murfey.util import sanitise_path
@@ -33,7 +33,7 @@ def request_sim_reconstruction(
     sim_data: SIMDataFile,
     murfey_db: SQLModelSession = murfey_db,
 ):
-    if _transport_object is None:
+    if murfey.server._transport_object is None:
         logger.error("No TransportManager object was set up")
         return None
 
@@ -120,14 +120,14 @@ def request_sim_reconstruction(
             "far_red_params": str(pysimrecon_config["far_red"]),
             # Return message
             "session_id": session_id,
-            "feedback_queue": _transport_object.feedback_queue,
+            "feedback_queue": murfey.server._transport_object.feedback_queue,
         },
     }
     logger.debug(
         "Will submit the following message to 'processing_recipe':\n"
         f"{json.dumps(recipe, indent=2, default=str)}"
     )
-    # Disabled for now; will submit message once recipe and service have been set up
-    _transport_object.send(
+    # Submit message for processing
+    murfey.server._transport_object.send(
         queue="processing_recipe", message=recipe, new_connection=True
     )

@@ -7,7 +7,7 @@ from sqlmodel import select
 from sqlmodel.orm.session import Session as SQLModelSession
 from werkzeug.utils import secure_filename
 
-from murfey.server import _transport_object
+import murfey.server
 from murfey.server.api.auth import MurfeySessionIDInstrument as MurfeySessionID
 from murfey.util import sanitise
 from murfey.util.config import get_machine_config
@@ -185,11 +185,11 @@ def process_sxt_tilt_series(
                 "y_location": y_pixel_location,
             },
         }
-        if _transport_object:
+        if murfey.server._transport_object:
             logger.info(
                 f"Sending Zocalo message for processing: {sanitise(str(zocalo_message))}"
             )
-            _transport_object.send(
+            murfey.server._transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
         else:

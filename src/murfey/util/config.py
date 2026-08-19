@@ -250,7 +250,7 @@ class Security(BaseModel):
 
     # Murfey server connection settings
     auth_url: str = ""
-    auth_type: Literal["password", "cookie"] = "password"
+    auth_type: Literal["password", "cookie", "none"] = "password"
     auth_algorithm: str = ""
     auth_key: str = ""
     cookie_key: str = ""

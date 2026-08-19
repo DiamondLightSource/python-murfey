@@ -5,7 +5,7 @@ from pathlib import Path
 from sqlmodel import select
 from sqlmodel.orm.session import Session as SQLModelSession
 
-from murfey.server import _transport_object
+import murfey.server
 from murfey.util.db import DataCollectionGroup
 
 logger = logging.getLogger("murfey.workflows.register_atlas_update")
@@ -15,13 +15,13 @@ def run(
     message: dict,
     murfey_db: SQLModelSession,  # Defined for compatibility but unused
 ):
-    if _transport_object is None:
+    if murfey.server._transport_object is None:
         logger.error("Unable to find transport manager")
         return {"success": False, "requeue": False}
 
     logger.info(f"Registering updated atlas: \n{message}")
 
-    _transport_object.do_update_atlas(
+    murfey.server._transport_object.do_update_atlas(
         atlas_id=message["atlas_id"],
         atlas_image=message["atlas"],
         pixel_size=message["atlas_pixel_size"],

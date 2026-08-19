@@ -38,7 +38,7 @@ def test_process_raw_lifs(
     # Mock the transport object
     mock_transport = MagicMock(feedback_queue="clem")
     mocker.patch(
-        "murfey.server.api.workflow_clem._transport_object",
+        "murfey.server._transport_object",
         mock_transport if has_transport else None,
     )
 
@@ -128,7 +128,7 @@ def test_process_raw_tiffs(
     # Mock the transport object
     mock_transport = MagicMock(feedback_queue="clem")
     mocker.patch(
-        "murfey.server.api.workflow_clem._transport_object",
+        "murfey.server._transport_object",
         mock_transport if has_transport else None,
     )
 

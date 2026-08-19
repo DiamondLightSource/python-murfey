@@ -12,7 +12,7 @@ from murfey.util.models import SearchMapParameters
 from tests.conftest import ExampleVisit
 
 
-@mock.patch("murfey.server.api.workflow._transport_object")
+@mock.patch("murfey.server._transport_object")
 def test_register_dc_group_new_dcg(mock_transport, murfey_db_session: Session):
     """Test the request for a completely new data collection group"""
     mock_transport.feedback_queue = "mock_feedback_queue"
@@ -56,7 +56,7 @@ def test_register_dc_group_new_dcg(mock_transport, murfey_db_session: Session):
     )
 
 
-@mock.patch("murfey.server.api.workflow._transport_object")
+@mock.patch("murfey.server._transport_object")
 def test_register_dc_group_atlas_to_processing(
     mock_transport, murfey_db_session: Session
 ):
@@ -126,7 +126,7 @@ def test_register_dc_group_atlas_to_processing(
     assert new_dcg.tag == "processing_tag"
 
 
-@mock.patch("murfey.server.api.workflow._transport_object")
+@mock.patch("murfey.server._transport_object")
 def test_register_dc_group_processing_to_atlas(
     mock_transport, murfey_db_session: Session
 ):
@@ -219,7 +219,7 @@ def test_register_dc_group_processing_to_atlas(
     assert second_new_dcg.tag != "/path/to/Sample10/Atlas"
 
 
-@mock.patch("murfey.server.api.workflow._transport_object")
+@mock.patch("murfey.server._transport_object")
 def test_register_dc_group_new_dcg_old_atlas(
     mock_transport, murfey_db_session: Session
 ):
@@ -281,7 +281,7 @@ def test_register_dc_group_new_dcg_old_atlas(
     )
 
 
-@mock.patch("murfey.server.api.workflow._transport_object")
+@mock.patch("murfey.server._transport_object")
 def test_register_dc_group_new_atlas(mock_transport, murfey_db_session: Session):
     """
     Test the request to update an existing data collection group
@@ -336,7 +336,7 @@ def test_register_dc_group_new_atlas(mock_transport, murfey_db_session: Session)
     assert new_dcg.atlas_id == 5
 
 
-@mock.patch("murfey.server.api.workflow._transport_object")
+@mock.patch("murfey.server._transport_object")
 @mock.patch("murfey.server.api.workflow.register_search_map_in_database")
 @mock.patch("murfey.server.api.workflow.get_machine_config")
 def test_register_dc_group_new_atlas_with_searchmaps(
@@ -449,7 +449,7 @@ def test_register_dc_group_new_atlas_with_searchmaps(
     )
 
 
-@mock.patch("murfey.server.api.workflow._transport_object")
+@mock.patch("murfey.server._transport_object")
 @mock.patch("murfey.server.api.workflow.get_machine_config")
 def test_register_dc_group_new_atlas_with_sxt_roi(
     mock_machine_config,
@@ -579,7 +579,7 @@ def test_register_dc_group_new_atlas_with_sxt_roi(
     )
 
 
-@mock.patch("murfey.server.api.workflow._transport_object")
+@mock.patch("murfey.server._transport_object")
 @mock.patch("murfey.server.api.workflow.get_machine_config")
 def test_register_dc_group_roi_update(
     mock_machine_config,

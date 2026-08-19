@@ -43,18 +43,22 @@ from murfey.util.models import (
 log = logging.getLogger("murfey.server.ispyb")
 security_config = get_security_config()
 
-try:
-    ISPyBSession = sessionmaker(
-        bind=create_engine(
-            url(credentials=security_config.ispyb_credentials),
-            connect_args={"use_pure": True},
-            pool_recycle=250,
+if security_config.ispyb_credentials:
+    try:
+        ISPyBSession = sessionmaker(
+            bind=create_engine(
+                url(credentials=security_config.ispyb_credentials),
+                connect_args={"use_pure": True},
+                pool_recycle=250,
+            )
         )
-    )
-    log.info("Loaded ISPyB database session")
-# Catch all errors associated with loading ISPyB database
-except Exception:
-    log.error("Error loading ISPyB session", exc_info=True)
+        log.info("Loaded ISPyB database session")
+    # Catch all errors associated with loading ISPyB database
+    except Exception:
+        log.error("Error loading ISPyB session", exc_info=True)
+        ISPyBSession = lambda: None
+else:
+    log.info("No ISPyB credentials set, using local database")
     ISPyBSession = lambda: None
 
 

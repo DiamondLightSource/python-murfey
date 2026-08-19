@@ -43,9 +43,7 @@ def test_run(
     mock_get_session_id.return_value = ispyb_session_id
 
     # Transport object inserts
-    mock_transport_object = mocker.patch(
-        "murfey.workflows.register_data_collection._transport_object"
-    )
+    mock_transport_object = mocker.patch("murfey.server._transport_object")
     mock_transport_object.do_insert_data_collection.return_value = {
         "return_value": insert_data_collection
     }
