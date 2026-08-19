@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from ast import literal_eval
 from importlib.metadata import (
     EntryPoint,  # type hinting only
@@ -92,10 +93,9 @@ def process_raw_lifs(
             "feedback_queue": murfey.server._transport_object.feedback_queue,
         },
     }
-    logger.debug(
-        f"Submitting LIF processing request to {murfey.server._transport_object.feedback_queue!r} "
-        "with the following recipe: \n"
-        f"{recipe}"
+    logger.info(
+        f"Submitting LIF processing request to 'processing_recipe': \n"
+        f"{json.dumps(recipe, indent=2, default=str)}"
     )
     murfey.server._transport_object.send(
         queue="processing_recipe",
@@ -177,10 +177,9 @@ def process_raw_tiffs(
             "feedback_queue": murfey.server._transport_object.feedback_queue,
         },
     }
-    logger.debug(
-        f"Submitting TIFF processing request to {murfey.server._transport_object.feedback_queue!r} "
-        "with the following recipe: \n"
-        f"{recipe}"
+    logger.info(
+        f"Submitting TIFF processing request to 'processing_recipe': \n"
+        f"{json.dumps(recipe, indent=2, default=str)}"
     )
     murfey.server._transport_object.send(
         queue="processing_recipe",
