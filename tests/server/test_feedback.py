@@ -4,38 +4,32 @@ from unittest.mock import MagicMock
 import pytest
 from pytest_mock import MockerFixture
 
-feedback_callback_params_matrix = (
-    # Murfey workflows currently present in pyproject.toml
-    ("atlas_update",),
-    ("clem.align_and_merge",),
-    ("clem.process_raw_lifs",),
-    ("clem.process_raw_tiffs",),
-    ("clem.register_align_and_merge_result",),
-    ("clem.register_preprocessing_result",),
-    ("data_collection",),
-    ("data_collection_group",),
-    ("pato",),
-    ("picked_particles",),
-    ("spa.ctf_estimated",),
-    ("spa.motion_corrected",),
-    ("picked_tomogram",),
-    ("processing_job",),
-    ("spa.flush_spa_preprocess",),
+
+@pytest.mark.parametrize(
+    "entry_point_name",
+    (
+        # Murfey workflows currently present in pyproject.toml
+        "atlas_update",
+        "clem.register_align_and_merge_result",
+        "clem.register_preprocessing_result",
+        "data_collection",
+        "data_collection_group",
+        "pato",
+        "picked_particles",
+        "spa.ctf_estimated",
+        "spa.motion_corrected",
+        "picked_tomogram",
+        "processing_job",
+        "spa.flush_spa_preprocess",
+    ),
 )
-
-
-@pytest.mark.parametrize("test_params", feedback_callback_params_matrix)
 def test_feedback_callback(
     mocker: MockerFixture,
-    test_params: tuple[str],
+    entry_point_name: str,
 ):
     """
     Checks that feedback-callback loop works correctly for the entry points-based workflows
     """
-
-    # Unpack test params
-    (entry_point_name,) = test_params
-
     # Patch the functions used to generate the module-level variables
     mock_get_security_config = mocker.patch("murfey.util.config.get_security_config")
     mock_get_security_config.return_value = MagicMock()

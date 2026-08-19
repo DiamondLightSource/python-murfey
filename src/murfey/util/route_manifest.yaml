@@ -1416,13 +1416,6 @@ murfey.server.api.workflow_clem.router:
         type: int
     methods:
       - POST
-  - path: /workflow/clem/sessions/{session_id}/align_and_merge_stacks
-    function: align_and_merge_stacks
-    path_params:
-      - name: session_id
-        type: int
-    methods:
-      - POST
 murfey.server.api.workflow_fib.router:
   - path: /workflow/fib/sessions/{session_id}/register_atlas
     function: register_fib_atlas
