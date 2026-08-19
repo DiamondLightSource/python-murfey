@@ -15,3 +15,4 @@ def run(
         "Received message containing the following:\n"
         f"{json.dumps(message, indent=2, default=str)}"
     )
+    return {"success": True}
