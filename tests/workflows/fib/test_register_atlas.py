@@ -365,9 +365,6 @@ def test_run_with_db(
     mocker.patch(
         "murfey.server._transport_object", new=TransportManager("PikaTransport")
     )
-    mocker.patch(
-        "murfey.server._transport_object", new=TransportManager("PikaTransport")
-    )
 
     # Mock the metadata returned from the image file
     import murfey.workflows.fib.register_atlas
