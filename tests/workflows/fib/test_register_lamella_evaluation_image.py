@@ -1,3 +1,4 @@
+import json
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -368,7 +369,7 @@ def test_run(
     # Run function and check that expected calls were made
     result = run(message, mock_murfey_db)
     mock_logger.info.assert_called_with(
-        "Extracted the following metadata from the image:\n",
-        metadata.model_dump_json(indent=2),
+        "Extracted the following metadata from the image:\n"
+        f"{json.dumps(metadata.model_dump(), indent=2, default=str)}"
     )
     assert result["success"]

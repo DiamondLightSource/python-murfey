@@ -194,8 +194,8 @@ def run(
                 rotation_offset=rotation_offset,
             )
             logger.info(
-                "Extracted the following metadata from the image:\n",
-                metadata.model_dump_json(indent=2),
+                "Extracted the following metadata from the image:\n"
+                f"{json.dumps(metadata.model_dump(), indent=2, default=str)}"
             )
         except Exception:
             logger.error(
