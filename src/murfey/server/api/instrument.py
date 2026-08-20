@@ -202,7 +202,7 @@ async def setup_multigrid_watcher(
                     log.warning(
                         "failed to register acquisition with smartem", exc_info=True
                     )
-            else:
+            elif acquisition_uuid is None:
                 log.info("smartem not configured")
             if acquisition_uuid is not None:
                 session = db.exec(select(Session).where(Session.id == session_id)).one()

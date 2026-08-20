@@ -134,11 +134,7 @@ def register_dc_group(
         instrument_name
     ]
     smartem_grid_uuid = None
-    if (
-        dcg_params.create_smartem_grid
-        and SMARTEM_ACTIVE
-        and dcg_params.acquisition_uuid
-    ):
+    if SMARTEM_ACTIVE and dcg_params.acquisition_uuid:
         if machine_config.smartem_api_url:
             try:
                 smartem_client = SmartEMAPIClient(
@@ -146,19 +142,29 @@ def register_dc_group(
                     logger=logger,
                     keycloak_client=keycloak_client,
                 )
-                grid_data = SmartEMGridData(
-                    data_dir=Path(dcg_params.tag),
-                    atlas_dir=Path(dcg_params.atlas) if dcg_params.atlas else None,
-                    acquisition_data=SmartEMAcquisitionData(
-                        uuid=dcg_params.acquisition_uuid,
-                        name=f"{visit_name}-sample-{dcg_params.sample}"
-                        if dcg_params.sample
-                        else f"{visit_name}-sample-unknown",
-                    ),
-                )
-                smartem_grid_uuid = smartem_client.create_acquisition_grid(
-                    grid_data
-                ).uuid
+                if dcg_params.create_smartem_grid:
+                    grid_data = SmartEMGridData(
+                        data_dir=Path(dcg_params.tag),
+                        atlas_dir=Path(dcg_params.atlas) if dcg_params.atlas else None,
+                        acquisition_data=SmartEMAcquisitionData(
+                            uuid=dcg_params.acquisition_uuid,
+                            name=f"{visit_name}-sample-{dcg_params.sample}"
+                            if dcg_params.sample
+                            else f"{visit_name}-sample-unknown",
+                        ),
+                    )
+                    smartem_grid_uuid = smartem_client.create_acquisition_grid(
+                        grid_data
+                    ).uuid
+                else:
+                    possible_grids = smartem_client.get_acquisition_grids(
+                        dcg_params.acquisition_uuid
+                    )
+                    for grid in possible_grids:
+                        if grid.name.endswith(str(dcg_params.sample)):
+                            smartem_grid_uuid = grid.uuid
+                            break
+
             except Exception:
                 logger.warning("Failed to register SmartEM grid", exc_info=True)
     if (
