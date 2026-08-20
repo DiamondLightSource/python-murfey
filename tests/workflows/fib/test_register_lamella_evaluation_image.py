@@ -367,7 +367,7 @@ def test_run(
 
     # Run function and check that expected calls were made
     result = run(message, mock_murfey_db)
-    mock_logger.debug.assert_called_with(
+    mock_logger.info.assert_called_with(
         "Extracted the following metadata from the image:\n",
         metadata.model_dump_json(indent=2),
     )

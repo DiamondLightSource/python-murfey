@@ -1,3 +1,4 @@
+import json
 import logging
 import math
 import xml.etree.ElementTree as ET
@@ -153,6 +154,9 @@ def run(
     murfey_db: Session,
 ):
     # Outer try-finally block to ensure the database connection is closed
+    logger.info(
+        f"Received the following message:\n{json.dumps(message, indent=2, default=str)}"
+    )
     try:
         try:
             # Validate incoming message
@@ -189,13 +193,13 @@ def run(
                 visit_name=visit_name,
                 rotation_offset=rotation_offset,
             )
-            logger.debug(
+            logger.info(
                 "Extracted the following metadata from the image:\n",
                 metadata.model_dump_json(indent=2),
             )
         except Exception:
             logger.error(
-                f"Error extracting metadata from file {fib_info.atlas_file}",
+                f"Error extracting metadata from file {fib_info.lamella_image_file}",
                 exc_info=True,
             )
             return {"success": False, "requeue": False}
