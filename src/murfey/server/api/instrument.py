@@ -201,14 +201,10 @@ async def setup_multigrid_watcher(
             else:
                 log.info("smartem not configured")
             if acquisition_uuid is not None:
-                async with clientsession.post(
-                    f"{machine_config.instrument_server_url}{url_path_for('api.router', 'update_session', session_id=session_id)}",
-                    parameters={"smartem_acquisition_uuid": acquisition_uuid},
-                    headers={
-                        "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
-                    },
-                ) as resp:
-                    await resp.json()
+                session = db.exec(select(Session).where(Session.id == session_id)).one()
+                session.smartem_acquisition_uuid = acquisition_uuid
+                db.add(session)
+                db.commit()
 
             async with clientsession.post(
                 f"{machine_config.instrument_server_url}{url_path_for('api.router', 'setup_multigrid_watcher', session_id=session_id)}",
