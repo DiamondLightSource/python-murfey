@@ -79,8 +79,9 @@ def motion_corrected_mrc(
     else:
         parts = [secure_filename(p) for p in input_movie.parts]
         visit_idx = parts.index(visit_name)
-        core = Path(*parts[: visit_idx + 1])
-        ppath = Path(*parts)
+        # Include leading slash which is removed in the secure parts above
+        core = Path("/") / Path(*parts[: visit_idx + 1])
+        ppath = Path("/") / Path(*parts)
         if machine_config.process_multiple_datasets:
             sub_dataset = ppath.relative_to(core).parts[0]
         else:

@@ -34,15 +34,15 @@ try:
 
     from murfey.util.config import get_security_config
 
-    keycloak_client = KeycloakClient(
-        load_keycloak_config(
-            Path(
-                os.getenv("SMARTEM_KEYCLOAK_CONFIGURATION")
-                or get_security_config().smartem_keycloak_config
-            )
-        )
-    )
-    SMARTEM_ACTIVE = True
+    if keycloak_config := (
+        os.getenv("SMARTEM_KEYCLOAK_CONFIGURATION")
+        or get_security_config().smartem_keycloak_config
+    ):
+        keycloak_client = KeycloakClient(load_keycloak_config(Path(keycloak_config)))
+        SMARTEM_ACTIVE = True
+    else:
+        keycloak_client = None
+        SMARTEM_ACTIVE = False
 except ImportError:
     keycloak_client = None
     SMARTEM_ACTIVE = False
@@ -695,8 +695,6 @@ async def request_spa_preprocessing(
                     "Failed to register micrograph with smartem", exc_info=True
                 )
 
-        db.close()
-
         recipe_name = machine_config.recipes.get(
             "em-spa-preprocess", "em-spa-preprocess"
         )
@@ -741,7 +739,7 @@ async def request_spa_preprocessing(
                 f"Pre-processing was requested for {sanitise(Path(proc_file.path).name)} "
                 "but no Zocalo transport object was found"
             )
-            return proc_file
+        db.close()
 
     else:
         for_stash = PreprocessStash(

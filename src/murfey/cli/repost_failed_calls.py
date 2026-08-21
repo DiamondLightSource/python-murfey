@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import json
+import os
 from datetime import datetime
 from functools import partial
 from inspect import getfullargspec, iscoroutinefunction
@@ -9,10 +10,6 @@ from queue import Empty, Queue
 
 from sqlmodel import Session, create_engine
 from workflows.transport.pika_transport import PikaTransport
-
-from murfey.server.murfey_db import url
-from murfey.server.run import _set_up_transport
-from murfey.util.config import security_from_file
 
 
 def dlq_purge(
@@ -191,10 +188,17 @@ def run():
     args = parser.parse_args()
 
     # Read the security config file
+    os.environ["MURFEY_SECURITY_CONFIGURATION"] = args.config
+
+    from murfey.util.config import security_from_file
+
     security_config = security_from_file(args.config)
 
     # Configure the transport
     PikaTransport().load_configuration_file(security_config.rabbitmq_credentials)
+
+    from murfey.server.run import _set_up_transport
+
     _set_up_transport("PikaTransport")
 
     # Now import transport object which was set up in the above step
@@ -212,6 +216,8 @@ def run():
     )
 
     # Set up database and retry api calls
+    from murfey.server.murfey_db import url
+
     _url = url(security_config)
     engine = create_engine(_url)
     with Session(engine) as murfey_db:
