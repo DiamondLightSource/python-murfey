@@ -1,74 +1,17 @@
 import json
 import logging
-import math
-import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any, cast
 
-import PIL.Image
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
 import murfey.util.db as MurfeyDB
 from murfey.util.config import get_machine_config
-from murfey.util.fib import get_slot_number
+from murfey.util.fib import parse_image_metadata
 from murfey.util.models import FIBImageMetadata
 
 logger = logging.getLogger(__name__)
-
-
-def _parse_metadata(file: Path, visit_name: str, rotation_offset: float):
-    """
-    Parses through the atlas image's tags to extract the relevant metadata
-    """
-
-    # Search for the XML metadata in the tags (34683 is the default key)
-    img = PIL.Image.open(file)
-    tags = dict(img.text)
-    xml_metadata = None
-    if (
-        isinstance((tag_contents := tags.get("Metadata")), str)
-        and "xml version" in tag_contents
-    ):
-        xml_metadata = ET.fromstring(tag_contents)
-    if xml_metadata is None:
-        raise ValueError(f"Could not find required metadata in file {file}")
-
-    # Extract key values from metadata
-    extracted: dict[str, Any] = {
-        key: node.text if (node := xml_metadata.find(node_path)) is not None else None
-        for key, node_path in (
-            ("voltage", ".//Optics/AccelerationVoltage"),
-            ("shift_x", ".//Optics/BeamShift/X"),
-            ("shift_y", ".//Optics/BeamShift/Y"),
-            ("len_x", ".//Optics/ScanFieldOfView/X"),
-            ("len_y", ".//Optics/ScanFieldOfView/Y"),
-            ("pos_x", ".//StageSettings/StagePosition/X"),
-            ("pos_y", ".//StageSettings/StagePosition/Y"),
-            ("pos_z", ".//StageSettings/StagePosition/Z"),
-            # Angles are in radians
-            ("rotation", ".//StageSettings/StagePosition/Rotation"),
-            ("tilt_alpha", ".//StageSettings/StagePosition/Tilt/Alpha"),
-            ("tilt_beta", ".//StageSettings/StagePosition/Tilt/Beta"),
-            ("pixels_x", ".//BinaryResult/ImageSize/X"),
-            ("pixels_y", ".//BinaryResult/ImageSize/Y"),
-            ("pixel_size_x", ".//BinaryResult/PixelSize/X"),
-            ("pixel_size_y", ".//BinaryResult/PixelSize/Y"),
-        )
-    }
-    # Calculate the slot number
-    extracted["slot_number"] = get_slot_number(
-        x=float(extracted["pos_x"]),
-        y=float(extracted["pos_y"]),
-        rotation=math.degrees(float(extracted["rotation"])),  # Convert to degrees
-        rotation_offset=rotation_offset,
-    )
-    # Return the parsed Pydantic model
-    return FIBImageMetadata(
-        visit_name=visit_name,
-        file=file,
-        **extracted,
-    )
 
 
 class FIBLamellaImageInfo(BaseModel):
@@ -115,10 +58,13 @@ def run(
             )
 
             # Extract metadata from the image
-            metadata = _parse_metadata(
-                file=fib_info.lamella_image_file,
+            metadata = FIBImageMetadata(
                 visit_name=visit_name,
-                rotation_offset=rotation_offset,
+                file=fib_info.lamella_image_file
+                ** parse_image_metadata(
+                    file=fib_info.lamella_image_file,
+                    rotation_offset=rotation_offset,
+                ),
             )
             logger.info(
                 "Extracted the following metadata from the image:\n"

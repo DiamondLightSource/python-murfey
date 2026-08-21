@@ -1,7 +1,5 @@
 import logging
-import math
 import traceback
-import xml.etree.ElementTree as ET
 from importlib.metadata import entry_points
 from pathlib import Path
 from typing import Any, cast
@@ -13,73 +11,10 @@ from sqlmodel import Session, select
 
 import murfey.util.db as MurfeyDB
 from murfey.util.config import get_machine_config
-from murfey.util.fib import get_slot_number, number_from_name
+from murfey.util.fib import number_from_name, parse_image_metadata
 from murfey.util.models import FIBImageMetadata
 
 logger = logging.getLogger("murfey.workflows.fib.register_atlas")
-
-
-def _parse_metadata(file: Path, visit_name: str, rotation_offset: float):
-    """
-    Parses through the atlas image's tags to extract the relevant metadata
-    """
-
-    # Search for the XML metadata in the tags (34683 is the default key)
-    img = PIL.Image.open(file)
-    tags = dict(img.tag_v2)
-    xml_metadata = None
-    if (
-        isinstance((tag_contents := tags.get(34683)), str)
-        and "xml version" in tag_contents
-    ):
-        xml_metadata = ET.fromstring(tag_contents)
-    else:
-        logger.warning(
-            "Could not find metadata under tag key 34683, iterating through tags"
-        )
-        for key, value in tags.items():
-            if key == 34683:  # Already inspected
-                continue
-            if isinstance(value, str) and "xml version" in value:
-                xml_metadata = ET.fromstring(value)
-    if xml_metadata is None:
-        raise ValueError(f"Could not find required metadata in file {file}")
-
-    # Extract key values from metadata
-    extracted: dict[str, Any] = {
-        key: node.text if (node := xml_metadata.find(node_path)) is not None else None
-        for key, node_path in (
-            ("voltage", ".//Optics/AccelerationVoltage"),
-            ("shift_x", ".//Optics/BeamShift/X"),
-            ("shift_y", ".//Optics/BeamShift/Y"),
-            ("len_x", ".//Optics/ScanFieldOfView/X"),
-            ("len_y", ".//Optics/ScanFieldOfView/Y"),
-            ("pos_x", ".//StageSettings/StagePosition/X"),
-            ("pos_y", ".//StageSettings/StagePosition/Y"),
-            ("pos_z", ".//StageSettings/StagePosition/Z"),
-            # Angles are in radians
-            ("rotation", ".//StageSettings/StagePosition/Rotation"),
-            ("tilt_alpha", ".//StageSettings/StagePosition/Tilt/Alpha"),
-            ("tilt_beta", ".//StageSettings/StagePosition/Tilt/Beta"),
-            ("pixels_x", ".//BinaryResult/ImageSize/X"),
-            ("pixels_y", ".//BinaryResult/ImageSize/Y"),
-            ("pixel_size_x", ".//BinaryResult/PixelSize/X"),
-            ("pixel_size_y", ".//BinaryResult/PixelSize/Y"),
-        )
-    }
-    # Calculate the slot number
-    extracted["slot_number"] = get_slot_number(
-        x=float(extracted["pos_x"]),
-        y=float(extracted["pos_y"]),
-        rotation=math.degrees(float(extracted["rotation"])),  # Convert to degrees
-        rotation_offset=rotation_offset,
-    )
-    # Return the parsed Pydantic model
-    return FIBImageMetadata(
-        visit_name=visit_name,
-        file=file,
-        **extracted,
-    )
 
 
 def _make_thumbnail(file: Path, metadata: FIBImageMetadata, visit_name: str):
@@ -305,10 +240,13 @@ def run(
             )
 
             # Extract metadata from Electron Snapshot image
-            metadata = _parse_metadata(
-                fib_info.atlas_file,
+            metadata = FIBImageMetadata(
                 visit_name=visit_name,
-                rotation_offset=rotation_offset,
+                file=fib_info.atlas_file,
+                **parse_image_metadata(
+                    fib_info.atlas_file,
+                    rotation_offset=rotation_offset,
+                ),
             )
         except Exception:
             logger.error(
