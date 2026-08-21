@@ -2,92 +2,19 @@ import json
 import logging
 import math
 import xml.etree.ElementTree as ET
-from functools import cached_property
 from pathlib import Path
 from typing import Any, cast
 
 import PIL.Image
-from pydantic import BaseModel, computed_field, model_validator
+from pydantic import BaseModel
 from sqlmodel import Session, select
 
 import murfey.util.db as MurfeyDB
 from murfey.util.config import get_machine_config
 from murfey.util.fib import get_slot_number
+from murfey.util.models import FIBImageMetadata
 
 logger = logging.getLogger(__name__)
-
-
-class FIBImageMetadata(BaseModel):
-    """
-    These fields should ALL be present in the Electron Snapshot image.
-    Positions and pixel sizes are in metres, whereas angles are in radians.
-    """
-
-    visit_name: str
-    file: Path
-    thumbnail_path: Path | None = None
-    # Acceleration voltage
-    voltage: float
-    # Beam shifts
-    shift_x: float
-    shift_y: float
-    # Actual field of view
-    len_x: float
-    len_y: float
-    # Stage position
-    pos_x: float
-    pos_y: float
-    pos_z: float
-    rotation: float  # Radians
-    slot_number: int
-    tilt_alpha: float  # Radians
-    tilt_beta: float  # Radians
-    # Image dimensions
-    pixels_x: int
-    pixels_y: int
-    # Pixel size
-    pixel_size_x: float
-    pixel_size_y: float
-
-    @model_validator(mode="after")
-    def check_pixel_size_tolerance(self):
-        """
-        The pixel size values for x and y should be nigh-identical
-        """
-        if abs(self.pixel_size_x - self.pixel_size_y) > 1e-18:
-            raise ValueError
-        return self
-
-    # mypy doesn't support decorators on @property
-    @computed_field  # type: ignore
-    @cached_property
-    def pixel_size(self) -> float:
-        """
-        Return an average of pixel sizes along the x- and y-axes
-        """
-        return 0.5 * (self.pixel_size_x + self.pixel_size_y)
-
-    # mypy doesn't support decorators on @property
-    @computed_field  # type: ignore
-    @cached_property
-    def project_name(self) -> str:
-        """
-        Extract the project name from the file path. This assumes a specific
-        folder structure of '{visit_name}/maps/{project_name}'.
-        """
-        path_parts = self.file.parts
-        visit_idx = path_parts.index(self.visit_name)
-        return path_parts[visit_idx + 2]  # {visit}/maps/{project_name}
-
-    # mypy doesn't support decorators on @property
-    @computed_field  # type: ignore
-    @cached_property
-    def site_name(self) -> str:
-        """
-        Create a site name for the current image based on the project name
-        and its slot number.
-        """
-        return f"{self.project_name}--slot_{self.slot_number}"
 
 
 def _parse_metadata(file: Path, visit_name: str, rotation_offset: float):

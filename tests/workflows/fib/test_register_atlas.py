@@ -13,7 +13,8 @@ from sqlmodel import Session as SQLModelSession, select as sm_select
 
 import murfey.util.db as MurfeyDB
 from murfey.util.fib import get_slot_number
-from murfey.workflows.fib.register_atlas import FIBAtlasMetadata, _parse_metadata, run
+from murfey.util.models import FIBImageMetadata
+from murfey.workflows.fib.register_atlas import _parse_metadata, run
 from tests.conftest import ExampleVisit
 
 session_id = 10
@@ -394,7 +395,7 @@ def test_run_with_db(
             rotation_offset=rotation_offset,
         )
     mock_metadata = [
-        FIBAtlasMetadata(
+        FIBImageMetadata(
             visit_name=visit_name,
             file=test_file,
             **extracted,
