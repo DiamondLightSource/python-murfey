@@ -12,6 +12,13 @@ import yaml
 from pydantic import BaseModel, ConfigDict, RootModel, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings
 
+try:
+    from smartem_backend.keycloak_client import KeycloakClient, load_keycloak_config
+
+    SMARTEM_ACTIVE = True
+except ImportError:
+    SMARTEM_ACTIVE = False
+
 
 class MagnificationTable(RootModel[dict[int, float]]):
     pass
@@ -353,3 +360,16 @@ def get_extended_machine_config(
     model = list(entry_points(group="murfey.config", name=extension_name))[0].load()
     data = getattr(machine_config, extension_name, {})
     return model(**data)
+
+
+def get_smartem_keycloak_client():
+    keycloak_client = None
+    if SMARTEM_ACTIVE:
+        if keycloak_config := (
+            os.getenv("SMARTEM_KEYCLOAK_CONFIGURATION")
+            or get_security_config().smartem_keycloak_config
+        ):
+            keycloak_client = KeycloakClient(
+                load_keycloak_config(Path(keycloak_config))
+            )
+    return keycloak_client

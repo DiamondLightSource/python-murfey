@@ -1,6 +1,4 @@
-import os
 from logging import getLogger
-from pathlib import Path
 
 from sqlmodel import Session, select
 
@@ -14,7 +12,6 @@ logger = getLogger("murfey.workflows.spa.ctf_estimation")
 
 try:
     from smartem_backend.api_client import SmartEMAPIClient
-    from smartem_backend.keycloak_client import KeycloakClient, load_keycloak_config
     from smartem_backend.model.http_request import (
         CtfEstimationRegisteredRequest,
         MicrographUpdateRequest,
@@ -25,17 +22,12 @@ try:
     )
     from smartem_common.entity_status import MicrographStatus
 
-    from murfey.util.config import get_security_config
+    from murfey.util.config import get_smartem_keycloak_client
 
-    keycloak_client = KeycloakClient(
-        load_keycloak_config(
-            Path(
-                os.getenv("SMARTEM_KEYCLOAK_CONFIGURATION")
-                or get_security_config().smartem_keycloak_config
-            )
-        )
-    )
-    SMARTEM_ACTIVE = True
+    if keycloak_client := get_smartem_keycloak_client():
+        SMARTEM_ACTIVE = True
+    else:
+        SMARTEM_ACTIVE = False
 except ImportError:
     keycloak_client = None
     SMARTEM_ACTIVE = False
