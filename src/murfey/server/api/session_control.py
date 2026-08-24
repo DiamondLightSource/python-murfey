@@ -14,6 +14,7 @@ from sqlmodel import select
 try:
     from smartem_agent.fs_parser import EpuParser
     from smartem_backend.api_client import SmartEMAPIClient
+    from smartem_backend.model.http_request import GridSquareUpdateRequest
     from smartem_common.schemas import AtlasData, AtlasTileGridSquarePositionData
 
     from murfey.util.config import get_smartem_keycloak_client
@@ -514,17 +515,16 @@ def register_square(
                     logger=logger,
                     keycloak_client=keycloak_client,
                 )
-                smartem_client.gridsquare_registered(
-                    smartem_uuid, count=square_registration_data.count
-                )
-                result = requests.put(
-                    f"{machine_config.smartem_api_url}/gridsquares/{smartem_uuid}",
-                    json={"image_path": square_registration_data.image_path},
-                )
-                if not result.status_code == 200:
-                    logger.warning(
-                        f"Post to smartem gridsquares returned {result.status_code}"
+                if not square_registration_data.serialem:
+                    smartem_client.gridsquare_registered(
+                        smartem_uuid, count=square_registration_data.count
                     )
+                logger.info(f"updating gridsquare with image path {square_registration_data.image_path}")
+                smartem_client._request(
+                    "put",
+                    f"gridsquares/{smartem_uuid}",
+                    GridSquareUpdateRequest(image_path=square_registration_data.image_path),
+                )
     else:
         logger.info("smartem deactivated so did not register square")
 
