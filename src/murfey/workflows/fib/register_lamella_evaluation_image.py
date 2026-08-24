@@ -60,8 +60,8 @@ def run(
             # Extract metadata from the image
             metadata = FIBImageMetadata(
                 visit_name=visit_name,
-                file=fib_info.lamella_image_file
-                ** parse_image_metadata(
+                file=fib_info.lamella_image_file,
+                **parse_image_metadata(
                     file=fib_info.lamella_image_file,
                     rotation_offset=rotation_offset,
                 ),
