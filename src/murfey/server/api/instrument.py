@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import datetime
 import logging
-import os
 from pathlib import Path
 from typing import Annotated, Any, List, Optional
 from urllib.parse import quote
@@ -16,20 +15,14 @@ from werkzeug.utils import secure_filename
 
 try:
     from smartem_backend.api_client import SmartEMAPIClient
-    from smartem_backend.keycloak_client import KeycloakClient, load_keycloak_config
     from smartem_common.schemas import AcquisitionData, MicroscopeData
 
-    from murfey.util.config import get_security_config
+    from murfey.util.config import get_smartem_keycloak_client
 
-    keycloak_client = KeycloakClient(
-        load_keycloak_config(
-            Path(
-                os.getenv("SMARTEM_KEYCLOAK_CONFIGURATION")
-                or get_security_config().smartem_keycloak_config
-            )
-        )
-    )
-    SMARTEM_ACTIVE = True
+    if keycloak_client := get_smartem_keycloak_client():
+        SMARTEM_ACTIVE = True
+    else:
+        SMARTEM_ACTIVE = False
 except ImportError:
     keycloak_client = None
     SMARTEM_ACTIVE = False

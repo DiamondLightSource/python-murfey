@@ -1,5 +1,4 @@
 import asyncio
-import os
 from datetime import datetime
 from logging import getLogger
 from pathlib import Path
@@ -24,7 +23,6 @@ import murfey.server
 
 try:
     from smartem_backend.api_client import SmartEMAPIClient
-    from smartem_backend.keycloak_client import KeycloakClient, load_keycloak_config
     from smartem_common.schemas import (
         AcquisitionData as SmartEMAcquisitionData,
         GridData as SmartEMGridData,
@@ -32,16 +30,11 @@ try:
         MicrographManifest as SmartEMMicrographManifest,
     )
 
-    from murfey.util.config import get_security_config
+    from murfey.util.config import get_smartem_keycloak_client
 
-    if keycloak_config := (
-        os.getenv("SMARTEM_KEYCLOAK_CONFIGURATION")
-        or get_security_config().smartem_keycloak_config
-    ):
-        keycloak_client = KeycloakClient(load_keycloak_config(Path(keycloak_config)))
+    if keycloak_client := get_smartem_keycloak_client():
         SMARTEM_ACTIVE = True
     else:
-        keycloak_client = None
         SMARTEM_ACTIVE = False
 except ImportError:
     keycloak_client = None
