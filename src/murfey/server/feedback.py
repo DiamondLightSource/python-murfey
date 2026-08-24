@@ -52,6 +52,7 @@ from murfey.util.tomo import midpoint
 
 logger = logging.getLogger("murfey.server.feedback")
 
+murfey_entry_points = entry_points(group="murfey.workflows")
 
 # The first job number available to dynamic SPA feedback jobs. Jobs 1..6 are
 # the fixed preprocessing jobs (Import, MotionCorr, CtfFind, AutoPick, Extract,
@@ -2270,11 +2271,11 @@ def feedback_callback(header: dict, message: dict, _db=murfey_db) -> None:
             if murfey.server._transport_object:
                 murfey.server._transport_object.transport.ack(header)
             return None
-        elif message["register"] in entry_points(group="murfey.workflows").names:
+        elif message["register"] in murfey_entry_points.names:
             # Search for corresponding workflow
-            workflows: list[EntryPoint] = list(
-                entry_points(group="murfey.workflows", name=message["register"])
-            )  # Returns either 1 item or empty list
+            workflows: list[EntryPoint] = [
+                ep for ep in murfey_entry_points if ep.name == message["register"]
+            ]  # Returns either 1 item or empty list
             if not workflows:
                 logger.error(f"No workflow found for {sanitise(message['register'])}")
                 if murfey.server._transport_object:
