@@ -182,7 +182,7 @@ def test_atlas_context_dm(mock_capture_post, tmp_path):
         instrument_name="m01",
         session_id=1,
         data={
-            "name": "cm12345-6-sample-2",
+            "name": "cm12345-6-slot-2",
             "acquisition_uuid": "uuid1",
             "register_grid": True,
             "tag": str(atlas_dm.parent),
