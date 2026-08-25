@@ -260,7 +260,7 @@ def test_parse_metadata(
     tags[tag_key] = xml_string
     mock_image = MagicMock(text=tags)
     mocker.patch(
-        "PIL.Image.open",
+        "murfey.util.fib.PIL.Image.open",
         return_value=mock_image,
     )
 

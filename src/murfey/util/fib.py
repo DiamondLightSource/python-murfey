@@ -7,6 +7,11 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
+try:
+    import PIL.Image  # Used by 'parse_image_metadata' on the server-side
+except ImportError:
+    pass
+
 
 def number_from_name(name: str) -> int:
     """
@@ -74,8 +79,6 @@ def parse_image_metadata(
     1. Electron snapshot TIFFs (Maps)
     2. Lamella evaluation images (AutoTEM)
     """
-
-    import PIL.Image
 
     # Open image and load metadata
     img = PIL.Image.open(file)
