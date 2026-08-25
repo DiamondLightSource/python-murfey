@@ -14,7 +14,8 @@ from sqlmodel import select
 try:
     from smartem_agent.fs_parser import EpuParser
     from smartem_backend.api_client import SmartEMAPIClient
-    from smartem_common.schemas import AtlasTileGridSquarePositionData
+    from smartem_backend.model.http_request import GridSquareUpdateRequest
+    from smartem_common.schemas import AtlasData, AtlasTileGridSquarePositionData
 
     from murfey.util.config import get_smartem_keycloak_client
 
@@ -400,7 +401,7 @@ def register_atlas(
                     .where(DataCollectionGroup.session_id == session_id)
                     .where(DataCollectionGroup.tag == atlas_registration_data.tag)
                 ).one_or_none()
-                if dcg is None:
+                if dcg is None and "Sample" in atlas_registration_data.tag:
                     sample = int(
                         atlas_registration_data.tag.split("Sample")[1].split("/")[0]
                     )
@@ -411,6 +412,7 @@ def register_atlas(
                         .order_by(desc(DataCollectionGroup.id))
                     ).first()
                 grid_uuid = dcg.smartem_grid_uuid if dcg is not None else None
+                atlas_path = Path(dcg.atlas).parent
             else:
                 possible_grids = smartem_client.get_acquisition_grids(
                     atlas_registration_data.acquisition_uuid
@@ -420,22 +422,38 @@ def register_atlas(
                         grid_uuid = grid.uuid
                         atlas_path = Path(grid.atlas_dir).parent
                         break
+            logger.info(f"New atlas {grid_uuid} with path {atlas_path}")
             if grid_uuid is not None and atlas_path is not None:
-                existing_atlas = smartem_client.get_grid_atlas(grid_uuid)
-                if (
-                    existing_atlas.name == atlas_registration_data.name
-                    and existing_atlas.storage_folder
-                    == atlas_registration_data.storage_folder
-                ):
-                    # there is a question here of whether the grid should be registered if specified
-                    return
-                parser = EpuParser()
-                atlas_data = parser.parse_atlas_manifest(
-                    str(atlas_path / "Atlas.dm"), grid_uuid
-                )
-                atlas_data.acquisition_date = atlas_data.acquisition_date.replace(
-                    tzinfo=None
-                )  # timezone information is not consistently provided so drop it
+                try:
+                    existing_atlas = smartem_client.get_grid_atlas(grid_uuid)
+                    if (
+                        existing_atlas.name == atlas_registration_data.name
+                        and existing_atlas.storage_folder
+                        == atlas_registration_data.storage_folder
+                    ):
+                        # there is a question here of whether the grid should be registered if specified
+                        return
+                except requests.exceptions.HTTPError:
+                    pass
+                logger.info(f"Registering new atlas {atlas_registration_data.name}")
+                if (Path(atlas_path) / "Atlas.dm").is_file():
+                    parser = EpuParser()
+                    atlas_data = parser.parse_atlas_manifest(
+                        str(atlas_path / "Atlas.dm"), grid_uuid
+                    )
+                    atlas_data.acquisition_date = atlas_data.acquisition_date.replace(
+                        tzinfo=None
+                    )  # timezone information is not consistently provided so drop it
+                else:
+                    atlas_data = AtlasData(
+                        id=atlas_registration_data.tag,
+                        acquisition_date=datetime.now(),
+                        storage_folder=str(atlas_path),
+                        name=atlas_registration_data.name,
+                        tiles=[],
+                        gridsquare_positions=None,
+                        grid_uuid=grid_uuid,
+                    )
                 smartem_client.create_grid_atlas(atlas_data)
                 registered_squares = smartem_client.get_grid_gridsquares(grid_uuid)
                 gs_uuid_map = {gs.gridsquare_id: gs.uuid for gs in registered_squares}
@@ -497,17 +515,16 @@ def register_square(
                     logger=logger,
                     keycloak_client=keycloak_client,
                 )
-                smartem_client.gridsquare_registered(
-                    smartem_uuid, count=square_registration_data.count
-                )
-                result = requests.put(
-                    f"{machine_config.smartem_api_url}/gridsquares/{smartem_uuid}",
-                    json={"image_path": square_registration_data.image_path},
-                )
-                if not result.status_code == 200:
-                    logger.warning(
-                        f"Post to smartem gridsquares returned {result.status_code}"
+                if not square_registration_data.serialem:
+                    smartem_client.gridsquare_registered(
+                        smartem_uuid, count=square_registration_data.count
                     )
+                logger.info(f"updating gridsquare with image path {square_registration_data.image_path}")
+                smartem_client._request(
+                    "put",
+                    f"gridsquares/{smartem_uuid}",
+                    GridSquareUpdateRequest(image_path=square_registration_data.image_path),
+                )
     else:
         logger.info("smartem deactivated so did not register square")
 

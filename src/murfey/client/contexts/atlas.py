@@ -51,6 +51,33 @@ class AtlasContext(Context):
         if environment and transferred_file.suffix == ".mrc":
             source = _get_source(transferred_file, environment)
             if source:
+                sample = int(transferred_file.stem.split("slot")[1])
+                transferred_atlas_jpg = _atlas_destination(
+                    environment,
+                    source,
+                    Path(self._machine_config.get("rsync_basepath", "")),
+                ) / transferred_file.relative_to(source.parent).with_suffix(".jpg")
+                dcg_data = {
+                    "experiment_type_id": 44,  # Atlas
+                    "tag": str(transferred_file.parent),
+                    "atlas": str(transferred_atlas_jpg).replace("//", "/"),
+                    "sample": sample,
+                    "create_smartem_grid": False,
+                    "acquisition_uuid": environment.acquisition_uuid,
+                }
+                capture_post(
+                    base_url=str(environment.url.geturl()),
+                    router_name="workflow.router",
+                    function_name="register_dc_group",
+                    token=self._token,
+                    instrument_name=environment.instrument_name,
+                    visit_name=environment.visit,
+                    session_id=environment.murfey_session,
+                    data=dcg_data,
+                )
+                logger.info(
+                    f"Registered data collection group for atlas {str(transferred_file.stem)!r}"
+                )
                 capture_post(
                     base_url=str(environment.url.geturl()),
                     router_name="session_control.spa_router",
@@ -59,6 +86,7 @@ class AtlasContext(Context):
                     instrument_name=environment.instrument_name,
                     session_id=environment.murfey_session,
                     data={
+                        "tag": str(transferred_file.parent),
                         "name": transferred_file.stem,
                         "acquisition_uuid": environment.acquisition_uuid,
                         "storage_folder": str(
@@ -223,7 +251,7 @@ class AtlasContext(Context):
                     instrument_name=environment.instrument_name,
                     session_id=environment.murfey_session,
                     data={
-                        "name": f"{environment.visit}-sample-{sample}",
+                        "name": f"{environment.visit}-slot-{sample}",
                         "acquisition_uuid": environment.acquisition_uuid,
                         "register_grid": True,
                         "tag": str(transferred_file.parent),

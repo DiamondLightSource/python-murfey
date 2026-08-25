@@ -237,7 +237,7 @@ class SPAMetadataContext(Context):
                             instrument_name=environment.instrument_name,
                             session_id=environment.murfey_session,
                             data={
-                                "name": f"{environment.visit}-sample-{environment.samples[images_disc].sample}",
+                                "name": f"{environment.visit}-slot-{environment.samples[images_disc].sample}",
                                 "acquisition_uuid": environment.acquisition_uuid,
                                 "register_grid": True,
                                 "tag": dcg_tag,

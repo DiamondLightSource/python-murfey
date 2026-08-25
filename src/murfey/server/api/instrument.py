@@ -180,7 +180,18 @@ async def setup_multigrid_watcher(
                         name=visit,
                         id=visit,
                         instrument=microscope_data,
-                        storage_path=str(secure_path(watcher_spec.source / visit)),
+                        storage_path=str(
+                            secure_path(
+                                machine_config.rsync_basepath
+                                / str(datetime.datetime.now().year)
+                                / visit
+                            )
+                        )
+                        if machine_config.rsync_basepath
+                        else "",
+                        atlas_path=str(
+                            secure_path(watcher_spec.source / visit / "atlas")
+                        ),
                         start_time=datetime.datetime.now(),
                     )
                     acquisition_response_data = smartem_client.create_acquisition(
@@ -191,7 +202,7 @@ async def setup_multigrid_watcher(
                     log.warning(
                         "failed to register acquisition with smartem", exc_info=True
                     )
-            else:
+            elif acquisition_uuid is None:
                 log.info("smartem not configured")
             if acquisition_uuid is not None:
                 session = db.exec(select(Session).where(Session.id == session_id)).one()
