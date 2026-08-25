@@ -148,9 +148,9 @@ def register_dc_group(
                         atlas_dir=Path(dcg_params.atlas) if dcg_params.atlas else None,
                         acquisition_data=SmartEMAcquisitionData(
                             uuid=dcg_params.acquisition_uuid,
-                            name=f"{visit_name}-sample-{dcg_params.sample}"
+                            name=f"{visit_name}-slot-{dcg_params.sample}"
                             if dcg_params.sample
-                            else f"{visit_name}-sample-unknown",
+                            else f"{visit_name}-slot-unknown",
                         ),
                     )
                     smartem_grid_uuid = smartem_client.create_acquisition_grid(

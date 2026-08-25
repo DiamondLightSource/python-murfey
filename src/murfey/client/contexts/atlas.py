@@ -251,7 +251,7 @@ class AtlasContext(Context):
                     instrument_name=environment.instrument_name,
                     session_id=environment.murfey_session,
                     data={
-                        "name": f"{environment.visit}-sample-{sample}",
+                        "name": f"{environment.visit}-slot-{sample}",
                         "acquisition_uuid": environment.acquisition_uuid,
                         "register_grid": True,
                         "tag": str(transferred_file.parent),
