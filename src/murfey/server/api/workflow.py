@@ -187,13 +187,16 @@ def register_dc_group(
         # Or registering a new atlas-type dcg for a sample that is already present
         for dcg_instance in dcg_murfey:
             # Update all instances in case there are multiple processing runs
-            sample_registered = False
-            if dcg_instance.sample is not None and dcg_params.sample in [
-                None,
-                dcg_instance.sample,
-            ]:
-                # Skip Scaup registration if sample is unchanged
-                sample_registered = True
+            # Skip Scaup registration if sample is unchanged
+            sample_registered = (
+                dcg_instance.sample is not None
+                and dcg_params.sample
+                in [
+                    None,
+                    dcg_instance.sample,
+                ]
+            )
+            # Update dcg table
             dcg_instance.atlas = dcg_params.atlas or dcg_instance.atlas
             dcg_instance.sample = dcg_params.sample or dcg_instance.sample
             dcg_instance.atlas_pixel_size = (
