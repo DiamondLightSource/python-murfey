@@ -34,7 +34,7 @@ def run(
     # Find out how many dcgs we have with this atlas
     if (
         message.get("atlas")
-        and message.get("sample")
+        and message.get("sample") is not None
         and "atlas" in Path(message.get("tag", "/")).parts
     ):
         dcgs_atlas = murfey_db.exec(
@@ -48,10 +48,14 @@ def run(
             logger.info(f"Skipping data collection group hooks for {message['tag']}")
             return {"success": True}
 
-    if dcg_hooks := entry_points(group="murfey.hooks", name="data_collection_group"):
-        try:
-            for hook in dcg_hooks:
-                hook.load()(message["dcgid"], session_id=message["session_id"])
-        except Exception:
-            logger.error("Call to data collection group hook failed", exc_info=True)
+    if not message.get("sample_registered"):
+        # Only send Scaup sample registration if we didn't have a sample before
+        if dcg_hooks := entry_points(
+            group="murfey.hooks", name="data_collection_group"
+        ):
+            try:
+                for hook in dcg_hooks:
+                    hook.load()(message["dcgid"], session_id=message["session_id"])
+            except Exception:
+                logger.error("Call to data collection group hook failed", exc_info=True)
     return {"success": True}
