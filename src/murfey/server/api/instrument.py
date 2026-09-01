@@ -377,6 +377,37 @@ async def check_instrument_server(instrument_name: MurfeyInstrumentName):
     return data
 
 
+@router.get("/instruments/{instrument_name}/sessions/{session_id}/possible_otf_dirs")
+async def get_possible_otf_dirs(
+    instrument_name: MurfeyInstrumentName,
+    session_id: MurfeySessionID,
+) -> list[File]:
+    """
+    Submits a GET request to the client-side instrument server to get all top-level
+    directories found under the configured OTF files directory.
+    """
+    data: list[File] = []
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
+    if machine_config.instrument_server_url:
+        async with lock:
+            token = instrument_server_tokens[session_id]["access_token"]
+        async with aiohttp.ClientSession() as clientsession:
+            url_path = url_path_for(
+                "api.router",
+                "get_possible_otf_dirs",
+                instrument_name=sanitise(instrument_name),
+                session_id=session_id,
+            )
+            async with clientsession.get(
+                f"{machine_config.instrument_server_url}{url_path}",
+                headers={"Authorization": f"Bearer {token}"},
+            ) as resp:
+                data = await resp.json()
+    return data
+
+
 @router.get(
     "/instruments/{instrument_name}/sessions/{session_id}/possible_gain_references"
 )

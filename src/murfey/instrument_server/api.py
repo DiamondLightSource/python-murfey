@@ -383,6 +383,46 @@ def register_processing_parameters(
     return {"success": True}
 
 
+@router.get("/instruments/{instrument_name}/sessions/{session_id}/possible_otf_dirs")
+def get_possible_otf_dirs(
+    instrument_name: str,
+    session_id: MurfeySessionID,
+) -> list[File]:
+    """
+    Looks under the configured reference file directory for all top-level directories,
+    and returns them as a list of Pydantic models.
+    """
+    # Get the machine config from the backend server
+    url_path = url_path_for(
+        "session_control.router",
+        "machine_info_by_instrument",
+        instrument_name=sanitise_nonpath(instrument_name),
+    )
+    machine_config = requests.get(
+        f"{_get_murfey_url()}{url_path}",
+        headers={"Authorization": f"Bearer {tokens[session_id]}"},
+    ).json()
+
+    # Look for OTF directories under the specified directory
+    candidates: list[File] = []
+    for item in secure_path(
+        Path(machine_config["gain_reference_directory"]), keep_spaces=True
+    ).glob("*"):
+        if item.is_dir():
+            dir_stats = item.stat()
+            candidates.append(
+                File(
+                    name=item.name,
+                    description="",
+                    size=dir_stats.st_size / 1e6,
+                    timestamp=datetime.fromtimestamp(dir_stats.st_mtime),
+                    full_path=str(item),
+                )
+            )
+    candidates.sort(key=lambda x: x.timestamp, reverse=True)
+    return candidates
+
+
 @router.get(
     "/instruments/{instrument_name}/sessions/{session_id}/possible_gain_references"
 )
