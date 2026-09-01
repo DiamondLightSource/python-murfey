@@ -30,17 +30,17 @@ def set_up_test_client(session_id: Optional[int] = None):
     return TestClient(client_app)
 
 
-test_get_murfey_url_params_matrix = (
-    # Server URL to use
-    ("default",),
-    ("0.0.0.0:8000",),
-    ("murfey_server",),
-    ("http://murfey_server:8000",),
-    ("http://murfey_server:8080/api",),
+@pytest.mark.parametrize(
+    "test_params",
+    (
+        # Server URL to use
+        ("default",),
+        ("0.0.0.0:8000",),
+        ("murfey_server",),
+        ("http://murfey_server:8000",),
+        ("http://murfey_server:8080/api",),
+    ),
 )
-
-
-@pytest.mark.parametrize("test_params", test_get_murfey_url_params_matrix)
 def test_get_murfey_url(
     test_params: tuple[str],
     mock_client_configuration,  # From conftest.py
@@ -101,15 +101,15 @@ def test_check_multigrid_controller_status(mocker: MockerFixture):
     }
 
 
-test_upload_gain_reference_params_matrix = (
-    # Rsync URL settings
-    ("http://1.1.1.1",),  # When rsync_url is provided
-    ("",),  # When rsync_url is blank
-    (None,),  # When rsync_url not provided
+@pytest.mark.parametrize(
+    "test_params",
+    (
+        # Rsync URL settings
+        ("http://1.1.1.1",),  # When rsync_url is provided
+        ("",),  # When rsync_url is blank
+        (None,),  # When rsync_url not provided
+    ),
 )
-
-
-@pytest.mark.parametrize("test_params", test_upload_gain_reference_params_matrix)
 def test_upload_gain_reference(
     mocker: MockerFixture,
     test_params: tuple[Optional[str]],
