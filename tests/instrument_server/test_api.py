@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from typing import Optional
 from unittest.mock import ANY, MagicMock, patch
@@ -15,6 +16,7 @@ from murfey.instrument_server.api import (
 )
 from murfey.util import posix_path
 from murfey.util.api import url_path_for
+from murfey.util.config import MachineConfig
 
 
 def set_up_test_client(session_id: Optional[int] = None):
@@ -99,6 +101,54 @@ def test_check_multigrid_controller_status(mocker: MockerFixture):
         "exists": True,
         "finalising": False,
     }
+
+
+def test_get_possible_otf_dirs(
+    mocker: MockerFixture,
+    tmp_path: Path,
+):
+    session_id = 1
+
+    # Set up client-side OTF files
+    otf_dir = tmp_path / "otfs" / "otfs-123456"
+    otf_dir.mkdir(parents=True, exist_ok=True)
+    for stem in ("far_red.tiff", "red.tiff", "green.tiff", "blue.tiff"):
+        file = otf_dir / stem
+        file.touch(exist_ok=True)
+
+    # Mock the stored tokens
+    mocker.patch("murfey.instrument_server.api.tokens", {session_id: "dummy"})
+
+    # Mock the GET request
+    mock_machine_config = json.loads(
+        MachineConfig(gain_reference_directory=otf_dir.parent).model_dump_json()
+    )
+    mock_response = MagicMock()
+    mock_response.json.return_value = mock_machine_config
+    mocker.patch(
+        "murfey.instrument_server.api.requests.get", return_value=mock_response
+    )
+
+    # Set up the test client
+    client_server = set_up_test_client(session_id=session_id)
+    url_path = url_path_for(
+        "api.router",
+        "get_possible_otf_dirs",
+        instrument_name="sim",
+        session_id=session_id,
+    )
+    response = client_server.get(url_path)
+
+    # Check that the result is as expected
+    assert response.json() == [
+        {
+            "name": str(otf_dir.name),
+            "description": "",
+            "size": ANY,
+            "timestamp": ANY,
+            "full_path": str(otf_dir),
+        }
+    ]
 
 
 @pytest.mark.parametrize(
