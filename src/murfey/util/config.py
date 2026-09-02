@@ -67,6 +67,7 @@ class MachineConfig(BaseModel):  # type: ignore
         "files": [],
     }
     mkdir_chmod: int = 0o2750
+    gain_directory_name: str = "processing"
 
     # Rsync setup
     rsync_url: str = ""
@@ -85,7 +86,6 @@ class MachineConfig(BaseModel):  # type: ignore
     # General processing setup
     processing_enabled: bool = True
     process_by_default: bool = True
-    gain_directory_name: str = "processing"
     process_multiple_datasets: bool = True
     processed_directory_name: str = "processed"
     processed_extra_directory: str = ""
