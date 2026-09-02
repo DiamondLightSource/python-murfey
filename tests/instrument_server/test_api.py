@@ -103,8 +103,13 @@ def test_check_multigrid_controller_status(mocker: MockerFixture):
     }
 
 
+@pytest.mark.parametrize(
+    "has_gain_reference_directory",
+    (True, False),
+)
 def test_get_possible_otf_dirs(
     mocker: MockerFixture,
+    has_gain_reference_directory: bool,
     tmp_path: Path,
 ):
     session_id = 1
@@ -127,7 +132,11 @@ def test_get_possible_otf_dirs(
 
     # Mock the GET request
     mock_machine_config = json.loads(
-        MachineConfig(gain_reference_directory=otf_dir.parent).model_dump_json()
+        MachineConfig(
+            gain_reference_directory=otf_dir.parent
+            if has_gain_reference_directory
+            else None
+        ).model_dump_json()
     )
     mock_response = MagicMock()
     mock_response.json.return_value = mock_machine_config
@@ -146,15 +155,19 @@ def test_get_possible_otf_dirs(
     response = client_server.get(url_path)
 
     # Check that the result is as expected
-    assert response.json() == [
-        {
-            "name": str(otf_dir.name),
-            "description": "",
-            "size": ANY,
-            "timestamp": ANY,
-            "full_path": str(otf_dir),
-        }
-    ]
+    assert response.json() == (
+        [
+            {
+                "name": str(otf_dir.name),
+                "description": "",
+                "size": ANY,
+                "timestamp": ANY,
+                "full_path": str(otf_dir),
+            }
+        ]
+        if has_gain_reference_directory
+        else []
+    )
 
 
 @pytest.mark.parametrize(
