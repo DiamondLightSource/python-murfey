@@ -425,6 +425,91 @@ def get_possible_otf_dirs(
     return candidates
 
 
+class OTFDirectoryUploadInfo(BaseModel):
+    dir_path: Path  # Full client-side path to OTF directory
+    visit_path: str  # Path fragment from rsync module to visit directory
+    destination_dir: str = "setup"  # Folder in visit directory to save to
+
+
+@router.post("/instruments/{instrument_name}/sessions/{session_id}/upload_otf_dir")
+def upload_otf_dir(
+    instrument_name: str,
+    session_id: MurfeySessionID,
+    otf_dir_info: OTFDirectoryUploadInfo,
+):
+    # Sanitise incoming values
+    otf_dir_path = sanitise(str(otf_dir_info.dir_path))
+    visit_path = sanitise(otf_dir_info.visit_path)
+    destination_dir = sanitise(otf_dir_info.destination_dir)
+
+    # Load machine config and other needed properties
+    machine_config_url_path = url_path_for(
+        "session_control.router",
+        "machine_info_by_instrument",
+        instrument_name=sanitise_nonpath(instrument_name),
+    )
+    machine_config: dict[str, Any] = requests.get(
+        f"{_get_murfey_url()}{machine_config_url_path}",
+        headers={"Authorization": f"Bearer {tokens[session_id]}"},
+    ).json()
+
+    # Validate that file passed is from the gain reference directory
+    otf_dir = machine_config.get("gain_reference_directory", "")
+    if not otf_dir_path.startswith(otf_dir):
+        raise ValueError(
+            "Gain reference file does not originate from the gain reference directory "
+            f"{otf_dir!r}"
+        )
+
+    # Construct the rsync path to use
+    # Return the rsync URL if set, otherwise assume you are syncing via Murfey
+    rsync_url = urlparse(
+        str(machine_config["rsync_url"])
+        if machine_config.get("rsync_url", "")
+        else _get_murfey_url()
+    )
+    rsync_module = machine_config.get("rsync_module", "data")
+    rsync_path = f"{rsync_url.hostname}::{rsync_module}/{visit_path}/{destination_dir}"
+
+    # Construct the expected destination path on the server side
+    rsync_basepath: str | None = machine_config.get("rsync_basepath")
+    if not rsync_basepath:
+        logger.error(f"No rsync base path was configured for {instrument_name}")
+        return {"success": False}
+    destination_path = (
+        f"{rsync_basepath}/{visit_path}/{destination_dir}/"
+        f"{secure_filename(otf_dir_info.dir_path.name)}"
+    )
+
+    # Run rsync subprocess to transfer OTF directory and contents
+    cmd = [
+        "rsync",
+        "-a",  # Sync folder contents
+    ]
+    if rsync_chmod := machine_config.get("rsync_chmod"):
+        cmd.append(f"--chmod={rsync_chmod}")
+    cmd.extend([posix_path(Path(otf_dir_path)), rsync_path])
+    process = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+    )
+    if process.returncode:
+        logger.warning(
+            f"Failed to transfer OTF directory {otf_dir_path!r} to {f'{destination_path}'!r} \n"
+            f"Executed the following command: {' '.join(cmd)!r} \n"
+            f"Returned the following error: \n"
+            f"{process.stderr}"
+        )
+        return {"success": False}
+
+    # Return the full path as part of the message
+    return {
+        "success": True,
+        "destination_path": str(destination_path),
+    }
+
+
 @router.get(
     "/instruments/{instrument_name}/sessions/{session_id}/possible_gain_references"
 )
