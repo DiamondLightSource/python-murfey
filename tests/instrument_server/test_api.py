@@ -119,6 +119,12 @@ def test_get_possible_otf_dirs(
     # Mock the stored tokens
     mocker.patch("murfey.instrument_server.api.tokens", {session_id: "dummy"})
 
+    # Mock the stored Murfey URL
+    mocker.patch(
+        "murfey.instrument_server.api.murfey_server_url",
+        MagicMock(url="dummy"),
+    )
+
     # Mock the GET request
     mock_machine_config = json.loads(
         MachineConfig(gain_reference_directory=otf_dir.parent).model_dump_json()
