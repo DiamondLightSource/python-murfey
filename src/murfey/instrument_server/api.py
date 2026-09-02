@@ -398,28 +398,30 @@ def get_possible_otf_dirs(
         "machine_info_by_instrument",
         instrument_name=sanitise_nonpath(instrument_name),
     )
-    machine_config = requests.get(
+    machine_config: dict[str, Any] = requests.get(
         f"{_get_murfey_url()}{url_path}",
         headers={"Authorization": f"Bearer {tokens[session_id]}"},
     ).json()
 
     # Look for OTF directories under the specified directory
     candidates: list[File] = []
-    for item in secure_path(
-        Path(machine_config["gain_reference_directory"]), keep_spaces=True
-    ).glob("*"):
-        if item.is_dir():
-            dir_stats = item.stat()
-            candidates.append(
-                File(
-                    name=item.name,
-                    description="",
-                    size=dir_stats.st_size / 1e6,
-                    timestamp=datetime.fromtimestamp(dir_stats.st_mtime),
-                    full_path=str(item),
+    otf_dir = machine_config.get("gain_reference_directory", None)
+    if otf_dir is not None:
+        for item in secure_path(Path(otf_dir), keep_spaces=True).glob("*"):
+            if item.is_dir():
+                dir_stats = item.stat()
+                candidates.append(
+                    File(
+                        name=item.name,
+                        description="",
+                        size=dir_stats.st_size / 1e6,
+                        timestamp=datetime.fromtimestamp(dir_stats.st_mtime),
+                        full_path=str(item),
+                    )
                 )
-            )
-    candidates.sort(key=lambda x: x.timestamp, reverse=True)
+        candidates.sort(key=lambda x: x.timestamp, reverse=True)
+    else:
+        logger.error(f"No OTF directory was configured for {instrument_name}")
     return candidates
 
 
