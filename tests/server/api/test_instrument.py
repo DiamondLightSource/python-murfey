@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Callable, Literal
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock
 
@@ -51,6 +51,24 @@ def mock_aiohttp_clientsession(
     return mock_clientsession, mock_response
 
 
+def set_up_test_backend_client(session_id: int, mock_db_session: Callable):
+    """
+    Helper function to set up a test backend server whose response can be inspected
+    to check that the endpoint function works as expected
+    """
+    # Set up the backend server
+    backend_app = FastAPI()
+
+    # Override validation and database dependencies
+    backend_app.dependency_overrides[validate_token] = lambda: None
+    backend_app.dependency_overrides[validate_frontend_session_access] = (
+        lambda: session_id
+    )
+    backend_app.dependency_overrides[murfey_db_session] = mock_db_session
+    backend_app.include_router(backend_router)
+    return TestClient(backend_app)
+
+
 def test_check_multigrid_controller_status(mocker: MockerFixture):
     # Set up the objects to mock
     instrument_name = "test"
@@ -92,17 +110,11 @@ def test_check_multigrid_controller_status(mocker: MockerFixture):
         status=200,
     )
 
-    # Set up the backend server
-    backend_app = FastAPI()
-
-    # Override validation and database dependencies
-    backend_app.dependency_overrides[validate_token] = lambda: None
-    backend_app.dependency_overrides[validate_frontend_session_access] = (
-        lambda: session_id
+    # # Set up the backend server
+    backend_server = set_up_test_backend_client(
+        session_id=session_id,
+        mock_db_session=mock_get_db_session,
     )
-    backend_app.dependency_overrides[murfey_db_session] = mock_get_db_session
-    backend_app.include_router(backend_router)
-    backend_server = TestClient(backend_app)
 
     # Construct the URL paths for poking and sending to
     backend_url_path = url_path_for(
