@@ -258,7 +258,7 @@ def test_request_otf_dir_upload(
         gain_directory_name=otf_dir_name,
         instrument_server_url=instrument_server_url,
     )
-    mock_get_machine_config = mocker.patch(
+    mocker.patch(
         "murfey.server.api.instrument.get_machine_config",
         return_value={instrument_name: mock_machine_config},
     )
@@ -282,7 +282,7 @@ def test_request_otf_dir_upload(
     # Mock the client session the API is requesting from
     json_data = {
         "success": True,
-        "destination_path": str(visit_dir / "setup" / otf_dir_client.name),
+        "destination_path": str(visit_dir / otf_dir_name / otf_dir_client.name),
     }
     mock_client_session, _ = mock_aiohttp_clientsession(
         mocker,
@@ -316,8 +316,8 @@ def test_request_otf_dir_upload(
         json={"dir_path": str(otf_dir_client)},
     )
 
-    # Check that 'get_machine_config' was called
-    mock_get_machine_config.assert_called_once()
+    # Check that the server-side OTF directory save location was created
+    assert (visit_dir / otf_dir_name).exists()
 
     # Check that request was sent to instrument server with expected calls
     payload = {
