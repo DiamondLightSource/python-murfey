@@ -24,28 +24,30 @@ def visit_dir(tmp_path: Path):
 
 @pytest.mark.parametrize(
     "test_params",
-    (  # Transport object | DB query success | Machine config found | PySIMRecon config found | Output dir found
+    (  # Transport object | DB query success | Machine config found | OTF files found | PySIMRecon config found | Output dir found
         # Successful case
-        (True, True, True, True, True),
-        (True, True, True, False, True),  # No PySIMRecon config
+        (True, True, True, True, True, True),
+        (True, True, True, True, False, True),  # No PySIMRecon config
         # Failure cases
-        (False, True, True, True, True),  # No transport object
-        (True, False, True, True, True),  # DB query failed
-        (True, True, False, True, True),  # Machine config error
-        (True, True, True, True, False),  # Incorrect output dir
+        (False, True, True, True, True, True),  # No transport object
+        (True, False, True, True, True, True),  # DB query failed
+        (True, True, False, True, True, True),  # Machine config error
+        (True, True, True, False, True, True),  # No OTF files
+        (True, True, True, True, True, False),  # Incorrect output dir
     ),
 )
 def test_request_sim_reconstruction(
     mocker: MockerFixture,
     tmp_path: Path,
     visit_dir: Path,
-    test_params: tuple[bool, bool, bool, bool, bool],
+    test_params: tuple[bool, bool, bool, bool, bool, bool],
 ):
     # Unpack test params
     (
         has_transport_object,
         db_query_success,
         machine_config_found,
+        has_otfs,
         pysimrecon_configured,
         output_dir_success,
     ) = test_params
@@ -66,9 +68,10 @@ def test_request_sim_reconstruction(
     # Set up test OTF files
     otf_dir = tmp_path / "otfs" / "OTF-123456"
     otf_dir.mkdir(parents=True, exist_ok=True)
-    for wavelength in (452, 525, 605, 655):
-        otf_file = otf_dir / f"20200101_OTF_{wavelength}_123456.tiff"
-        otf_file.touch(exist_ok=True)
+    if has_otfs:
+        for wavelength in (452, 525, 605, 655):
+            otf_file = otf_dir / f"20200101_OTF_{wavelength}_123456.tiff"
+            otf_file.touch(exist_ok=True)
 
     # Mock the Murfey DB
     mock_murfey_session = MagicMock(
@@ -145,6 +148,13 @@ def test_request_sim_reconstruction(
     elif not machine_config_found:
         mock_logger.error.assert_called_with(
             "Error loading machine config from database", exc_info=True
+        )
+        mock_transport_object.send.assert_not_called()
+    elif not has_otfs:
+        mock_logger.error.assert_called_with(
+            f"One or more OTF files missing from {otf_dir}\n"
+            f"Files accounted for:\n"
+            f"{json.dumps({}, indent=2, default=str)}"
         )
         mock_transport_object.send.assert_not_called()
     elif not output_dir_success:
