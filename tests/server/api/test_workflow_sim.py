@@ -63,10 +63,18 @@ def test_request_sim_reconstruction(
     # Mock the logger
     mock_logger = mocker.patch("murfey.server.api.workflow_sim.logger")
 
+    # Set up test OTF files
+    otf_dir = tmp_path / "otfs" / "OTF-123456"
+    otf_dir.mkdir(parents=True, exist_ok=True)
+    for wavelength in (452, 525, 605, 655):
+        otf_file = otf_dir / f"20200101_OTF_{wavelength}_123456.tiff"
+        otf_file.touch(exist_ok=True)
+
     # Mock the Murfey DB
     mock_murfey_session = MagicMock(
         instrument_name=instrument_name,
         visit=visit_name,
+        current_gain_ref=str(otf_dir),
     )
     mock_db = MagicMock()
     if db_query_success:
@@ -79,18 +87,22 @@ def test_request_sim_reconstruction(
         "wavelength": 452,
         "ls": 0.123 if pysimrecon_configured else 0.330,
         "beaddiam": 0.220,
+        "otf_path": str(otf_dir / f"20200101_OTF_{452}_123456.tiff"),
     }
     green_params = {
         "wavelength": 525,
         "ls": 0.234 if pysimrecon_configured else 0.394,
+        "otf_path": str(otf_dir / f"20200101_OTF_{525}_123456.tiff"),
     }
     red_params = {
         "wavelength": 605,
         "ls": 0.345 if pysimrecon_configured else 0.451,
+        "otf_path": str(otf_dir / f"20200101_OTF_{605}_123456.tiff"),
     }
     far_red_params = {
         "wavelength": 655,
         "ls": 0.456 if pysimrecon_configured else 0.521,
+        "otf_path": str(otf_dir / f"20200101_OTF_{655}_123456.tiff"),
     }
     pysimrecon_config = {
         "blue": blue_params,
@@ -145,6 +157,7 @@ def test_request_sim_reconstruction(
         recipe = {
             "recipes": ["sim-reconstruction"],
             "parameters": {
+                "visit_name": visit_name,
                 "file": f"{str(sim_data.file)}",
                 "output_dir": str(output_dir),
                 "blue_params": str(pysimrecon_config["blue"]),
