@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import datetime
-import json
 import logging
 import os
 from pathlib import Path
@@ -471,13 +470,6 @@ async def request_otf_dir_upload(
                 "visit_path": visit_path,
                 "destination_dir": machine_config.gain_directory_name,
             }
-
-            # REMOVE AFTER TESTING
-            log.info(
-                "Submitting the following payload to instrument server: \n"
-                f"{json.dumps(payload, indent=2, default=str)}"
-            )
-
             async with clientsession.post(
                 f"{machine_config.instrument_server_url}{url_path}",
                 json=payload,
