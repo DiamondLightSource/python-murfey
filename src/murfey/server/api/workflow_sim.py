@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from pathlib import Path
 from typing import Any
 
@@ -44,8 +45,38 @@ def request_sim_reconstruction(
         ).one()
         instrument_name = murfey_session.instrument_name
         visit_name = murfey_session.visit
+        otf_dir = Path(murfey_session.current_gain_ref)
     except Exception:
         logger.error("Error querying session information from database", exc_info=True)
+        return None
+
+    # Look for OTF files in the saved directory and match them to wavelengths
+    COLOR_LOOKUP = {
+        452: "blue",
+        525: "green",
+        605: "red",
+        655: "far_red",
+    }
+    otf_files: dict[str, Path] = {}
+    pattern = r"(?<!\d)\d{3}(?!\d)"  # Regex match for EXACTLY 3 consecutive digits (wavelength)
+    for file in otf_dir.glob("*"):
+        if (
+            file.is_file()
+            and file.suffix.endswith((".tif", ".tiff"))
+            and "otf" in file.stem.lower()
+            and (match := re.search(pattern, file.stem))
+        ):
+            wavelength = int(match.group())
+            if color := COLOR_LOOKUP.get(wavelength):
+                otf_files[color] = file
+
+    # If 4 matches weren't found, log as an error and exit early
+    if len(otf_files) < 4:
+        logger.error(
+            f"One or more OTF files missing from {otf_dir}\n"
+            f"Files accounted for:\n"
+            f"{json.dumps(otf_files, indent=2, default=str)}"
+        )
         return None
 
     # Load PySIMRecon values from the machine config
@@ -84,6 +115,10 @@ def request_sim_reconstruction(
         logger.error("Error loading machine config from database", exc_info=True)
         return None
 
+    # Add the OTF file information to the PySIMRecon config
+    for color, otf_file in otf_files.items():
+        pysimrecon_config[color]["otf_path"] = str(otf_file)
+
     # Construct message and submit it to 'processing_recipe'
     logger.info(
         f"Submitting request to process the cryoSIM file {sanitise_path(sim_data.file)}"
@@ -112,6 +147,7 @@ def request_sim_reconstruction(
         "recipes": ["sim-reconstruction"],
         "parameters": {
             # PySIMRecon parameters
+            "visit_name": visit_name,
             "file": f"{str(sim_data.file)}",
             "output_dir": str(output_dir),
             "blue_params": str(pysimrecon_config["blue"]),

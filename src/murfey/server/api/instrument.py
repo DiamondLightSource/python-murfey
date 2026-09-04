@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import datetime
 import logging
+import os
 from pathlib import Path
 from typing import Annotated, Any, List, Optional
 from urllib.parse import quote
@@ -405,6 +406,82 @@ async def get_possible_otf_dirs(
                 headers={"Authorization": f"Bearer {token}"},
             ) as resp:
                 data = await resp.json()
+    return data
+
+
+class OTFDirectoryUploadRequest(BaseModel):
+    dir_path: Path
+
+
+@router.post("/sessions/{session_id}/upload_otf_dir")
+async def request_otf_dir_upload(
+    session_id: MurfeySessionID,
+    otf_dir_request: OTFDirectoryUploadRequest,
+    db=murfey_db,
+):
+    # Load session information from database
+    murfey_session = db.exec(select(Session).where(Session.id == session_id)).one()
+    visit_name = murfey_session.visit
+    instrument_name = murfey_session.instrument_name
+
+    # Load machine config
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
+
+    # Default data to return
+    data: dict[str, Any] = {"success": False}
+
+    # Load the rsync basepath
+    rsync_basepath = machine_config.rsync_basepath
+    if rsync_basepath is None:
+        log.error(f"No rsync basepath was configured for instrument {instrument_name}")
+        return data
+
+    # Construct the partial and full paths to the server-side visit directory
+    visit_path = f"{datetime.datetime.now().year}/{visit_name}"
+    visit_dir = rsync_basepath / visit_path
+    if not visit_dir.exists():  # Check previous year in case of rollover
+        visit_dir_prev = visit_dir
+        visit_path = f"{datetime.datetime.now().year - 1}/{visit_name}"
+        visit_dir = rsync_basepath / visit_path
+        if not visit_dir.exists():
+            log.error(
+                "Unable to find visit directory under "
+                f"{str(visit_dir_prev)} or {str(visit_dir)}"
+            )
+            return data
+
+    # Ensure that the OTF destination directory exists
+    otf_dir = visit_dir / machine_config.gain_directory_name
+    otf_dir.mkdir(exist_ok=True)
+    os.chmod(otf_dir, mode=machine_config.mkdir_chmod)  # Set permissions
+
+    if machine_config.instrument_server_url:
+        async with aiohttp.ClientSession() as clientsession:
+            url_path = url_path_for(
+                "api.router",
+                "upload_otf_dir",
+                instrument_name=instrument_name,
+                session_id=session_id,
+            )
+            payload = {
+                "dir_path": str(otf_dir_request.dir_path),
+                "visit_path": visit_path,
+                "destination_dir": machine_config.gain_directory_name,
+            }
+            async with clientsession.post(
+                f"{machine_config.instrument_server_url}{url_path}",
+                json=payload,
+                headers={
+                    "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
+                },
+            ) as resp:
+                data = await resp.json()
+    else:
+        log.error(
+            f"No instrument server URL was configured for instrument {instrument_name}"
+        )
     return data
 
 

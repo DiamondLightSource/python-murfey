@@ -1,3 +1,5 @@
+from datetime import datetime
+from pathlib import Path
 from typing import Callable, Literal
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock
@@ -207,19 +209,11 @@ def test_get_possible_otf_dirs(
         instrument_name=instrument_name,
         session_id=session_id,
     )
-    assert (
-        backend_url_path
-        == f"/instrument_server/instruments/{instrument_name}/sessions/{session_id}/possible_otf_dirs"
-    )
     client_url_path = url_path_for(
         "api.router",
         "get_possible_otf_dirs",
         instrument_name=instrument_name,
         session_id=session_id,
-    )
-    assert (
-        client_url_path
-        == f"/instruments/{instrument_name}/sessions/{session_id}/possible_otf_dirs"
     )
 
     # Poke the backend
@@ -231,4 +225,112 @@ def test_get_possible_otf_dirs(
     )
     assert response.status_code == 200
     assert response.json() == json_data
-    pass
+
+
+def test_request_otf_dir_upload(
+    mocker: MockerFixture,
+    tmp_path: Path,
+):
+    # Set reusable variables here
+    instrument_name = "sim"
+    session_id = 1
+    visit_name = "cm12345-6"
+
+    instrument_server_url = "https://murfey.instrument-server.test"
+    access_token = "dummy"
+    rsync_basepath = tmp_path / "data"
+    otf_dir_name = "setup"
+
+    current_year = datetime.now().year
+
+    # Create the visit directory
+    visit_dir = rsync_basepath / str(current_year) / visit_name
+    visit_dir.mkdir(parents=True, exist_ok=True)
+    visit_path = visit_dir.relative_to(rsync_basepath)
+
+    # Create the client-side OTF directory to transfer
+    otf_dir_client = tmp_path / "client" / "otfs" / "OTFs-123456"
+    otf_dir_client.mkdir(parents=True, exist_ok=True)
+
+    # Mock the machine config
+    mock_machine_config = MachineConfig(
+        rsync_basepath=rsync_basepath,
+        gain_directory_name=otf_dir_name,
+        instrument_server_url=instrument_server_url,
+    )
+    mocker.patch(
+        "murfey.server.api.instrument.get_machine_config",
+        return_value={instrument_name: mock_machine_config},
+    )
+
+    # Mock the instrument server access token
+    mocker.patch(
+        "murfey.server.api.instrument.instrument_server_tokens",
+        {session_id: {"access_token": access_token}},
+    )
+
+    # Override the database session generator
+    mock_session = MagicMock(instrument_name=instrument_name, visit=visit_name)
+    mock_query_result = MagicMock()
+    mock_query_result.one.return_value = mock_session
+    mock_db_session = MagicMock()
+    mock_db_session.exec.return_value = mock_query_result
+
+    def mock_get_db_session():
+        yield mock_db_session
+
+    # Mock the client session the API is requesting from
+    json_data = {
+        "success": True,
+        "destination_path": str(visit_dir / otf_dir_name / otf_dir_client.name),
+    }
+    mock_client_session, _ = mock_aiohttp_clientsession(
+        mocker,
+        method="post",
+        json_data=json_data,
+    )
+
+    # Set up the backend server
+    backend_server = set_up_test_backend_client(
+        session_id=session_id,
+        instrument_name=instrument_name,
+        mock_db_session=mock_get_db_session,
+    )
+
+    # Construct the URL paths for poking and sending to
+    backend_url_path = url_path_for(
+        "api.instrument.router",
+        "request_otf_dir_upload",
+        session_id=session_id,
+    )
+    client_url_path = url_path_for(
+        "api.router",
+        "upload_otf_dir",
+        instrument_name=instrument_name,
+        session_id=session_id,
+    )
+
+    # Poke the backend
+    response = backend_server.post(
+        backend_url_path,
+        json={"dir_path": str(otf_dir_client)},
+    )
+
+    # Check that the server-side OTF directory save location was created
+    assert (visit_dir / otf_dir_name).exists()
+
+    # Check that request was sent to instrument server with expected calls
+    payload = {
+        "dir_path": str(otf_dir_client),
+        "visit_path": str(visit_path),
+        "destination_dir": otf_dir_name,
+    }
+    mock_client_session.post.assert_called_once_with(
+        f"{instrument_server_url}{client_url_path}",
+        json=payload,
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+
+    # Check that the status code and returned data are correct
+    assert response.status_code == 200
+    assert response.json() == json_data

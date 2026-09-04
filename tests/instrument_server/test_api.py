@@ -179,6 +179,118 @@ def test_get_possible_otf_dirs(
         (None,),  # When rsync_url not provided
     ),
 )
+def test_upload_otf_dir(
+    mocker: MockerFixture,
+    test_params: tuple[Optional[str]],
+    tmp_path: Path,
+):
+    # Unpack test parameters and define other ones
+    (rsync_url_setting,) = test_params
+    server_url = "https://murfey.server.test"
+    instrument_name = "murfey"
+    session_id = 1
+
+    # Mock out objects
+    mock_request = mocker.patch("murfey.instrument_server.api.requests")
+    mock_get_server_url = mocker.patch("murfey.instrument_server.api._get_murfey_url")
+    mock_subprocess = mocker.patch("murfey.instrument_server.api.subprocess")
+    mocker.patch("murfey.instrument_server.api.tokens", {session_id: ANY})
+
+    # Create a mock machine config base on the test params
+    rsync_module = "data"
+    rsync_basepath = tmp_path / "data"
+    otf_dir = "C:/ProgramData/SIM/OTFs"
+    mock_machine_config = {
+        "rsync_module": rsync_module,
+        "rsync_basepath": str(rsync_basepath),
+        "gain_reference_directory": otf_dir,
+    }
+    if rsync_url_setting is not None:
+        mock_machine_config["rsync_url"] = rsync_url_setting
+
+    # Assign expected values to the mock objects
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = mock_machine_config
+    mock_request.get.return_value = mock_response
+    mock_get_server_url.return_value = server_url
+    mock_subprocess.run.return_value = MagicMock(returncode=0)
+
+    # Construct payload and pass request to function
+    otf_folder_name = "OTFs-123456"
+    otf_dir_path = f"{otf_dir}/{otf_folder_name}"
+    visit_path = "2025/aa00000-0"
+    destination_dir = "setup"
+    payload = {
+        "dir_path": otf_dir_path,
+        "visit_path": visit_path,
+        "destination_dir": destination_dir,
+    }
+
+    # Set up instrument server test client
+    client_server = set_up_test_client(session_id=session_id)
+
+    # Poke the endpoint with the expected data
+    url_path = url_path_for(
+        "api.router",
+        "upload_otf_dir",
+        instrument_name=instrument_name,
+        session_id=session_id,
+    )
+    response = client_server.post(url_path, json=payload)
+
+    # Check that the machine config request was called
+    machine_config_url = url_path_for(
+        "session_control.router",
+        "machine_info_by_instrument",
+        instrument_name=instrument_name,
+    )
+    mock_request.get.assert_called_once_with(
+        f"{server_url}{machine_config_url}",
+        headers={"Authorization": ANY},
+    )
+
+    # Check that the subprocess was run with the expected arguments
+    # If no rsync_url key is provided, or rsync_url key is empty,
+    # It should default to the server URL
+    expected_rsync_url = (
+        urlparse(server_url) if not rsync_url_setting else urlparse(rsync_url_setting)
+    )
+    expected_rsync_path = (
+        f"{expected_rsync_url.hostname}::{rsync_module}/{visit_path}/{destination_dir}"
+    )
+    expected_rsync_cmd = [
+        "rsync",
+        "-a",
+        posix_path(Path(otf_dir_path)),
+        expected_rsync_path,
+    ]
+    expected_destination_path = (
+        rsync_basepath / visit_path / destination_dir / otf_folder_name
+    )
+
+    mock_subprocess.run.assert_called_once_with(
+        expected_rsync_cmd,
+        capture_output=True,
+        text=True,
+    )
+
+    # Check that the function ran through to completion successfully
+    assert response.json() == {
+        "success": True,
+        "destination_path": str(expected_destination_path),
+    }
+
+
+@pytest.mark.parametrize(
+    "test_params",
+    (
+        # Rsync URL settings
+        ("http://1.1.1.1",),  # When rsync_url is provided
+        ("",),  # When rsync_url is blank
+        (None,),  # When rsync_url not provided
+    ),
+)
 def test_upload_gain_reference(
     mocker: MockerFixture,
     test_params: tuple[Optional[str]],

@@ -139,6 +139,15 @@ murfey.instrument_server.api.router:
         type: int
     methods:
       - GET
+  - path: /instruments/{instrument_name}/sessions/{session_id}/upload_otf_dir
+    function: upload_otf_dir
+    path_params:
+      - name: instrument_name
+        type: str
+      - name: session_id
+        type: int
+    methods:
+      - POST
   - path: /instruments/{instrument_name}/sessions/{session_id}/possible_gain_references
     function: get_possible_gain_references
     path_params:
@@ -561,6 +570,13 @@ murfey.server.api.instrument.router:
         type: int
     methods:
       - GET
+  - path: /instrument_server/sessions/{session_id}/upload_otf_dir
+    function: request_otf_dir_upload
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
   - path: /instrument_server/instruments/{instrument_name}/sessions/{session_id}/possible_gain_references
     function: get_possible_gain_references
     path_params:
