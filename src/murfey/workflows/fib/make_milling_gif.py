@@ -1,5 +1,4 @@
 import logging
-import os
 from pathlib import Path
 from typing import Any
 
@@ -8,7 +7,7 @@ import PIL.Image
 from sqlmodel import Session as SQLModelSession, select
 
 import murfey.util.db as MurfeyDB
-from murfey.util import sanitise_path
+from murfey.util import safe_chmod, sanitise_path
 from murfey.util.config import get_machine_config
 from murfey.util.models import FIBGIFParameters
 
@@ -48,13 +47,7 @@ def run(message: dict[str, Any], murfey_db: SQLModelSession):
             if not current_path.exists():
                 current_path.mkdir(parents=True)
                 logger.debug(f"Created output directory {current_path}")
-                try:
-                    os.chmod(current_path, mode=machine_config.mkdir_chmod)
-                except PermissionError:
-                    logger.warning(
-                        f"Insufficient permissions to modify directory {current_path}"
-                    )
-                    continue
+                safe_chmod(current_path, mode=machine_config.mkdir_chmod)
 
         # Load the images as PIL Image objects
         converted: list[PIL.Image.Image] = []
