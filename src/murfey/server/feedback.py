@@ -890,8 +890,8 @@ def _register_complete_2d_batch(message: dict, _db):
             # reserve only the trailing jobs: combine goes at the end and the
             # autoselect job is combine - 1 (see select_classes).
             trailing = 3 if default_spa_parameters.do_icebreaker_jobs else 2
-            class2d_job = _current_pipeline_job_counter(
-                visit_name, feedback_params.next_job
+            class2d_job = (
+                _current_pipeline_job_counter(visit_name, feedback_params.next_job) - 1
             )
             feedback_params.next_job = _reserve_pipeline_job_numbers(
                 visit_name, trailing, feedback_params.next_job
