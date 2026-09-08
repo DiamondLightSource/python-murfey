@@ -320,6 +320,14 @@ Models related to the single-particle analysis workflow.
 """
 
 
+class AtlasRegistration(BaseModel):
+    name: str
+    acquisition_uuid: str | None
+    storage_folder: str = ""
+    register_grid: bool = False
+    tag: str = ""
+
+
 class ProcessingParametersSPA(BaseModel):
     tag: str
     dose_per_frame: Optional[float] = None

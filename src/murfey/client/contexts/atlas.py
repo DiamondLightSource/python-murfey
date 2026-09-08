@@ -51,7 +51,7 @@ class AtlasContext(Context):
         if environment and transferred_file.suffix == ".mrc":
             source = _get_source(transferred_file, environment)
             if source:
-                sample = int(transferred_file.stem.split("slot")[1])
+                sample = int(transferred_file.stem.split("slot-")[1])
                 transferred_atlas_jpg = _atlas_destination(
                     environment,
                     source,
@@ -59,7 +59,7 @@ class AtlasContext(Context):
                 ) / transferred_file.relative_to(source.parent).with_suffix(".jpg")
                 dcg_data = {
                     "experiment_type_id": 44,  # Atlas
-                    "tag": str(transferred_file.parent),
+                    "tag": str(transferred_file.parent / transferred_file.stem),
                     "atlas": str(transferred_atlas_jpg).replace("//", "/"),
                     "sample": sample,
                     "create_smartem_grid": False,
@@ -86,7 +86,7 @@ class AtlasContext(Context):
                     instrument_name=environment.instrument_name,
                     session_id=environment.murfey_session,
                     data={
-                        "tag": str(transferred_file.parent),
+                        "tag": str(transferred_file.parent / transferred_file.stem),
                         "name": transferred_file.stem,
                         "acquisition_uuid": environment.acquisition_uuid,
                         "storage_folder": str(
