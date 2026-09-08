@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import datetime
 import logging
-import os
 from pathlib import Path
 from typing import Annotated, Any, List, Optional
 from urllib.parse import quote
@@ -38,7 +37,7 @@ from murfey.server.api.auth import (
     validate_token,
 )
 from murfey.server.murfey_db import murfey_db
-from murfey.util import sanitise, secure_path
+from murfey.util import safe_chmod, sanitise, secure_path
 from murfey.util.api import url_path_for
 from murfey.util.config import get_machine_config
 from murfey.util.db import RsyncInstance, Session, SessionProcessingParameters
@@ -455,7 +454,7 @@ async def request_otf_dir_upload(
     # Ensure that the OTF destination directory exists
     otf_dir = visit_dir / machine_config.gain_directory_name
     otf_dir.mkdir(exist_ok=True)
-    os.chmod(otf_dir, mode=machine_config.mkdir_chmod)  # Set permissions
+    safe_chmod(otf_dir, mode=machine_config.mkdir_chmod)  # Set permissions
 
     if machine_config.instrument_server_url:
         async with aiohttp.ClientSession() as clientsession:
