@@ -58,7 +58,7 @@ def _register_fib_imaging_site(
             session_id=session_id,
             site_name=metadata.site_name,
             image_path=str(metadata.file),
-            data_type="atlas",
+            data_type="grid_square",
         )
         fib_imaging_site = populate_fib_imaging_site_entry(fib_imaging_site, metadata)
     else:
