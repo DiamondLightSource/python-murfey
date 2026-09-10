@@ -135,7 +135,7 @@ def test_register_fib_imaging_site_with_db(
     assert registered_site.session_id == session_id
     assert registered_site.data_type == "grid_square"
     assert registered_site.site_name == metadata.site_name
-    if existing_site and not newer_insert:
+    if has_existing_entry and not newer_insert:
         assert registered_site.image_path != str(file)
     else:
         assert registered_site.image_path == str(file)
