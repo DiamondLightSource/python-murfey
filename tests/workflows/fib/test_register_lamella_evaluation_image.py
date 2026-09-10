@@ -123,7 +123,7 @@ def test_register_fib_imaging_site_with_db(
     _register_fib_imaging_site(
         session_id=session_id,
         metadata=metadata,
-        murfey_db=murfey_session,
+        murfey_db=murfey_db_session,
     )
 
     # Only one entry should exist
