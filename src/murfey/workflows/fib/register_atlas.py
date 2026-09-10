@@ -10,9 +10,12 @@ from sqlmodel import Session, select
 
 import murfey.util.db as MurfeyDB
 from murfey.util.config import get_machine_config
-from murfey.util.fib import number_from_name, parse_image_metadata
+from murfey.util.fib import number_from_name
 from murfey.util.models import FIBImageMetadata
-from murfey.workflows.fib.shared import populate_fib_imaging_site_entry
+from murfey.workflows.fib.shared import (
+    parse_image_metadata,
+    populate_fib_imaging_site_entry,
+)
 
 logger = logging.getLogger("murfey.workflows.fib.register_atlas")
 

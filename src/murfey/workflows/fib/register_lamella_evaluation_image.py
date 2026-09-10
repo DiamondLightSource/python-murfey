@@ -8,8 +8,8 @@ from sqlmodel import Session, select
 
 import murfey.util.db as MurfeyDB
 from murfey.util.config import get_machine_config
-from murfey.util.fib import parse_image_metadata
 from murfey.util.models import FIBImageMetadata
+from murfey.workflows.fib.shared import parse_image_metadata
 
 logger = logging.getLogger(__name__)
 
