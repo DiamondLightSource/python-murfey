@@ -8,6 +8,7 @@ from pytest_mock import MockerFixture
 from murfey.util.config import MachineConfig
 from murfey.workflows.fib.register_lamella_evaluation_image import (
     FIBImageMetadata,
+    FIBLamellaImageInfo,
     run,
 )
 from tests.conftest import ExampleVisit
@@ -92,17 +93,32 @@ def test_run(
         return_value=metadata_dict,
     )
 
+    # Mock the results of '_register_fib_image_site'
+    mock_register_imaging_site = mocker.patch(
+        "murfey.workflows.fib.register_lamella_evaluation_image._register_fib_imaging_site",
+        return_value=MagicMock(),
+    )
+
     # Construct the message to pass to the function
     message = {
         "register": "fib.register_lamella_evaluation_image",
         "session_id": session_id,
         "lamella_image_file": str(file),
     }
+    fib_info = FIBLamellaImageInfo(**message)
 
     # Run function and check that expected calls were made
     result = run(message, mock_murfey_db)
-    mock_logger.info.assert_called_with(
+
+    # Metadata should have been extracted and logged
+    mock_logger.info.assert_any_call(
         "Extracted the following metadata from the image:\n"
         f"{json.dumps(metadata.model_dump(), indent=2, default=str)}"
+    )
+    # Imaging site registration function should have been called
+    mock_register_imaging_site.assert_called_once_with(
+        fib_info.session_id,
+        metadata,
+        mock_murfey_db,
     )
     assert result["success"]
