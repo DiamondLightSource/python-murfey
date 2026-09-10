@@ -78,27 +78,6 @@ class AtlasContext(Context):
                 logger.info(
                     f"Registered data collection group for atlas {str(transferred_file.stem)!r}"
                 )
-                capture_post(
-                    base_url=str(environment.url.geturl()),
-                    router_name="session_control.spa_router",
-                    function_name="register_atlas",
-                    token=self._token,
-                    instrument_name=environment.instrument_name,
-                    session_id=environment.murfey_session,
-                    data={
-                        "tag": str(transferred_file.parent / transferred_file.stem),
-                        "name": transferred_file.stem,
-                        "acquisition_uuid": environment.acquisition_uuid,
-                        "storage_folder": str(
-                            _atlas_destination(
-                                environment,
-                                source,
-                                Path(self._machine_config.get("rsync_basepath", "")),
-                            )
-                            / "atlas"
-                        ),
-                    },
-                )
 
     def post_transfer_epu(
         self,
@@ -171,8 +150,7 @@ class AtlasContext(Context):
                     "atlas": str(transferred_atlas_jpg).replace("//", "/"),
                     "sample": sample,
                     "atlas_pixel_size": atlas_pixel_size,
-                    "create_smartem_grid": bool(environment.acquisition_uuid),
-                    "acquisition_uuid": environment.acquisition_uuid,
+                    "create_smartem_grid": False,
                 }
                 capture_post(
                     base_url=str(environment.url.geturl()),
@@ -204,20 +182,31 @@ class AtlasContext(Context):
                 return
 
             # Make sure a dcg is requested before doing grid squares
-            capture_post(
-                base_url=str(environment.url.geturl()),
-                router_name="workflow.router",
-                function_name="register_dc_group",
-                token=self._token,
-                instrument_name=environment.instrument_name,
-                visit_name=environment.visit,
-                session_id=environment.murfey_session,
-                data={
-                    "experiment_type_id": 44,  # Atlas
-                    "tag": str(transferred_file.parent),
-                    "sample": sample,
-                },
-            )
+            source = _get_source(transferred_file, environment)
+            atlas_mrc = list(transferred_file.parent.glob("Atlas_*.mrc"))[0]
+            if source:
+                transferred_atlas = _atlas_destination(
+                    environment,
+                    source,
+                    Path(self._machine_config.get("rsync_basepath", "")),
+                ) / atlas_mrc.relative_to(source.parent)
+                capture_post(
+                    base_url=str(environment.url.geturl()),
+                    router_name="workflow.router",
+                    function_name="register_dc_group",
+                    token=self._token,
+                    instrument_name=environment.instrument_name,
+                    visit_name=environment.visit,
+                    session_id=environment.murfey_session,
+                    data={
+                        "experiment_type_id": 44,  # Atlas
+                        "tag": str(transferred_file.parent),
+                        "atlas": str(transferred_atlas).replace("//", "/"),
+                        "sample": sample,
+                        "create_smartem_grid": bool(environment.acquisition_uuid),
+                        "acquisition_uuid": environment.acquisition_uuid,
+                    },
+                )
             # Register all grid squares on this atlas
             for gs, pos_data in gs_pix_positions.items():
                 if pos_data:
@@ -255,5 +244,15 @@ class AtlasContext(Context):
                         "acquisition_uuid": environment.acquisition_uuid,
                         "register_grid": True,
                         "tag": str(transferred_file.parent),
+                        "storage_folder": str(
+                            _atlas_destination(
+                                environment,
+                                source,
+                                Path(self._machine_config.get("rsync_basepath", "")),
+                            )
+                            / "atlas"
+                            if source
+                            else ""
+                        ),
                     },
                 )
