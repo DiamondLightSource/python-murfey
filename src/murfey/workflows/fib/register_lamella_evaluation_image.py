@@ -145,7 +145,7 @@ def run(
             # Register imaging site to Murfey, or update existing one
             _ = _register_fib_imaging_site(fib_info.session_id, metadata, murfey_db)
             logger.info(
-                f"Register lamella evaluation image {fib_info.lamella_image_file} "
+                f"Registered lamella evaluation image {fib_info.lamella_image_file} "
                 f"for slot {metadata.slot_number} in Murfey database"
             )
         except Exception:
