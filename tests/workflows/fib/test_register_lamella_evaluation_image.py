@@ -39,6 +39,7 @@ def visit_dir(tmp_path: Path):
 )
 def test_register_fib_imaging_site_with_db(
     test_params: tuple[bool, bool],
+    visit_dir: Path,
     murfey_db_session: SQLModelSession,
 ):
     # Unpack test params
