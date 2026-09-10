@@ -4,15 +4,18 @@ from importlib.metadata import entry_points
 from pathlib import Path
 from typing import Any, cast
 
-import numpy as np
 import PIL.Image
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
 import murfey.util.db as MurfeyDB
 from murfey.util.config import get_machine_config
-from murfey.util.fib import number_from_name, parse_image_metadata
+from murfey.util.fib import number_from_name
 from murfey.util.models import FIBImageMetadata
+from murfey.workflows.fib.shared import (
+    parse_image_metadata,
+    populate_fib_imaging_site_entry,
+)
 
 logger = logging.getLogger("murfey.workflows.fib.register_atlas")
 
@@ -50,33 +53,6 @@ def _register_fib_imaging_site(
     """
     Register FIB atlas in Murfey database or update existing entry.
     """
-
-    def _update_entry(
-        imaging_site: MurfeyDB.ImagingSite,
-        metadata: FIBImageMetadata,
-    ):
-        imaging_site.image_path = str(metadata.file)
-        imaging_site.pos_x = metadata.pos_x
-        imaging_site.pos_y = metadata.pos_y
-        imaging_site.pos_z = metadata.pos_z
-        imaging_site.rotation = float(np.rad2deg(metadata.rotation))
-        imaging_site.tilt_alpha = float(np.rad2deg(metadata.tilt_alpha))
-        imaging_site.tilt_beta = float(np.rad2deg(metadata.tilt_beta))
-        imaging_site.len_x = metadata.len_x
-        imaging_site.len_y = metadata.len_y
-        imaging_site.image_pixels_x = metadata.pixels_x
-        imaging_site.image_pixels_y = metadata.pixels_y
-        imaging_site.image_pixel_size = metadata.pixel_size
-
-        if metadata.thumbnail_path is not None:
-            scale = 512 / (max(metadata.pixels_x, metadata.pixels_y) or 1)
-            imaging_site.thumbnail_path = str(metadata.thumbnail_path)
-            imaging_site.thumbnail_pixels_x = int(round(metadata.pixels_x * scale)) or 1
-            imaging_site.thumbnail_pixels_y = int(round(metadata.pixels_y * scale)) or 1
-            imaging_site.thumbnail_pixel_size = metadata.pixel_size / scale
-
-        return imaging_site
-
     if (
         fib_imaging_site := murfey_db.exec(
             select(MurfeyDB.ImagingSite)
@@ -92,7 +68,7 @@ def _register_fib_imaging_site(
             image_path=str(metadata.file),
             data_type="atlas",
         )
-        fib_imaging_site = _update_entry(fib_imaging_site, metadata)
+        fib_imaging_site = populate_fib_imaging_site_entry(fib_imaging_site, metadata)
     else:
         # Check if the entry is new or newer than the current stored one
         incoming_number = number_from_name(metadata.file.stem)
@@ -106,7 +82,9 @@ def _register_fib_imaging_site(
             current_number = 0
         # Update if incoming one is newer
         if incoming_number >= current_number:
-            fib_imaging_site = _update_entry(fib_imaging_site, metadata)
+            fib_imaging_site = populate_fib_imaging_site_entry(
+                fib_imaging_site, metadata
+            )
 
     murfey_db.add(fib_imaging_site)
     murfey_db.commit()
