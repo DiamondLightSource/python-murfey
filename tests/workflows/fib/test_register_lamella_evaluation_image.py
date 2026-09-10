@@ -48,6 +48,7 @@ def test_register_fib_imaging_site_with_db(
     murfey_session = MurfeyDB.Session(
         id=session_id,
         visit=visit_name,
+        name=visit_name,
         instrument_name=instrument_name,
         started=True,
     )
