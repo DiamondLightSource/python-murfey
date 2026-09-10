@@ -1285,7 +1285,7 @@ def _resize_initial_model(
     if executables.get("relion_align_symmetry") and symmetry != "C1":
         align_proc = subprocess.run(
             [
-                "relion_align_symmetry",
+                f"{executables['relion_align_symmetry']}",
                 "--i",
                 str(output_path),
                 "--o",
