@@ -251,11 +251,13 @@ def run(
                 fib_info.session_id, metadata, murfey_db
             )
             logger.info(
-                f"Registered FIB atlas image {fib_info.atlas_file} for slot {metadata.slot_number} in Murfey database"
+                f"Registered FIB atlas image {fib_info.atlas_file} "
+                f"for slot {metadata.slot_number} in Murfey database"
             )
         except Exception:
             logger.error(
-                f"Error registering FIB atlas image {fib_info.atlas_file} in Murfey database",
+                "Error registering FIB atlas image "
+                f"{fib_info.atlas_file} in Murfey database",
                 exc_info=True,
             )
             return {"success": False, "requeue": False}
@@ -273,7 +275,7 @@ def run(
         except Exception:
             # Log error but allow workflow to proceed
             logger.error(
-                "Exception encountered when registering data collection group for FIB workflow "
+                "Error registering data collection group for FIB workflow "
                 f"for {metadata.site_name!r}: \n"
                 f"{traceback.format_exc()}"
             )
