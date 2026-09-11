@@ -100,6 +100,7 @@ def test_atlas_context_dm(mock_capture_post, tmp_path):
     )
 
     # Write sample dm file
+    (tmp_path / "cm12345-6/Supervisor_atlas/Sample2/Atlas/Atlas_01.mrc").touch()
     atlas_dm = tmp_path / "cm12345-6/Supervisor_atlas/Sample2/Atlas/Atlas.dm"
     atlas_dm.parent.mkdir(parents=True)
     (tmp_path / "cm12345-6/Supervisor_atlas/Sample2/Atlas/Atlas_01.mrc").touch()
