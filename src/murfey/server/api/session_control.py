@@ -460,7 +460,7 @@ def register_grid_square(
         murfey.server._transport_object.send(
             murfey.server._transport_object.feedback_queue,
             {
-                "register": "register_grid_square",
+                "register": "spa.register_grid_square",
                 "session_id": session_id,
                 "gsid": gsid,
                 "grid_square_params": grid_square_params.model_dump(),
