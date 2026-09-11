@@ -29,7 +29,7 @@ pattern = re.compile(r"(?<!\d)\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2}(?!\d)")
 
 def _get_timestamp(name: str):
     """
-    Helper functino to extract the datetime information from the lamella evaluation
+    Helper function to extract the datetime information from the lamella evaluation
     image file name.
     """
     if (match := pattern.search(name)) is not None:
