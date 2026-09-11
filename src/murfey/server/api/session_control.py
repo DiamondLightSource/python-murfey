@@ -72,7 +72,6 @@ from murfey.util.models import (
 from murfey.workflows.spa.atlas import atlas_jpg_from_mrc
 from murfey.workflows.spa.flush_spa_preprocess import (
     register_foil_hole as _register_foil_hole,
-    register_grid_square as _register_grid_square,
 )
 from murfey.workflows.tomo.tomo_metadata import (
     register_batch_position_in_database,
@@ -457,7 +456,16 @@ def register_grid_square(
     grid_square_params: GridSquareParameters,
     db=murfey_db,
 ):
-    return _register_grid_square(session_id, gsid, grid_square_params, db)
+    if murfey.server._transport_object:
+        murfey.server._transport_object.send(
+            murfey.server._transport_object.feedback_queue,
+            {
+                "register": "register_grid_square",
+                "session_id": session_id,
+                "gsid": gsid,
+                "grid_square_params": grid_square_params.model_dump(),
+            },
+        )
 
 
 @spa_router.post("/sessions/{session_id}/grid_square/{gs_name}/foil_hole")
