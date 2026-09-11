@@ -77,7 +77,6 @@ def test_atlas_context_xml(mock_capture_post, tmp_path):
         "sample": 2,
         "atlas_pixel_size": atlas_pixel_size * 7.8,
         "create_smartem_grid": False,
-        "acquisition_uuid": None,
     }
     mock_capture_post.assert_called_once_with(
         base_url="http://localhost:8000",
@@ -107,6 +106,7 @@ def test_atlas_context_dm(mock_capture_post, tmp_path):
     )
 
     # Write sample dm file
+    (tmp_path / "cm12345-6/Supervisor_atlas/Sample2/Atlas/Atlas_01.mrc").touch()
     atlas_dm = tmp_path / "cm12345-6/Supervisor_atlas/Sample2/Atlas/Atlas.dm"
     atlas_dm.parent.mkdir(parents=True)
     grid_square_values = (
