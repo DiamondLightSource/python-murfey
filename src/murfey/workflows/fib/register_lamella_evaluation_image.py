@@ -21,6 +21,9 @@ logger = logging.getLogger(__name__)
 
 # The timestamp in the lamella evaluation image follows the pattern
 # yyyy-mm-dd-HH-MM-SS
+# E.g.
+#   2026-03-09-18-24-51_drift_corrected_image_Finer Milling - Electron Image.png
+#   2026-03-10-16-06-25_drift_corrected_image_Polishing 2 - Electron Image.png
 # This can be searched for using regex
 # (?<!\d) --> Character prior to pattern CANNOT be a digit
 # (?!\d)  --> Character after pattern CANNOT be a digit
