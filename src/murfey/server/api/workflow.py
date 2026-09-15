@@ -56,7 +56,7 @@ from murfey.server.feedback import (
 from murfey.server.ispyb import DB as ispyb_db, get_proposal_id
 from murfey.server.murfey_db import murfey_db
 from murfey.util import sanitise
-from murfey.util.config import get_machine_config
+from murfey.util.config import MachineConfig, get_machine_config
 from murfey.util.db import (
     AutoProcProgram,
     DataCollection,
@@ -112,28 +112,10 @@ class DCGroupParameters(BaseModel):
     acquisition_uuid: Optional[str] = None
 
 
-@router.post(
-    "/visits/{visit_name}/sessions/{session_id}/register_data_collection_group"
-)
-def register_dc_group(
-    visit_name: str,
-    session_id: MurfeySessionID,
-    dcg_params: DCGroupParameters,
-    db: SQLModelSession = murfey_db,
-):
-    ispyb_proposal_code = visit_name[:2]
-    ispyb_proposal_number = visit_name.split("-")[0][2:]
-    ispyb_visit_number = visit_name.split("-")[-1]
-    instrument_name = (
-        db.exec(select(MurfeySession).where(MurfeySession.id == session_id))
-        .one()
-        .instrument_name
-    )
-    logger.info(f"Registering data collection group on microscope {instrument_name}")
-    machine_config = get_machine_config(instrument_name=instrument_name)[
-        instrument_name
-    ]
-    smartem_grid_uuid = None
+def _register_smartem_grid(
+    machine_config: MachineConfig, dcg_params: DCGroupParameters, visit_name: str
+) -> str:
+    smartem_grid_uuid = ""
     if SMARTEM_ACTIVE and dcg_params.acquisition_uuid:
         if machine_config.smartem_api_url:
             try:
@@ -167,6 +149,31 @@ def register_dc_group(
 
             except Exception:
                 logger.warning("Failed to register SmartEM grid", exc_info=True)
+    return smartem_grid_uuid
+
+
+@router.post(
+    "/visits/{visit_name}/sessions/{session_id}/register_data_collection_group"
+)
+def register_dc_group(
+    visit_name: str,
+    session_id: MurfeySessionID,
+    dcg_params: DCGroupParameters,
+    db: SQLModelSession = murfey_db,
+):
+    ispyb_proposal_code = visit_name[:2]
+    ispyb_proposal_number = visit_name.split("-")[0][2:]
+    ispyb_visit_number = visit_name.split("-")[-1]
+    instrument_name = (
+        db.exec(select(MurfeySession).where(MurfeySession.id == session_id))
+        .one()
+        .instrument_name
+    )
+    logger.info(f"Registering data collection group on microscope {instrument_name}")
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
+
     if (
         dcg_murfey := db.exec(
             select(DataCollectionGroup)
@@ -185,6 +192,15 @@ def register_dc_group(
     ):
         # Either switching atlas for a common (atlas or processing) tag
         # Or registering a new atlas-type dcg for a sample that is already present
+        smartem_grid_uuid = ""
+        for dcg in dcg_murfey:
+            if dcg.smartem_grid_uuid:
+                smartem_grid_uuid = dcg.smartem_grid_uuid
+                break
+        else:
+            smartem_grid_uuid = _register_smartem_grid(
+                machine_config, dcg_params, visit_name
+            )
         for dcg_instance in dcg_murfey:
             # Update all instances in case there are multiple processing runs
             # Skip Scaup registration if sample is unchanged
@@ -300,6 +316,10 @@ def register_dc_group(
         )
     ).all():
         # Case where we switch from atlas to processing
+        if not dcg_murfey[0].smartem_grid_uuid:
+            dcg_murfey[0].smartem_grid_uuid = _register_smartem_grid(
+                machine_config, dcg_params, visit_name
+            )
         original_tag = dcg_murfey[0].tag
         dcg_murfey[0].tag = dcg_params.tag or dcg_murfey[0].tag
         if murfey.server._transport_object:
@@ -321,6 +341,9 @@ def register_dc_group(
             db.add(grid_square)
         db.commit()
     else:
+        smartem_grid_uuid = _register_smartem_grid(
+            machine_config, dcg_params, visit_name
+        )
         dcg_parameters = {
             "start_time": str(datetime.now()),
             "experiment_type_id": dcg_params.experiment_type_id,
