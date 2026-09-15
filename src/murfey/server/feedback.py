@@ -17,7 +17,7 @@ from importlib.metadata import (
     entry_points,
 )
 from pathlib import Path
-from typing import Dict, List, NamedTuple, Tuple
+from typing import NamedTuple
 
 import mrcfile
 import numpy as np
@@ -218,7 +218,7 @@ def check_tilt_series_mc(tilt_series_id: int, _db) -> bool:
     )
 
 
-def get_all_tilts(tilt_series_id: int, _db) -> List[str]:
+def get_all_tilts(tilt_series_id: int, _db) -> list[str]:
     complete_results = _db.exec(
         select(db.Tilt, db.TiltSeries, db.Session)
         .where(db.Tilt.tilt_series_id == db.TiltSeries.id)
@@ -274,7 +274,7 @@ def get_tomo_proc_params(dcg_id: int, _db) -> db.TomographyProcessingParameters:
     return results
 
 
-def _murfey_id(app_id: int, _db, number: int = 1, close: bool = True) -> List[int]:
+def _murfey_id(app_id: int, _db, number: int = 1, close: bool = True) -> list[int]:
     murfey_ledger = [db.MurfeyLedger(app_id=app_id) for _ in range(number)]
     for ml in murfey_ledger:
         _db.add(ml)
@@ -302,7 +302,7 @@ def _murfey_id(app_id: int, _db, number: int = 1, close: bool = True) -> List[in
 
 
 def _murfey_class2ds(
-    murfey_ids: List[int], particles_file: str, app_id: int, _db, close: bool = False
+    murfey_ids: list[int], particles_file: str, app_id: int, _db, close: bool = False
 ):
     pj_id = _pj_id(app_id, _db, recipe="em-spa-class2d")
     class2ds = [
@@ -321,7 +321,7 @@ def _murfey_class2ds(
         _db.close()
 
 
-def _murfey_class3ds(murfey_ids: List[int], particles_file: str, app_id: int, _db):
+def _murfey_class3ds(murfey_ids: list[int], particles_file: str, app_id: int, _db):
     pj_id = _pj_id(app_id, _db, recipe="em-spa-class3d")
     class3ds = [
         db.Class3D(
@@ -351,7 +351,7 @@ def _murfey_refine(murfey_id: int, refine_dir: str, tag: str, app_id: int, _db):
     _db.close()
 
 
-def _2d_class_murfey_ids(particles_file: str, app_id: int, _db) -> Dict[str, int]:
+def _2d_class_murfey_ids(particles_file: str, app_id: int, _db) -> dict[str, int]:
     pj_id = (
         _db.exec(select(db.AutoProcProgram).where(db.AutoProcProgram.id == app_id))
         .one()
@@ -367,7 +367,7 @@ def _2d_class_murfey_ids(particles_file: str, app_id: int, _db) -> Dict[str, int
     return {str(cl.class_number): cl.murfey_id for cl in classes}
 
 
-def _3d_class_murfey_ids(particles_file: str, app_id: int, _db) -> Dict[str, int]:
+def _3d_class_murfey_ids(particles_file: str, app_id: int, _db) -> dict[str, int]:
     pj_id = (
         _db.exec(select(db.AutoProcProgram).where(db.AutoProcProgram.id == app_id))
         .one()
@@ -384,7 +384,7 @@ def _3d_class_murfey_ids(particles_file: str, app_id: int, _db) -> Dict[str, int
     return {str(cl.class_number): cl.murfey_id for cl in classes}
 
 
-def _refine_murfey_id(refine_dir: str, tag: str, app_id: int, _db) -> Dict[str, int]:
+def _refine_murfey_id(refine_dir: str, tag: str, app_id: int, _db) -> dict[str, int]:
     pj_id = (
         _db.exec(select(db.AutoProcProgram).where(db.AutoProcProgram.id == app_id))
         .one()
@@ -438,7 +438,7 @@ def _pj_id(app_id: int, _db, recipe: str = "") -> int:
 
 def _get_spa_params(
     app_id: int, _db
-) -> Tuple[db.SPARelionParameters, db.ClassificationFeedbackParameters]:
+) -> tuple[db.SPARelionParameters, db.ClassificationFeedbackParameters]:
     pj_id = _pj_id(app_id, _db, recipe="em-spa-preprocess")
     relion_params = _db.exec(
         select(db.SPARelionParameters).where(db.SPARelionParameters.pj_id == pj_id)
@@ -1179,7 +1179,7 @@ def _find_initial_model(visit: str, machine_config: MachineConfig) -> Path | Non
 
 def _downscaled_box_size(
     particle_diameter_ang: float, pixel_size: float
-) -> Tuple[int, float]:
+) -> tuple[int, float]:
     particle_diameter = particle_diameter_ang / pixel_size
     box_size = int(math.ceil(1.2 * particle_diameter))
     box_size = box_size + box_size % 2
@@ -1221,8 +1221,8 @@ def _resize_initial_model(
     input_path: Path,
     output_path: Path,
     symmetry: str,
-    executables: Dict[str, str],
-    env: Dict[str, str],
+    executables: dict[str, str],
+    env: dict[str, str],
 ) -> None:
     with mrcfile.open(input_path) as input_mrc:
         input_size_x = input_mrc.header.nx
