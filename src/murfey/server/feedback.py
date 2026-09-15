@@ -1622,16 +1622,7 @@ def _flush_tomography_preprocessing(message: dict, _db):
                 "processing_recipe", zocalo_message, new_connection=True
             )
         else:
-            feedback_callback(
-                {},
-                {
-                    "register": "motion_corrected",
-                    "movie": f.file_path,
-                    "mrc_out": f.mrc_out,
-                    "movie_id": murfey_ids[0],
-                    "program_id": detached_ids[3],
-                },
-            )
+            logger.warning("No TransportManager object was set up")
         _db.delete(f)
         _db.commit()
         _db.close()
