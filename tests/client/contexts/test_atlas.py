@@ -20,14 +20,12 @@ def test_atlas_context_mrc(mock_capture_post, tmp_path):
         url=urlparse("http://localhost:8000"),
         client_id=0,
         sources=[tmp_path / "cm12345-6"],
-        default_destinations={
-            tmp_path / "cm12345-6": f"{tmp_path}/destination/cm12345-6"
-        },
+        default_destinations={tmp_path / "cm12345-6": "destination/cm12345-6"},
         instrument_name="m01",
         visit="cm12345-6",
         murfey_session=1,
     )
-    context = AtlasContext("tomo", tmp_path, {}, "token")
+    context = AtlasContext("tomo", tmp_path, {"rsync_basepath": "/base"}, "token")
 
     atlas_mrc = tmp_path / "cm12345-6/Supervisor_atlas/Sample2/Atlas/Atlas_1.mrc"
     atlas_mrc.parent.mkdir(parents=True)
@@ -41,7 +39,7 @@ def test_atlas_context_mrc(mock_capture_post, tmp_path):
         token="token",
         instrument_name="m01",
         session_id=1,
-        data={"path": f"{tmp_path}/destination/{atlas_mrc.relative_to(tmp_path)}"},
+        data={"path": f"/base/destination/{atlas_mrc.relative_to(tmp_path)}"},
     )
 
 
@@ -51,14 +49,12 @@ def test_atlas_context_xml(mock_capture_post, tmp_path):
         url=urlparse("http://localhost:8000"),
         client_id=0,
         sources=[tmp_path / "cm12345-6"],
-        default_destinations={
-            tmp_path / "cm12345-6": f"{tmp_path}/destination/cm12345-6"
-        },
+        default_destinations={tmp_path / "cm12345-6": "destination/cm12345-6"},
         instrument_name="m01",
         visit="cm12345-6",
         murfey_session=1,
     )
-    context = AtlasContext("tomo", tmp_path, {}, "token")
+    context = AtlasContext("tomo", tmp_path, {"rsync_basepath": "/base"}, "token")
 
     atlas_pixel_size = 4.6
     atlas_xml = tmp_path / "cm12345-6/Supervisor_atlas/Sample2/Atlas/Atlas_1.xml"
@@ -73,7 +69,7 @@ def test_atlas_context_xml(mock_capture_post, tmp_path):
     dcg_data = {
         "experiment_type_id": 44,  # Atlas
         "tag": str(atlas_xml.parent),
-        "atlas": f"{tmp_path}/destination/{atlas_xml.relative_to(tmp_path).with_suffix('.jpg')}",
+        "atlas": f"/base/destination/{atlas_xml.relative_to(tmp_path).with_suffix('.jpg')}",
         "sample": 2,
         "atlas_pixel_size": atlas_pixel_size * 7.8,
         "create_smartem_grid": False,
@@ -96,9 +92,7 @@ def test_atlas_context_dm(mock_capture_post, tmp_path):
         url=urlparse("http://localhost:8000"),
         client_id=0,
         sources=[tmp_path / "cm12345-6"],
-        default_destinations={
-            tmp_path / "cm12345-6": f"{tmp_path}/destination/cm12345-6"
-        },
+        default_destinations={tmp_path / "cm12345-6": "destination/cm12345-6"},
         instrument_name="m01",
         visit="cm12345-6",
         murfey_session=1,
@@ -136,7 +130,8 @@ def test_atlas_context_dm(mock_capture_post, tmp_path):
             "</_items></TilesEfficient></Atlas></AtlasSessionXml>"
         )
 
-    context = AtlasContext("tomo", tmp_path, {}, "token")
+    context = AtlasContext("tomo", tmp_path, {"rsync_basepath": "/base"}, "token")
+    assert context._machine_config.get("rsync_basepath") == "/base"
     context.post_transfer(atlas_dm, environment=env)
 
     assert mock_capture_post.call_count == 6
@@ -152,6 +147,9 @@ def test_atlas_context_dm(mock_capture_post, tmp_path):
             "experiment_type_id": 44,  # Atlas
             "tag": str(atlas_dm.parent),
             "sample": 2,
+            "atlas": "/base/destination/cm12345-6/Supervisor_atlas/Sample2/Atlas/Atlas_01.mrc",
+            "create_smartem_grid": True,
+            "acquisition_uuid": "uuid1",
         },
     )
     mock_capture_post.assert_any_call(
@@ -186,5 +184,6 @@ def test_atlas_context_dm(mock_capture_post, tmp_path):
             "acquisition_uuid": "uuid1",
             "register_grid": True,
             "tag": str(atlas_dm.parent),
+            "storage_folder": "/base/destination/atlas",
         },
     )
