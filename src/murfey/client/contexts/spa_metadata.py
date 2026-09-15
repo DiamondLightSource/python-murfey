@@ -365,6 +365,7 @@ class SPAMetadataContext(Context):
                 try:
                     if h.name == "get_gridsquare_dm":
                         h.load()(
+                            destination_dir=source,
                             gridsquare_dm=gridsquare_dm,
                             environment=environment,
                             token=self._token,
