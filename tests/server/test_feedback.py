@@ -45,8 +45,14 @@ def test_feedback_callback(
     assert len(eps) == 1  # Entry point should be present and unique
     mock_function = mocker.patch(eps[0].value.replace(":", "."))
 
-    # Run the function and check that it calls the entry point correctly
+    # Run the function and check that the relevant calls were made
     header = {"dummy": "dummy"}
     message = {"register": entry_point_name}
     feedback_callback(header, message)
+
+    # The entry point should have been called
     mock_function.assert_called_once_with(message=message, murfey_db=mock_murfey_db)
+
+    # The database session context manager should have been entered and exited correctly
+    mock_sql_session.return_value.__enter__.assert_called_once()
+    mock_sql_session.return_value.__exit__.assert_called_once()
