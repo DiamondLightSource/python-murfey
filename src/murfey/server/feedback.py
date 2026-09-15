@@ -1221,6 +1221,7 @@ def _resize_initial_model(
     downscaled_pixel_size: float,
     input_path: Path,
     output_path: Path,
+    symmetry: str,
     executables: Dict[str, str],
     env: Dict[str, str],
 ) -> None:
@@ -1281,6 +1282,31 @@ def _resize_initial_model(
                 f"\n {comp_proc.stdout} \n {comp_proc.stderr}"
             )
             raise RuntimeError(f"Resizing initial model {input_path} failed")
+    if executables.get("relion_align_symmetry") and symmetry != "C1":
+        align_proc = subprocess.run(
+            [
+                f"{executables['relion_align_symmetry']}",
+                "--i",
+                str(output_path),
+                "--o",
+                str(output_path),
+                "--sym",
+                symmetry,
+                "--apply_sym",
+            ],
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        logger.info(
+            f"Initial model symmetrisation finished with code {align_proc.returncode}"
+        )
+        if align_proc.returncode:
+            logger.error(
+                f"Applying symmetry to initial model {input_path} failed"
+                f"\n {align_proc.stdout} \n {align_proc.stderr}"
+            )
+            raise RuntimeError(f"Symmetrising initial model {input_path} failed")
     return None
 
 
@@ -1330,6 +1356,7 @@ def _register_3d_batch(message: dict, _db):
                 ),
                 provided_initial_model,
                 rescaled_initial_model_path,
+                relion_options["symmetry"],
                 machine_config.external_executables,
                 machine_config.external_environment,
             )
