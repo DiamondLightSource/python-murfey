@@ -116,12 +116,15 @@ class AtlasContext(Context):
         ):
             source = _get_source(transferred_file, environment)
             if source:
-                atlas_mrc = transferred_file.with_suffix(".mrc")
-                transferred_atlas_jpg = _atlas_destination(
-                    environment,
-                    source,
-                    Path(self._machine_config.get("rsync_basepath", "")),
-                ) / atlas_mrc.relative_to(source.parent).with_suffix(".jpg")
+                atlas_jpg = transferred_file.with_suffix(".jpg")
+                transferred_atlas_jpg = (
+                    _atlas_destination(
+                        environment,
+                        source,
+                        Path(self._machine_config.get("rsync_basepath", "")),
+                    )
+                    / atlas_jpg
+                )
 
                 with open(transferred_file, "rb") as atlas_xml:
                     atlas_xml_data = xmltodict.parse(atlas_xml)
@@ -183,16 +186,19 @@ class AtlasContext(Context):
 
             # Make sure a dcg is requested before doing grid squares
             source = _get_source(transferred_file, environment)
-            atlas_mrc_glob = list(transferred_file.parent.glob("Atlas_*.mrc"))
+            atlas_jpg_glob = list(transferred_file.parent.glob("Atlas_*.jpg"))
 
             if source:
-                if atlas_mrc_glob:
-                    atlas_mrc = atlas_mrc_glob[0]
-                    transferred_atlas: str | Path = _atlas_destination(
-                        environment,
-                        source,
-                        Path(self._machine_config.get("rsync_basepath", "")),
-                    ) / atlas_mrc.relative_to(source.parent)
+                if atlas_jpg_glob:
+                    atlas_jpg = atlas_jpg_glob[0]
+                    transferred_atlas: str | Path = (
+                        _atlas_destination(
+                            environment,
+                            source,
+                            Path(self._machine_config.get("rsync_basepath", "")),
+                        )
+                        / atlas_jpg
+                    )
                 else:
                     transferred_atlas = ""
                 capture_post(
