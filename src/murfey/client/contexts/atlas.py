@@ -183,13 +183,18 @@ class AtlasContext(Context):
 
             # Make sure a dcg is requested before doing grid squares
             source = _get_source(transferred_file, environment)
-            atlas_mrc = list(transferred_file.parent.glob("Atlas_*.mrc"))[0]
+            atlas_mrc_glob = list(transferred_file.parent.glob("Atlas_*.mrc"))
+
             if source:
-                transferred_atlas = _atlas_destination(
-                    environment,
-                    source,
-                    Path(self._machine_config.get("rsync_basepath", "")),
-                ) / atlas_mrc.relative_to(source.parent)
+                if atlas_mrc_glob:
+                    atlas_mrc = atlas_mrc_glob[0]
+                    transferred_atlas: str | Path = _atlas_destination(
+                        environment,
+                        source,
+                        Path(self._machine_config.get("rsync_basepath", "")),
+                    ) / atlas_mrc.relative_to(source.parent)
+                else:
+                    transferred_atlas = ""
                 capture_post(
                     base_url=str(environment.url.geturl()),
                     router_name="workflow.router",
