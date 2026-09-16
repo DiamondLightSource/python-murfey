@@ -1,8 +1,9 @@
+import asyncio
 from logging import getLogger
 
 from sqlmodel import Session, select
 
-from murfey.util.config import get_machine_config
+from murfey.util.config import get_machine_config, get_rabbitmq_url
 from murfey.util.db import (
     Movie,
     Session as MurfeySession,
@@ -20,6 +21,11 @@ try:
         MicrographResponse,
         ProcessingFeedbackPublishResponse,
     )
+    from smartem_backend.model.mq_event import (
+        MessageQueueEventType,
+        MotionCorrectionCompleteBody,
+    )
+    from smartem_backend.rmq.publisher import AioPikaPublisher
     from smartem_common.entity_status import MicrographStatus
 
     from murfey.util.config import get_smartem_keycloak_client
@@ -71,6 +77,43 @@ def motion_corrected(message: dict, murfey_db: Session) -> dict[str, bool]:
                     registered_request,
                     ProcessingFeedbackPublishResponse,
                 )
+
+                async def _publish_motion_correction_completed(
+                    micrograph_uuid: str, total_motion: float, average_motion: float
+                ) -> None:
+                    publisher = AioPikaPublisher(
+                        url=get_rabbitmq_url(),
+                        exchange_name="smartem",
+                        routing_key="smartem",
+                        exchange_type="fanout",
+                    )
+                    await publisher.connect()
+                    try:
+                        await publisher.publish_event(
+                            MessageQueueEventType.MOTION_CORRECTION_COMPLETE,
+                            MotionCorrectionCompleteBody(
+                                event_type=MessageQueueEventType.MOTION_CORRECTION_COMPLETE,
+                                micrograph_uuid=micrograph_uuid,
+                                total_motion=total_motion,
+                                average_motion=average_motion,
+                            ),
+                        )
+                    except Exception:
+                        logger.warning(
+                            f"smartem failed to motion correction completion {micrograph_uuid}",
+                            exc_info=True,
+                        )
+                    finally:
+                        await publisher.close()
+
+                asyncio.run(
+                    _publish_motion_correction_completed(
+                        movie.smartem_uuid,
+                        message.get("total_motion", 0),
+                        message.get("average_motion", 0),
+                    )
+                )
+
         except Exception:
             logger.warning(
                 "Failed to emit motion correction complete event to smartem",
