@@ -1,3 +1,4 @@
+import asyncio
 from logging import getLogger
 from typing import List
 
@@ -11,7 +12,7 @@ from murfey.server.feedback import (
     _app_id,
     _pj_id,
 )
-from murfey.util.config import get_machine_config
+from murfey.util.config import get_machine_config, get_rabbitmq_url
 from murfey.util.db import (
     AutoProcProgram,
     ClassificationFeedbackParameters,
@@ -33,6 +34,11 @@ try:
     from smartem_backend.api_client import SmartEMAPIClient
     from smartem_backend.model.http_request import MicrographUpdateRequest
     from smartem_backend.model.http_response import MicrographResponse
+    from smartem_backend.model.mq_event import (
+        MessageQueueEventType,
+        ParticlePickingCompleteBody,
+    )
+    from smartem_backend.rmq.publisher import AioPikaPublisher
     from smartem_common.entity_status import MicrographStatus
 
     from murfey.util.config import get_smartem_keycloak_client
@@ -411,6 +417,45 @@ def particles_picked(message: dict, murfey_db: Session) -> dict[str, bool]:
                     update,
                     MicrographResponse,
                 )
+
+                async def _publish_particle_picking_completed(
+                    micrograph_uuid: str, number_of_particles_picked: int
+                ) -> None:
+                    publisher = AioPikaPublisher(
+                        url=get_rabbitmq_url(),
+                        exchange_name="smartem",
+                        routing_key="smartem",
+                        exchange_type="fanout",
+                    )
+                    await publisher.connect()
+                    try:
+                        await publisher.publish_event(
+                            MessageQueueEventType.PARTICLE_PICKING_COMPLETE,
+                            ParticlePickingCompleteBody(
+                                event_type=MessageQueueEventType.PARTICLE_PICKING_COMPLETE,
+                                micrograph_uuid=micrograph_uuid,
+                                number_of_particles_picked=number_of_particles_picked,
+                            ),
+                        )
+                    except Exception:
+                        logger.warning(
+                            f"smartem failed to publish picking completion {micrograph_uuid}",
+                            exc_info=True,
+                        )
+                    finally:
+                        await publisher.close()
+
+                number_of_particles_picked = message.get("particle_count")
+                if number_of_particles_picked is None:
+                    number_of_particles_picked = len(
+                        message.get("particle_diameters") or []
+                    )
+                asyncio.run(
+                    _publish_particle_picking_completed(
+                        movie.smartem_uuid, number_of_particles_picked
+                    )
+                )
+
         except Exception:
             logger.warning(
                 "Failed to emit particle picking complete event to smartem",
