@@ -43,7 +43,7 @@ def motion_corrected(message: dict, murfey_db: Session) -> dict[str, bool]:
     if not SMARTEM_ACTIVE:
         return {"success": True}
     movie = murfey_db.exec(
-        select(Movie).where(Movie.murfey_id == message["motion_correction_id"])
+        select(Movie).where(Movie.murfey_id == message["mc_id"])
     ).one()
     if movie.smartem_uuid:
         try:
