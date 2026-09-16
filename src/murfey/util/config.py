@@ -377,6 +377,7 @@ def get_smartem_keycloak_client():
     return keycloak_client
 
 
+@lru_cache(maxsize=1)
 def get_rabbitmq_url() -> str:
     rabbitmq_defaults = {
         "host": "localhost",
