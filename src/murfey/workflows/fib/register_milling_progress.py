@@ -43,7 +43,7 @@ def _ensure_prerequisites(
 
     """
     # Construct the DataCollectionGroup and GridSquare lookup tags
-    dcg_tag = f"{project_name}/slot_{slot_number}"
+    dcg_tag = f"{project_name}/grid_{slot_number}"
 
     # Determine variables to register data collection group and atlas with
     proposal_code = "".join(char for char in visit_name.split("-")[0] if char.isalpha())

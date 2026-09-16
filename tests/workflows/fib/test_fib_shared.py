@@ -342,7 +342,7 @@ def test_parse_metadata(
     assert parsed.pixel_size_x == pixel_size_x
     assert parsed.pixel_size_y == pixel_size_y
     assert parsed.slot_number == expected_slot_number
-    expected_site_name = f"{project_name}/slot_{expected_slot_number}"
+    expected_site_name = f"{project_name}/grid_{expected_slot_number}"
     if workflow_name == "autotem":
         expected_site_name += f"/lamella_{lamella_number}"
     assert parsed.site_name == expected_site_name
