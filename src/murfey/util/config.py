@@ -8,7 +8,7 @@ from functools import lru_cache
 from importlib.metadata import entry_points
 from pathlib import Path
 from typing import Any, Literal, Optional
-from urllib.parser import quote
+from urllib.parse import quote
 
 import yaml
 from pydantic import BaseModel, ConfigDict, RootModel, ValidationInfo, field_validator
