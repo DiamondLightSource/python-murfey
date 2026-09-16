@@ -228,21 +228,6 @@ class SPAMetadataContext(Context):
                                     "angle": pos_data[6],
                                 },
                             )
-                    if gs_pix_positions:
-                        capture_post(
-                            base_url=str(environment.url.geturl()),
-                            router_name="session_control.spa_router",
-                            function_name="register_atlas",
-                            token=self._token,
-                            instrument_name=environment.instrument_name,
-                            session_id=environment.murfey_session,
-                            data={
-                                "name": f"{environment.visit}-slot-{environment.samples[images_disc].sample}",
-                                "acquisition_uuid": environment.acquisition_uuid,
-                                "register_grid": True,
-                                "tag": dcg_tag,
-                            },
-                        )
 
         elif (
             transferred_file.suffix == ".dm"
