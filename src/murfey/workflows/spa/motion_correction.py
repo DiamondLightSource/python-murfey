@@ -109,8 +109,8 @@ def motion_corrected(message: dict, murfey_db: Session) -> dict[str, bool]:
                 asyncio.run(
                     _publish_motion_correction_completed(
                         movie.smartem_uuid,
-                        message.get("total_motion", 0),
-                        message.get("average_motion", 0),
+                        message.get("total_motion", 1000),
+                        message.get("average_motion", 1000),
                     )
                 )
 

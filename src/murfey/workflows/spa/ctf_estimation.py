@@ -1,8 +1,9 @@
+import asyncio
 from logging import getLogger
 
 from sqlmodel import Session, select
 
-from murfey.util.config import get_machine_config
+from murfey.util.config import get_machine_config, get_rabbitmq_url
 from murfey.util.db import (
     Movie,
     Session as MurfeySession,
@@ -20,6 +21,11 @@ try:
         MicrographResponse,
         ProcessingFeedbackPublishResponse,
     )
+    from smartem_backend.model.mq_event import (
+        CtfCompleteBody,
+        MessageQueueEventType,
+    )
+    from smartem_backend.rmq.publisher import AioPikaPublisher
     from smartem_common.entity_status import MicrographStatus
 
     from murfey.util.config import get_smartem_keycloak_client
@@ -69,6 +75,40 @@ def ctf_estimated(message: dict, murfey_db: Session) -> dict[str, bool]:
                     registered_request,
                     ProcessingFeedbackPublishResponse,
                 )
+
+                async def _publish_ctf_completed(
+                    micrograph_uuid: str, ctf_max_resolution: float
+                ) -> None:
+                    publisher = AioPikaPublisher(
+                        url=get_rabbitmq_url(),
+                        exchange_name="smartem",
+                        routing_key="smartem",
+                        exchange_type="fanout",
+                    )
+                    await publisher.connect()
+                    try:
+                        await publisher.publish_event(
+                            MessageQueueEventType.CTF_COMPLETE,
+                            CtfCompleteBody(
+                                event_type=MessageQueueEventType.CTF_COMPLETE,
+                                micrograph_uuid=micrograph_uuid,
+                                ctf_max_resolution_estimate=ctf_max_resolution,
+                            ),
+                        )
+                    except Exception:
+                        logger.warning(
+                            f"smartem failed to ctf estimation completion {micrograph_uuid}",
+                            exc_info=True,
+                        )
+                    finally:
+                        await publisher.close()
+
+                asyncio.run(
+                    _publish_ctf_completed(
+                        movie.smartem_uuid, message.get("ctf_max_resolution", 1000)
+                    )
+                )
+
         except Exception:
             logger.warning(
                 "Failed to emit CTF estimation complete event to smartem",
