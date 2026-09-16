@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 import pytest
 from pytest_mock import MockerFixture
 
+from murfey.util.fib import number_from_name
 from murfey.util.models import FIBImageMetadata
 from murfey.workflows.fib.shared import parse_image_metadata
 from tests.conftest import ExampleVisit
@@ -134,8 +135,10 @@ def create_image_metadata(
     "test_params",
     (
         (
+            "autotem",
             "Metadata",  # Tag key
             "2026-04-15-21-50-14_drift_corrected_image_Finer Milling - Electron Image.png",
+            "Lamella",  # Lamella folder
             "some_project",
             2000,  # Voltage
             0,  # Beam shift X
@@ -156,8 +159,34 @@ def create_image_metadata(
             1e-6,  # Y
         ),
         (
+            "autotem",
             "Metadata",  # Tag key
             "2026-04-16-02-39-40_drift_corrected_image_Polishing 2 - Electron Image.png",
+            "Lamella (23)",  # Lamella folder
+            "another_project",
+            2000,  # Voltage
+            0,  # Beam shift X
+            0,  # Y
+            0.003072,  # Field of view X
+            0.002048,  # Y
+            -0.003,  # Stage X
+            0.0003,  # Y
+            0.01,  # Z
+            1.833,  # Rotation
+            -75,  # Rotation offset
+            0,  # Alpha tilt
+            0,  # Beta tilt
+            2,  # Expected slot number
+            3072,  # Image size X
+            2048,  # Y
+            1e-6,  # Pixel size X
+            1e-6,  # Y
+        ),
+        (
+            "maps",
+            34683,  # Tag key
+            "Electron Snapshot.tiff",
+            "",  # Lamella folder
             "another_project",
             2000,  # Voltage
             0,  # Beam shift X
@@ -183,6 +212,8 @@ def test_parse_metadata(
     mocker: MockerFixture,
     test_params: tuple[
         str,
+        str | int,
+        str,
         str,
         str,
         float,
@@ -207,8 +238,10 @@ def test_parse_metadata(
 ):
     # Unpack test params
     (
+        workflow_name,
         tag_key,
         image_name,
+        lamella_folder,
         project_name,
         voltage,
         shift_x,
@@ -229,13 +262,25 @@ def test_parse_metadata(
         pixel_size_y,
     ) = test_params
     file = (
-        visit_dir
-        / "autotem"
-        / project_name
-        / "Sites"
-        / "Lamella"
-        / "LamellaEvaluationImages"
-        / image_name
+        (
+            visit_dir
+            / "autotem"
+            / project_name
+            / "Sites"
+            / lamella_folder
+            / "LamellaEvaluationImages"
+            / image_name
+        )
+        if workflow_name == "autotem"
+        else (
+            visit_dir
+            / "maps"
+            / project_name
+            / "LayersData"
+            / "Layer"
+            / "Electron Snapshot"
+            / image_name
+        )
     )
 
     # Mock the results of opening an image file
@@ -256,9 +301,15 @@ def test_parse_metadata(
         pixel_size_x,
         pixel_size_y,
     )
-    tags = dict.fromkeys(["Metadata", "MetadataAsINI"], 0)
-    tags[tag_key] = xml_string
-    mock_image = MagicMock(text=tags)
+    tags: dict[str | int, str | int]
+    if workflow_name == "autotem":
+        tags = dict.fromkeys(["Metadata", "MetadataAsINI"], 0)
+        tags[tag_key] = xml_string
+        mock_image = MagicMock(text=tags)
+    else:
+        tags = dict.fromkeys([34682, 34683], 0)
+        tags[tag_key] = xml_string
+        mock_image = MagicMock(tag_v2=tags)
     mocker.patch(
         "murfey.workflows.fib.shared.PIL.Image.open",
         return_value=mock_image,
@@ -273,6 +324,8 @@ def test_parse_metadata(
 
     assert parsed.visit_name == visit_name
     assert parsed.file == file
+    lamella_number = number_from_name(lamella_folder) if lamella_folder else None
+    assert parsed.lamella_number == lamella_number
     assert parsed.voltage == voltage
     assert parsed.shift_x == shift_x
     assert parsed.shift_y == shift_y
@@ -289,5 +342,8 @@ def test_parse_metadata(
     assert parsed.pixel_size_x == pixel_size_x
     assert parsed.pixel_size_y == pixel_size_y
     assert parsed.slot_number == expected_slot_number
-    assert parsed.site_name == f"{project_name}--slot_{expected_slot_number}"
+    expected_site_name = f"{project_name}/slot_{expected_slot_number}"
+    if workflow_name == "autotem":
+        expected_site_name += f"/lamella_{lamella_number}"
+    assert parsed.site_name == expected_site_name
     assert parsed.pixel_size == 0.5 * (pixel_size_x + pixel_size_y)
