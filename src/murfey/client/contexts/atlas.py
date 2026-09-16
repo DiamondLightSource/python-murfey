@@ -117,14 +117,11 @@ class AtlasContext(Context):
             source = _get_source(transferred_file, environment)
             if source:
                 atlas_jpg = transferred_file.with_suffix(".jpg")
-                transferred_atlas_jpg = (
-                    _atlas_destination(
-                        environment,
-                        source,
-                        Path(self._machine_config.get("rsync_basepath", "")),
-                    )
-                    / atlas_jpg
-                )
+                transferred_atlas_jpg = _atlas_destination(
+                    environment,
+                    source,
+                    Path(self._machine_config.get("rsync_basepath", "")),
+                ) / atlas_jpg.relative_to(source.parent)
 
                 with open(transferred_file, "rb") as atlas_xml:
                     atlas_xml_data = xmltodict.parse(atlas_xml)
@@ -191,14 +188,11 @@ class AtlasContext(Context):
             if source:
                 if atlas_jpg_glob:
                     atlas_jpg = atlas_jpg_glob[0]
-                    transferred_atlas: str | Path = (
-                        _atlas_destination(
-                            environment,
-                            source,
-                            Path(self._machine_config.get("rsync_basepath", "")),
-                        )
-                        / atlas_jpg
-                    )
+                    transferred_atlas: str | Path = _atlas_destination(
+                        environment,
+                        source,
+                        Path(self._machine_config.get("rsync_basepath", "")),
+                    ) / atlas_jpg.relative_to(source.parent)
                 else:
                     transferred_atlas = ""
                 capture_post(
