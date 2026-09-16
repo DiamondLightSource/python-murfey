@@ -11,7 +11,7 @@ import numpy as np
 import PIL.Image
 
 from murfey.util.db import ImagingSite
-from murfey.util.fib import get_slot_number
+from murfey.util.fib import get_slot_number, number_from_name
 from murfey.util.models import FIBImageMetadata
 
 
@@ -101,6 +101,13 @@ def parse_image_metadata(
                 ),  # Convert to degrees
                 rotation_offset=rotation_offset,
             )
+            # Determine the lamella number
+            try:
+                parts = file.parts
+                site_idx = parts.index("Sites") + 1
+                extracted["lamella_number"] = number_from_name(parts[site_idx])
+            except ValueError:
+                extracted["lamella_number"] = None
         case _:
             raise NotImplementedError(
                 f"Unsupported metadata format {metadata_format!r}"
