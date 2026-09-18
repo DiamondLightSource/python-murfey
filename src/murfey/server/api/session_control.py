@@ -375,6 +375,7 @@ def register_atlas(
         murfey.server._transport_object.send(
             murfey.server._transport_object.feedback_queue,
             {
+                "register": "spa.smartem_atlas",
                 "session_id": session_id,
                 "atlas_registration_data": atlas_registration_data.model_dump(),
             },

@@ -102,7 +102,7 @@ def test_atlas_context_dm(mock_capture_post, tmp_path):
     # Write sample dm file
     atlas_dm = tmp_path / "cm12345-6/Supervisor_atlas/Sample2/Atlas/Atlas.dm"
     atlas_dm.parent.mkdir(parents=True)
-    (tmp_path / "cm12345-6/Supervisor_atlas/Sample2/Atlas/Atlas_01.mrc").touch()
+    (tmp_path / "cm12345-6/Supervisor_atlas/Sample2/Atlas/Atlas_01.jpg").touch()
     grid_square_values = (
         "<value><b:PositionOnTheAtlas>"
         "<c:Center><d:x>1200</d:x><d:y>1500</d:y></c:Center>"
@@ -147,7 +147,7 @@ def test_atlas_context_dm(mock_capture_post, tmp_path):
             "experiment_type_id": 44,  # Atlas
             "tag": str(atlas_dm.parent),
             "sample": 2,
-            "atlas": "/base/destination/cm12345-6/Supervisor_atlas/Sample2/Atlas/Atlas_01.mrc",
+            "atlas": "/base/destination/cm12345-6/Supervisor_atlas/Sample2/Atlas/Atlas_01.jpg",
             "create_smartem_grid": True,
             "acquisition_uuid": "uuid1",
         },

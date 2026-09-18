@@ -31,7 +31,7 @@ logger = getLogger("murfey.workflows.spa.smartem_atlas")
 
 def smartem_atlas(message: dict, murfey_db: SQLModelSession):
     session_id = message.get("session_id")
-    atlas_registration_data = AtlasRegistration(message["atlas_registration_data"])
+    atlas_registration_data = AtlasRegistration(**message["atlas_registration_data"])
     if SMARTEM_ACTIVE and atlas_registration_data.acquisition_uuid is not None:
         session = murfey_db.exec(
             select(MurfeySession).where(MurfeySession.id == session_id)
