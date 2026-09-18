@@ -414,7 +414,7 @@ def test_run_with_db(
         sm_select(MurfeyDB.DataCollectionGroup)
         .where(MurfeyDB.DataCollectionGroup.session_id == session_id)
         .where(
-            MurfeyDB.DataCollectionGroup.tag == f"{site_info['project_name']}--slot_1"
+            MurfeyDB.DataCollectionGroup.tag == f"{site_info['project_name']}/grid_1"
         )
     ).one_or_none()
     assert dcg_murfey is not None

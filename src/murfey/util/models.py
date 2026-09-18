@@ -248,6 +248,7 @@ class FIBImageMetadata(BaseModel):
     visit_name: str
     file: Path
     thumbnail_path: Path | None = None
+    lamella_number: int | None = None
     # Acceleration voltage (V)
     voltage: float
     # Beam shifts (m)
@@ -309,7 +310,10 @@ class FIBImageMetadata(BaseModel):
         Create a site name for the current image based on the project name
         and its slot number.
         """
-        return f"{self.project_name}--slot_{self.slot_number}"
+        site_name = f"{self.project_name}/grid_{self.slot_number}"
+        if self.lamella_number is not None:
+            site_name += f"/lamella_{self.lamella_number}"
+        return site_name
 
 
 """
