@@ -1215,7 +1215,7 @@ def get_plugin_wheel(instrument_name: str, package: str):
     ]
     wheel_path = machine_config.plugin_packages.get(package)
     if wheel_path is None:
-        return None
+        raise HTTPException(status_code=404, detail=f"Package {package} not found")
     return FileResponse(
         wheel_path,
         headers={"Content-Disposition": f"attachment; filename={wheel_path.name}"},
