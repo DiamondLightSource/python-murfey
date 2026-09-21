@@ -1188,5 +1188,5 @@ def get_plugin_wheel(instrument_name: str, package: str):
         return None
     return FileResponse(
         wheel_path,
-        headers={"Content-Disposition": "attachment; filename={wheel_path.name}"},
+        headers={"Content-Disposition": f"attachment; filename={wheel_path.name}"},
     )
