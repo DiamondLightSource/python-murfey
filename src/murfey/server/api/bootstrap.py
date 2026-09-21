@@ -1178,6 +1178,36 @@ PYPI API ENDPOINT PLUGINS
 """
 
 
+@plugins.get("/instruments/{instrument_name}/", response_class=HTMLResponse)
+def show_plugin_wheels(instrument_name: str):
+    """
+    Shows plugin wheels that have been configured for this instrument
+    """
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
+    # Construct links to download the individual packages with
+    links = "\n".join(
+        f'<li><a href="{key}">{key}</a></li>'
+        for key in machine_config.plugin_packages.keys()
+    )
+    # Embed links in a HTML page
+    return f"""
+    <!DOCTYPE html>
+    <html>
+        <head>
+            <title>Packages</title>
+        </head>
+        <body>
+            <h1>Available packages</h1>
+            <ul>
+                {links}
+            </ul>
+        </body>
+    </html>
+    """
+
+
 @plugins.get("/instruments/{instrument_name}/{package}", response_class=FileResponse)
 def get_plugin_wheel(instrument_name: str, package: str):
     machine_config = get_machine_config(instrument_name=instrument_name)[
