@@ -52,7 +52,9 @@ class Session(SQLModel, table=True):  # type: ignore
     current_gain_ref: str = Field(default="")
     instrument_name: str = Field(default="")
     process: bool = Field(default=True)
-    visit_end_time: Optional[datetime] = Field(default=None)
+    visit_end_time: Optional[datetime] = Field(
+        default=None, sa_type=DateTime(timezone=False)
+    )
     smartem_acquisition_uuid: str | None = Field(default=None)
 
     # Image sites associated with this session
@@ -989,8 +991,7 @@ class Tomogram(SQLModel, table=True):  # type: ignore
     projXY: Optional[str] = None
     projXZ: Optional[str] = None
     recordTimeStamp: Optional[datetime] = Field(
-        sa_type=DateTime(timezone=False),
-        default_factory=datetime.now,
+        sa_type=DateTime(timezone=False), default_factory=datetime.now
     )
     globalAlignmentQuality: Optional[float] = None
     gridSquareId: Optional[int] = Field(foreign_key="searchmap.id")
