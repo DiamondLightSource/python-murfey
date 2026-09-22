@@ -2,6 +2,7 @@ import json
 import logging
 import re
 from datetime import datetime
+from importlib.metadata import entry_points
 from pathlib import Path
 from typing import Any, cast
 
@@ -116,6 +117,75 @@ def _register_fib_imaging_site(
     return fib_imaging_site
 
 
+def _register_dcg(
+    session_id: int,
+    instrument_name: str,
+    visit_name: str,
+    imaging_site: MurfeyDB.ImagingSite,
+    murfey_db: SQLModelSession,
+):
+    """
+    Takes an ImagingSite entry and uses it to create and register a DataCollectionGroup
+    entry in ISPyB if one doesn't already exist, or to populate an existing entry.
+    After doing so, it will register the DataCollectionGroup ID in Murfey and add it to
+    the ImagingSite entry.
+    """
+    # Determine variables to register data collection group and atlas with
+    proposal_code = "".join(char for char in visit_name.split("-")[0] if char.isalpha())
+    proposal_number = "".join(
+        char for char in visit_name.split("-")[0] if char.isdigit()
+    )
+    visit_number = visit_name.split("-")[-1]
+
+    # Generate a name/tag for the data collection group
+    # The name will be the site name minus the "/lamella..." specifier
+    dcg_name = "/".join(imaging_site.site_name.split("/")[:-1])
+
+    # Check if a DataCollectionGroup entry with this session and tag already exists
+    dcg_entry = murfey_db.exec(
+        select(MurfeyDB.DataCollectionGroup)
+        .where(MurfeyDB.DataCollectionGroup.session_id == session_id)
+        .where(MurfeyDB.DataCollectionGroup.tag == dcg_name)
+    ).one_or_none()
+    if not dcg_entry:
+        # Create a placeholder DataCollectionGroup and Atlas if not
+        dcg_message = {
+            "microscope": instrument_name,
+            "proposal_code": proposal_code,
+            "proposal_number": proposal_number,
+            "visit_number": visit_number,
+            "session_id": session_id,
+            "tag": dcg_name,
+            "experiment_type_id": 46,
+            "atlas": "",
+            "atlas_pixel_size": 0.0,
+            "sample": None,
+        }
+        if entry_point_result := entry_points(
+            group="murfey.workflows", name="data_collection_group"
+        ):
+            (workflow,) = entry_point_result
+            _ = workflow.load()(
+                message=dcg_message,
+                murfey_db=murfey_db,
+            )
+        else:
+            logger.warning("No workflow found for 'data_collection_group'")
+
+        # Load the newly-created DataCollectionGroup
+        dcg_entry = murfey_db.exec(
+            select(MurfeyDB.DataCollectionGroup)
+            .where(MurfeyDB.DataCollectionGroup.session_id == session_id)
+            .where(MurfeyDB.DataCollectionGroup.tag == dcg_name)
+        ).one()
+
+    # Update the ImagingSite with the DCG ID
+    imaging_site.dcg_id = dcg_entry.id
+    imaging_site.dcg_name = dcg_entry.tag
+    murfey_db.add(imaging_site)
+    murfey_db.commit()
+
+
 class FIBLamellaImageInfo(BaseModel):
     session_id: int
     lamella_image_file: Path
@@ -194,7 +264,9 @@ def run(
 
         try:
             # Register imaging site to Murfey, or update existing one
-            _ = _register_fib_imaging_site(fib_info.session_id, metadata, murfey_db)
+            fib_img_site = _register_fib_imaging_site(
+                fib_info.session_id, metadata, murfey_db
+            )
             logger.info(
                 f"Registered lamella evaluation image {fib_info.lamella_image_file} "
                 f"for slot {metadata.slot_number} in Murfey database"
@@ -206,6 +278,23 @@ def run(
                 exc_info=True,
             )
             return {"success": False, "requeue": False}
+
+        try:
+            # Register data collection group and atlas in ISPyB
+            _register_dcg(
+                session_id=fib_info.session_id,
+                instrument_name=instrument_name,
+                visit_name=visit_name,
+                imaging_site=fib_img_site,
+                murfey_db=murfey_db,
+            )
+        except Exception:
+            # Log error but allow workflow to proceed
+            logger.error(
+                "Exception encountered when registering data collection group for FIB workflow "
+                f"using {fib_info.lamella_image_file}",
+                exc_info=True,
+            )
 
         return {"success": True}
     finally:
