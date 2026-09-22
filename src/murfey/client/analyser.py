@@ -219,23 +219,10 @@ class Analyser(Observer):
         # SIM workflow checks
         # -----------------------------------------------------------------------------
         if (
-            # CryoSIM raw data files have no extension, and end with specific suffixes
-            not file_path.suffix
-            and file_path.stem.endswith(
-                (
-                    # Bright field
-                    "_BF",
-                    # Fluorescent
-                    "_BR",
-                    "_BFR",
-                    "_GR",
-                    "_GFR",
-                    "_BR_FL",
-                    "_BFR_FL",
-                    "_GR_FL",
-                    "_GFR_FL",
-                )
-            )
+            # CryoSIM raw data files have no extension
+            # Bright field files end with "_BF"
+            # Processing will be triggered on fluorescent files ending with "_FL"
+            not file_path.suffix and file_path.stem.endswith(("_BF", "_FL"))
         ):
             if (context := _get_context("SIMContext")) is None:
                 return False
