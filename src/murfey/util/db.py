@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import List, Optional
 
 import sqlalchemy
-from sqlmodel import Enum, Field, Relationship, SQLModel, create_engine
+from sqlmodel import DateTime, Enum, Field, Relationship, SQLModel, create_engine
 
 """
 =======================================================================================
@@ -672,6 +672,7 @@ class Movie(SQLModel, table=True):  # type: ignore
     creation_time: datetime = Field(
         alias="createdTimeStamp",
         sa_column_kwargs={"name": "createdTimeStamp"},
+        sa_type=DateTime(timezone=False),
         default_factory=datetime.now,
     )
     tag: str
@@ -987,7 +988,10 @@ class Tomogram(SQLModel, table=True):  # type: ignore
     xyShiftPlot: Optional[str] = None
     projXY: Optional[str] = None
     projXZ: Optional[str] = None
-    recordTimeStamp: Optional[datetime] = None
+    recordTimeStamp: Optional[datetime] = Field(
+        sa_type=DateTime(timezone=False),
+        default_factory=datetime.now,
+    )
     globalAlignmentQuality: Optional[float] = None
     gridSquareId: Optional[int] = Field(foreign_key="searchmap.id")
     pixelLocationX: Optional[int] = None
