@@ -21,18 +21,15 @@ logger = logging.getLogger("murfey.workflows.fib.register_atlas")
 
 
 def _make_thumbnail(file: Path, metadata: FIBImageMetadata, visit_name: str):
-    img = PIL.Image.open(file)
-    img.thumbnail((512, 512))
-
     # Find visit directory path
     visit_idx = file.parts.index(visit_name)
-    visit_dir = list(reversed(file.parents))[visit_idx]
+    visit_dir = Path(*file.parts[: visit_idx + 1])
 
     # Construct path to thumbnail
-    processed_dir = visit_dir / "processed"
     image_number = number_from_name(file.stem)
     save_path = (
-        processed_dir
+        visit_dir
+        / "processed"
         / metadata.project_name
         / f"grid_{metadata.slot_number}"
         / "atlas"
@@ -41,7 +38,9 @@ def _make_thumbnail(file: Path, metadata: FIBImageMetadata, visit_name: str):
     save_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Save the thumbnail
-    img.save(save_path)
+    with PIL.Image.open(file) as img:
+        img.thumbnail((512, 512))
+        img.save(save_path)
     return save_path
 
 
