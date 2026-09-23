@@ -138,9 +138,9 @@ def test_run_with_db(
     )
 
     # Mock 'PIL.Image.open' and create a test image
-    mocker.patch(
-        "murfey.workflows.fib.register_atlas.PIL.Image.open",
-        return_value=PIL.Image.fromarray(np.ones((2048, 1152), dtype=np.uint8)),
+    mock_open = mocker.patch("murfey.workflows.fib.register_atlas.PIL.Image.open")
+    mock_open.__enter__.return_value = PIL.Image.fromarray(
+        np.ones((2048, 1152), dtype=np.uint8)
     )
 
     # Run the function and check that it's run through to completion
