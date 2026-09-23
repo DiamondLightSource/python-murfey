@@ -183,8 +183,8 @@ def test_run_with_db(
     )
     processed_dir.mkdir(parents=True, exist_ok=True)
 
-    files = []
-    thumbnails = []
+    files: list[Path] = []
+    thumbnails: list[Path] = []
     for file_name in [
         "2026-04-16-02-39-38_drift_corrected_image_Finer Milling - Electron Image.png",
         "2026-04-16-02-39-40_drift_corrected_image_Polishing 2 - Electron Image.png",
@@ -246,7 +246,11 @@ def test_run_with_db(
     # 'PIL.Image.open' should have been called for each image
     assert mock_open.call_count == len(files)
 
-    # There should be one ImagingSite entry associated with the visit
+    # Both thumbnails should have been generated
+    for thumbnail in thumbnails:
+        assert thumbnail.is_file()
+
+    # There should only be one ImagingSite entry associated with the visit
     imaging_sites = murfey_db_session.exec(
         select(MurfeyDB.ImagingSite)
         .where(MurfeyDB.ImagingSite.session_id == session_id)
@@ -257,8 +261,7 @@ def test_run_with_db(
     # The later image ("Polishing 2") should have been registered
     imaging_site = imaging_sites[0]
     assert (
-        imaging_site.image_path is not None
-        and "Polishing 2" in imaging_site.thumbnail_path
+        imaging_site.image_path is not None and "Polishing 2" in imaging_site.image_path
     )
     assert (
         imaging_site.thumbnail_path is not None
