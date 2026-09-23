@@ -51,7 +51,7 @@ def test_run(
         / registered_position_name
         / "*.tiff"
     )
-    registered_series_name = f"{project_name}--TileScan_1--{registered_position_name}"
+    registered_series_name = f"{project_name}/TileScan_1/{registered_position_name}"
     site_name = registered_series_name.rstrip(registered_type)
     get_or_create_db_entry(
         murfey_db_session,
@@ -65,7 +65,7 @@ def test_run(
 
     # Create the incoming message
     incoming_position_name = "Position_1" + incoming_type
-    incoming_series_name = f"{project_name}--TileScan_1--{incoming_position_name}"
+    incoming_series_name = f"{project_name}/TileScan_1/{incoming_position_name}"
     # The site names should match
     assert site_name == incoming_series_name.rstrip(incoming_type)
 

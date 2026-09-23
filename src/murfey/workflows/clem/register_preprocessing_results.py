@@ -257,9 +257,7 @@ def _register_dcg_and_atlas(
     visit_number = visit_name.split("-")[-1]
 
     # Generate name/tag for data colleciton group based on series name
-    dcg_name = imaging_site.site_name.split("--")[0]
-    if imaging_site.site_name.split("--")[1].isdigit():
-        dcg_name += f"--{imaging_site.site_name.split('--')[1]}"
+    dcg_name = imaging_site.site_name.split("/")[0]
 
     # Determine values for atlas
     if is_atlas := imaging_site.data_type == "atlas":
