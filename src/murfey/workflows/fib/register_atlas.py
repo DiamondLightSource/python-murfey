@@ -26,7 +26,7 @@ def _make_thumbnail(file: Path, metadata: FIBImageMetadata, visit_name: str):
 
     # Find visit directory path
     visit_idx = file.parts.index(visit_name)
-    visit_dir = list(reversed(file.parents))[visit_idx]
+    visit_dir = Path(*file.parts[: visit_idx + 1])
 
     # Construct path to thumbnail
     processed_dir = visit_dir / "processed"
