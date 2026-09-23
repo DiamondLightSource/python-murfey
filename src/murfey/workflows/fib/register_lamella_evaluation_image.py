@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
 
+import PIL.Image
 from pydantic import BaseModel
 from sqlmodel import Session as SQLModelSession, select
 
@@ -38,6 +39,40 @@ def _get_timestamp(name: str):
     if (match := pattern.search(name)) is not None:
         return datetime.strptime(match.group(), "%Y-%m-%d-%H-%M-%S")
     raise ValueError(f"No datetime match found in {name}")
+
+
+def _make_thumbnail(file: Path, metadata: FIBImageMetadata, visit_name: str):
+    # Find the visit directory
+    visit_idx = file.parts.index(visit_name)
+    visit_dir = Path(*file.parts[: visit_idx + 1])
+
+    # Lamella number field should have been populated
+    if not metadata.lamella_number:
+        raise ValueError("No lamella number associated with this visit")
+
+    # Extract parts of the file name to retain
+    timestamp, step_name = file.stem.split("_drift_corrected_image_")
+    step_name = step_name.split(" - ")[0].replace(" ", "_").lower()
+
+    # Add parts to the thumbnail name
+    thumbnail_name = f"lamella_{metadata.lamella_number}_{timestamp}_{step_name}.png"
+
+    # Construct full path to the thumbnail image
+    save_path = (
+        visit_dir
+        / "processed"
+        / metadata.project_name
+        / f"grid_{metadata.slot_number}"
+        / "lamella_evaluation_images"
+        / thumbnail_name
+    )
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Save the thumbnail image
+    with PIL.Image.open(file) as img:
+        img.thumbnail((512, 512))  # Shrink to fit within 512 x 512
+        img.save(save_path)
+    return save_path
 
 
 def _register_fib_imaging_site(
@@ -143,6 +178,19 @@ def run(
                 exc_info=True,
             )
             return {"success": False, "requeue": False}
+
+        try:
+            # Make a thumbnail of the image and update metadata accordingly
+            metadata.thumbnail_path = _make_thumbnail(
+                file=fib_info.lamella_image_file,
+                metadata=metadata,
+                visit_name=visit_name,
+            )
+        except Exception:
+            logger.warning(
+                f"Error creating thumbnail of file {fib_info.lamella_image_file}",
+                exc_info=True,
+            )
 
         try:
             # Register imaging site to Murfey, or update existing one
