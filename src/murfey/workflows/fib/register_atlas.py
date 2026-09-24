@@ -15,6 +15,7 @@ from murfey.workflows.fib.shared import (
     parse_image_metadata,
     populate_fib_imaging_site_entry,
 )
+from murfey.workflows.register_data_collection_group import register_dcg
 
 logger = logging.getLogger("murfey.workflows.fib.register_atlas")
 
@@ -152,23 +153,14 @@ def _register_dcg_and_atlas(
             "atlas_pixel_size": atlas_pixel_size,
             "sample": metadata.slot_number,
         }
-        if entry_point_result := entry_points(
-            group="murfey.workflows", name="data_collection_group"
-        ):
-            (workflow,) = entry_point_result
-            # Register grid square
-            _ = workflow.load()(
-                message=dcg_message,
-                murfey_db=murfey_db,
+        dcg_entry = register_dcg(
+            message=dcg_message,
+            murfey_db=murfey_db,
+        )
+        if not dcg_entry:
+            raise RuntimeError(
+                f"Could not register DataCollectionGroup entry for {imaging_site.image_path}"
             )
-        else:
-            logger.warning("No workflow found for 'data_collection_group'")
-    dcg_entry = murfey_db.exec(
-        select(MurfeyDB.DataCollectionGroup)
-        .where(MurfeyDB.DataCollectionGroup.session_id == session_id)
-        .where(MurfeyDB.DataCollectionGroup.tag == imaging_site.site_name)
-    ).one()
-
     imaging_site.dcg_id = dcg_entry.id
     imaging_site.dcg_name = dcg_entry.tag
     murfey_db.add(imaging_site)
