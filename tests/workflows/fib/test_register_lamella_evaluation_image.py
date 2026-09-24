@@ -3,8 +3,11 @@ from pathlib import Path
 import numpy as np
 import PIL.Image
 import pytest
+from ispyb.sqlalchemy import _auto_db_schema as ISPyBDB
 from pytest_mock import MockerFixture
-from sqlmodel import Session as SQLModelSession, select
+from sqlalchemy import select as sa_select
+from sqlalchemy.orm import Session as SQLAlchemySession
+from sqlmodel import Session as SQLModelSession, select as sm_select
 
 import murfey.util.db as MurfeyDB
 from murfey.util.config import MachineConfig
@@ -127,7 +130,7 @@ def test_register_fib_imaging_site_with_db(
     )
 
     # Only one entry should exist
-    found_sites = murfey_db_session.exec(select(MurfeyDB.ImagingSite)).all()
+    found_sites = murfey_db_session.exec(sm_select(MurfeyDB.ImagingSite)).all()
     assert len(found_sites) == 1
 
     # Key parameters should be populated
@@ -145,6 +148,7 @@ def test_run_with_db(
     mocker: MockerFixture,
     visit_dir: Path,
     murfey_db_session: SQLModelSession,
+    ispyb_db_session: SQLAlchemySession,
 ):
     # Register a Session for this test
     murfey_session = MurfeyDB.Session(
@@ -252,7 +256,7 @@ def test_run_with_db(
 
     # There should only be one ImagingSite entry associated with the visit
     imaging_sites = murfey_db_session.exec(
-        select(MurfeyDB.ImagingSite)
+        sm_select(MurfeyDB.ImagingSite)
         .where(MurfeyDB.ImagingSite.session_id == session_id)
         .where(MurfeyDB.ImagingSite.data_type == "grid_square")
     ).all()
@@ -270,3 +274,44 @@ def test_run_with_db(
 
     # Site name should have been constructed correctly
     assert imaging_site.site_name == f"{visit_name}/grid_2/lamella_1"
+    assert imaging_site.dcg_name == f"{visit_name}/grid_2"
+
+    # Murfey's DataCollectionGroup should have an entry
+    murfey_dcg_search = murfey_db_session.exec(
+        sm_select(MurfeyDB.DataCollectionGroup).where(
+            MurfeyDB.DataCollectionGroup.session_id == session_id
+        )
+    ).all()
+    assert len(murfey_dcg_search) == 1
+
+    # Check that the Murfey DataCollectionGroup entry was populated correctly
+    murfey_dcg = murfey_dcg_search[0]
+    assert murfey_dcg.tag == f"{visit_name}/grid_2"
+
+    # ISPyB's DataCollectionGroup should have an entry
+    ispyb_dcg_search = (
+        ispyb_db_session.execute(
+            sa_select(ISPyBDB.DataCollectionGroup).where(
+                ISPyBDB.DataCollectionGroup.dataCollectionGroupId == murfey_dcg.id
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert len(ispyb_dcg_search) == 1
+
+    # Check that the ISPyB DataCollectionGroup entry was populated correctly
+    ispyb_dcg = ispyb_dcg_search[0]
+    assert ispyb_dcg.experimentTypeId == 46
+
+    # ISPyB's Atlas should have an entry
+    ispyb_atlas_search = (
+        ispyb_db_session.execute(
+            sa_select(ISPyBDB.Atlas).where(
+                ISPyBDB.Atlas.dataCollectionGroupId == ispyb_dcg.dataCollectionGroupId
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert len(ispyb_atlas_search) == 1
