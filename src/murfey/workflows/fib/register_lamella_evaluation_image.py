@@ -2,7 +2,6 @@ import json
 import logging
 import re
 from datetime import datetime
-from importlib.metadata import entry_points
 from pathlib import Path
 from typing import Any, cast
 
@@ -17,6 +16,7 @@ from murfey.workflows.fib.shared import (
     parse_image_metadata,
     populate_fib_imaging_site_entry,
 )
+from murfey.workflows.register_data_collection_group import register_dcg
 
 logger = logging.getLogger(__name__)
 
@@ -161,25 +161,17 @@ def _register_dcg(
             "atlas_pixel_size": 0.0,
             "sample": None,
         }
-        if entry_point_result := entry_points(
-            group="murfey.workflows", name="data_collection_group"
-        ):
-            (workflow,) = entry_point_result
-            _ = workflow.load()(
-                message=dcg_message,
-                murfey_db=murfey_db,
+        dcg_entry = register_dcg(
+            message=dcg_message,
+            murfey_db=murfey_db,
+        )
+        if not dcg_entry:
+            raise RuntimeError(
+                "Failed to create DataCollectionGroup entry for "
+                f"{imaging_site.image_path}"
             )
-        else:
-            logger.warning("No workflow found for 'data_collection_group'")
 
-        # Load the newly-created DataCollectionGroup
-        dcg_entry = murfey_db.exec(
-            select(MurfeyDB.DataCollectionGroup)
-            .where(MurfeyDB.DataCollectionGroup.session_id == session_id)
-            .where(MurfeyDB.DataCollectionGroup.tag == dcg_name)
-        ).one()
-
-    # Update the ImagingSite with the DCG ID
+    # Update the ImagingSite with the DataCollectionGroup ID
     imaging_site.dcg_id = dcg_entry.id
     imaging_site.dcg_name = dcg_entry.tag
     murfey_db.add(imaging_site)
