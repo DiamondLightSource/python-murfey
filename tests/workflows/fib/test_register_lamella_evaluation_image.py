@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session as SQLAlchemySession
 from sqlmodel import Session as SQLModelSession, select as sm_select
 
 import murfey.util.db as MurfeyDB
+import murfey.workflows.fib.register_lamella_evaluation_image
 from murfey.server.ispyb import TransportManager
 from murfey.util.config import MachineConfig
 from murfey.workflows.fib.register_lamella_evaluation_image import (
@@ -155,16 +156,16 @@ def test_run_with_db(
 ):
     # Register a Session for this test
     if not (
-        session_entry := murfey_db_session.exec(
+        murfey_session := murfey_db_session.exec(
             sm_select(MurfeyDB.Session).where(MurfeyDB.Session.id == session_id)
         ).one_or_none()
     ):
-        session_entry = MurfeyDB.Session(id=session_id)
-    session_entry.name = visit_name
-    session_entry.visit = visit_name
-    session_entry.instrument_name = instrument_name
+        murfey_session = MurfeyDB.Session(id=session_id)
+    murfey_session.name = visit_name
+    murfey_session.visit = visit_name
+    murfey_session.instrument_name = instrument_name
 
-    murfey_db_session.add(session_entry)
+    murfey_db_session.add(murfey_session)
     murfey_db_session.commit()
 
     # Mock the machine config
@@ -250,7 +251,7 @@ def test_run_with_db(
         "pixel_size_x": 1e-6,
         "pixel_size_y": 1e-6,
     }
-    mocker.patch(
+    mock_parse = mocker.patch(
         "murfey.workflows.fib.register_lamella_evaluation_image.parse_image_metadata",
         return_value=metadata_dict,
     )
@@ -261,6 +262,16 @@ def test_run_with_db(
     )
     mock_open.__enter__.return_value = PIL.Image.fromarray(
         np.ones((1500, 1000), dtype=np.uint8)
+    )
+
+    # Set up spies for the functions called by 'run()'
+    spy_thumbnail = mocker.spy(
+        murfey.workflows.fib.register_lamella_evaluation_image,
+        "_make_thumbnail",
+    )
+    spy_register = mocker.spy(
+        murfey.workflows.fib.register_lamella_evaluation_image,
+        "_register_fib_imaging_site",
     )
 
     # Run function and check that expected calls were made
@@ -275,7 +286,9 @@ def test_run_with_db(
         assert result["success"]
 
     # 'PIL.Image.open' should have been called for each image
-    assert mock_open.call_count == len(files)
+    assert mock_parse.call_count == len(files)
+    assert spy_thumbnail.call_count == len(files)
+    assert spy_register.call_count == len(files)
 
     # Both thumbnails should have been generated
     for thumbnail in thumbnails:
