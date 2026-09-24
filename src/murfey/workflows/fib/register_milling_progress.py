@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import logging
-from importlib.metadata import entry_points
 from typing import TYPE_CHECKING, Any, cast
 
 from sqlmodel import Session as SQLModelSession, select
@@ -19,6 +18,7 @@ from murfey.util.models import (
     StagePositionInfo,
     StagePositionValues,
 )
+from murfey.workflows.register_data_collection_group import register_dcg
 
 if TYPE_CHECKING:
     from murfey.server.ispyb import TransportManager
@@ -75,14 +75,10 @@ def _ensure_prerequisites(
             "color_flags": None,
             "collection_mode": None,
         }
-        if entry_point_result := entry_points(
-            group="murfey.workflows", name="data_collection_group"
-        ):
-            (workflow,) = entry_point_result
-            _ = workflow.load()(
-                message=dcg_message,
-                murfey_db=murfey_db,
-            )
+        register_dcg(
+            message=dcg_message,
+            murfey_db=murfey_db,
+        )
 
     # Register the GridSquare if it doesn't already exist
     grid_square_entry = murfey_db.exec(
