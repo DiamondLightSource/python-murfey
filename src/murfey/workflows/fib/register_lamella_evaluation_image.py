@@ -199,103 +199,58 @@ def run(
     logger.info(
         f"Received the following message:\n{json.dumps(message, indent=2, default=str)}"
     )
-    try:
-        try:
-            # Validate incoming message
-            fib_info = FIBLamellaImageInfo(**message)
-        except Exception:
-            logger.error("Could not validate incoming message", exc_info=True)
-            return {"success": False, "requeue": False}
 
-        try:
-            # Load visit information
-            murfey_session = murfey_db.exec(
-                select(MurfeyDB.Session).where(
-                    MurfeyDB.Session.id == fib_info.session_id
-                )
-            ).one()
-            visit_name = murfey_session.visit
-            instrument_name = murfey_session.instrument_name
-        except Exception:
-            logger.error(
-                "Exception encountered while querying Murfey database", exc_info=True
-            )
-            return {"success": False, "requeue": False}
+    # Validate incoming message
+    fib_info = FIBLamellaImageInfo(**message)
 
-        try:
-            # Load the machine config
-            machine_config = get_machine_config(instrument_name)[instrument_name]
-            rotation_offset: float = cast(
-                float, machine_config.calibrations.get("rotation_offset", 0)
-            )
+    # Load visit information
+    murfey_session = murfey_db.exec(
+        select(MurfeyDB.Session).where(MurfeyDB.Session.id == fib_info.session_id)
+    ).one()
+    visit_name = murfey_session.visit
+    instrument_name = murfey_session.instrument_name
 
-            # Extract metadata from the image
-            metadata = FIBImageMetadata(
-                visit_name=visit_name,
-                file=fib_info.lamella_image_file,
-                **parse_image_metadata(
-                    file=fib_info.lamella_image_file,
-                    rotation_offset=rotation_offset,
-                ),
-            )
-            logger.info(
-                "Extracted the following metadata from the image:\n"
-                f"{json.dumps(metadata.model_dump(), indent=2, default=str)}"
-            )
-        except Exception:
-            logger.error(
-                f"Error extracting metadata from file {fib_info.lamella_image_file}",
-                exc_info=True,
-            )
-            return {"success": False, "requeue": False}
+    # Load the machine config
+    machine_config = get_machine_config(instrument_name)[instrument_name]
+    rotation_offset: float = cast(
+        float, machine_config.calibrations.get("rotation_offset", 0)
+    )
 
-        try:
-            # Make a thumbnail of the image and update metadata accordingly
-            metadata.thumbnail_path = _make_thumbnail(
-                file=fib_info.lamella_image_file,
-                metadata=metadata,
-                visit_name=visit_name,
-            )
-        except Exception:
-            logger.warning(
-                f"Error creating thumbnail of file {fib_info.lamella_image_file}",
-                exc_info=True,
-            )
+    # Extract metadata from the image
+    metadata = FIBImageMetadata(
+        visit_name=visit_name,
+        file=fib_info.lamella_image_file,
+        **parse_image_metadata(
+            file=fib_info.lamella_image_file,
+            rotation_offset=rotation_offset,
+        ),
+    )
+    logger.info(
+        "Extracted the following metadata from the image:\n"
+        f"{json.dumps(metadata.model_dump(), indent=2, default=str)}"
+    )
 
-        try:
-            # Register imaging site to Murfey, or update existing one
-            fib_img_site = _register_fib_imaging_site(
-                fib_info.session_id, metadata, murfey_db
-            )
-            logger.info(
-                f"Registered lamella evaluation image {fib_info.lamella_image_file} "
-                f"for slot {metadata.slot_number} in Murfey database"
-            )
-        except Exception:
-            logger.error(
-                "Error registering lamella evaluation image "
-                f"{fib_info.lamella_image_file} in Murfey database",
-                exc_info=True,
-            )
-            return {"success": False, "requeue": False}
+    # Make a thumbnail of the image and update metadata accordingly
+    metadata.thumbnail_path = _make_thumbnail(
+        file=fib_info.lamella_image_file,
+        metadata=metadata,
+        visit_name=visit_name,
+    )
 
-        try:
-            # Register data collection group and atlas in ISPyB
-            _register_dcg(
-                session_id=fib_info.session_id,
-                instrument_name=instrument_name,
-                visit_name=visit_name,
-                imaging_site=fib_img_site,
-                murfey_db=murfey_db,
-            )
-        except Exception:
-            # Log error but allow workflow to proceed
-            logger.error(
-                "Exception encountered when registering data collection group for FIB workflow "
-                f"using {fib_info.lamella_image_file}",
-                exc_info=True,
-            )
+    # Register imaging site to Murfey, or update existing one
+    fib_img_site = _register_fib_imaging_site(fib_info.session_id, metadata, murfey_db)
+    logger.info(
+        f"Registered lamella evaluation image {fib_info.lamella_image_file} "
+        f"for slot {metadata.slot_number} in Murfey database"
+    )
 
-        return {"success": True}
-    finally:
-        murfey_db.close()
+    # Register data collection group and atlas in ISPyB
+    _register_dcg(
+        session_id=fib_info.session_id,
+        instrument_name=instrument_name,
+        visit_name=visit_name,
+        imaging_site=fib_img_site,
+        murfey_db=murfey_db,
+    )
+
+    return {"success": True}
