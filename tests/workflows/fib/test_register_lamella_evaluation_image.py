@@ -1,4 +1,5 @@
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import numpy as np
 import PIL.Image
@@ -10,6 +11,7 @@ from sqlalchemy.orm import Session as SQLAlchemySession
 from sqlmodel import Session as SQLModelSession, select as sm_select
 
 import murfey.util.db as MurfeyDB
+from murfey.server.ispyb import TransportManager
 from murfey.util.config import MachineConfig
 from murfey.workflows.fib.register_lamella_evaluation_image import (
     FIBImageMetadata,
@@ -149,16 +151,20 @@ def test_run_with_db(
     visit_dir: Path,
     murfey_db_session: SQLModelSession,
     ispyb_db_session: SQLAlchemySession,
+    mock_ispyb_credentials,
 ):
     # Register a Session for this test
-    murfey_session = MurfeyDB.Session(
-        id=session_id,
-        visit=visit_name,
-        name=visit_name,
-        instrument_name=instrument_name,
-        started=True,
-    )
-    murfey_db_session.add(murfey_session)
+    if not (
+        session_entry := murfey_db_session.exec(
+            sm_select(MurfeyDB.Session).where(MurfeyDB.Session.id == session_id)
+        ).one_or_none()
+    ):
+        session_entry = MurfeyDB.Session(id=session_id)
+    session_entry.name = visit_name
+    session_entry.visit = visit_name
+    session_entry.instrument_name = instrument_name
+
+    murfey_db_session.add(session_entry)
     murfey_db_session.commit()
 
     # Mock the machine config
@@ -170,6 +176,27 @@ def test_run_with_db(
     mocker.patch(
         "murfey.workflows.fib.register_lamella_evaluation_image.get_machine_config",
         return_value={instrument_name: machine_config},
+    )
+
+    # Mock the ISPyB connection where the TransportManager class is located
+    mocker.patch(
+        "murfey.server.ispyb.get_security_config",
+        return_value=MagicMock(ispyb_credentials=mock_ispyb_credentials),
+    )
+    mocker.patch(
+        "murfey.server.ispyb.ISPyBSession",
+        return_value=ispyb_db_session,
+    )
+
+    # Mock the ISPYB connection when registering data collection group
+    mocker.patch(
+        "murfey.workflows.register_data_collection_group.ISPyBSession",
+        return_value=ispyb_db_session,
+    )
+
+    # Patch the TransportManager object in the workflows called
+    mocker.patch(
+        "murfey.server._transport_object", new=TransportManager("PikaTransport")
     )
 
     # Create the test image files and their thumbnails
