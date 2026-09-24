@@ -1,5 +1,4 @@
 import logging
-import traceback
 from importlib.metadata import entry_points
 from pathlib import Path
 from typing import Any, cast
@@ -185,101 +184,55 @@ def run(
     message: dict[str, Any],
     murfey_db: Session,
 ):
-    # Outer try-finally block to ensure database connection closes
-    try:
-        try:
-            # Validate incoming message
-            fib_info = FIBAtlasRegistrationInfo(**message)
-        except Exception:
-            logger.error("Could not validate incoming message", exc_info=True)
-            return {"success": False, "requeue": False}
+    # Validate incoming message
+    fib_info = FIBAtlasRegistrationInfo(**message)
 
-        try:
-            # Load visit information
-            murfey_session = murfey_db.exec(
-                select(MurfeyDB.Session).where(
-                    MurfeyDB.Session.id == fib_info.session_id
-                )
-            ).one()
-            visit_name = murfey_session.visit
-            instrument_name = murfey_session.instrument_name
-        except Exception:
-            logger.error(
-                "Exception encountered while querying Murfey database", exc_info=True
-            )
-            return {"success": False, "requeue": False}
+    # Load visit information
+    murfey_session = murfey_db.exec(
+        select(MurfeyDB.Session).where(MurfeyDB.Session.id == fib_info.session_id)
+    ).one()
+    visit_name = murfey_session.visit
+    instrument_name = murfey_session.instrument_name
 
-        try:
-            # Load the machine config
-            machine_config = get_machine_config(instrument_name)[instrument_name]
-            rotation_offset: float = cast(
-                float, machine_config.calibrations.get("rotation_offset", 0)
-            )
+    # Load the machine config
+    machine_config = get_machine_config(instrument_name)[instrument_name]
+    rotation_offset: float = cast(
+        float, machine_config.calibrations.get("rotation_offset", 0)
+    )
 
-            # Extract metadata from Electron Snapshot image
-            metadata = FIBImageMetadata(
-                visit_name=visit_name,
-                file=fib_info.atlas_file,
-                **parse_image_metadata(
-                    fib_info.atlas_file,
-                    rotation_offset=rotation_offset,
-                ),
-            )
-        except Exception:
-            logger.error(
-                f"Error extracting metadata from file {fib_info.atlas_file}",
-                exc_info=True,
-            )
-            return {"success": False, "requeue": False}
+    # Extract metadata from Electron Snapshot image
+    metadata = FIBImageMetadata(
+        visit_name=visit_name,
+        file=fib_info.atlas_file,
+        **parse_image_metadata(
+            fib_info.atlas_file,
+            rotation_offset=rotation_offset,
+        ),
+    )
 
-        try:
-            # Make a thumbnail of the image and update metadata accordingly
-            metadata.thumbnail_path = _make_thumbnail(
-                file=metadata.file,
-                metadata=metadata,
-                visit_name=visit_name,
-            )
-        except Exception:
-            logger.warning(
-                f"Error creating thumbnail of file {fib_info.atlas_file}", exc_info=True
-            )
+    # Make a thumbnail of the image and update metadata accordingly
+    metadata.thumbnail_path = _make_thumbnail(
+        file=metadata.file,
+        metadata=metadata,
+        visit_name=visit_name,
+    )
 
-        try:
-            # Register imaging site in Murfey, or update existing one
-            fib_imaging_site = _register_fib_imaging_site(
-                fib_info.session_id, metadata, murfey_db
-            )
-            logger.info(
-                f"Registered FIB atlas image {fib_info.atlas_file} "
-                f"for slot {metadata.slot_number} in Murfey database"
-            )
-        except Exception:
-            logger.error(
-                "Error registering FIB atlas image "
-                f"{fib_info.atlas_file} in Murfey database",
-                exc_info=True,
-            )
-            return {"success": False, "requeue": False}
+    # Register imaging site in Murfey, or update existing one
+    fib_imaging_site = _register_fib_imaging_site(
+        fib_info.session_id, metadata, murfey_db
+    )
+    logger.info(
+        f"Registered FIB atlas image {fib_info.atlas_file} "
+        f"for slot {metadata.slot_number} in Murfey database"
+    )
 
-        try:
-            # Register data collection group and atlas in ISPyB
-            _register_dcg_and_atlas(
-                session_id=fib_info.session_id,
-                instrument_name=murfey_session.instrument_name,
-                visit_name=murfey_session.visit,
-                imaging_site=fib_imaging_site,
-                metadata=metadata,
-                murfey_db=murfey_db,
-            )
-        except Exception:
-            # Log error but allow workflow to proceed
-            logger.error(
-                "Error registering data collection group for FIB workflow "
-                f"for {metadata.site_name!r}: \n"
-                f"{traceback.format_exc()}"
-            )
-            return {"success": False, "requeue": True}
-        return {"success": True, "requeue": False}
-
-    finally:
-        murfey_db.close()
+    # Register data collection group and atlas in ISPyB
+    _register_dcg_and_atlas(
+        session_id=fib_info.session_id,
+        instrument_name=murfey_session.instrument_name,
+        visit_name=murfey_session.visit,
+        imaging_site=fib_imaging_site,
+        metadata=metadata,
+        murfey_db=murfey_db,
+    )
+    return {"success": True, "requeue": False}
