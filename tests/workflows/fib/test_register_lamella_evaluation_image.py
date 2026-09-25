@@ -1,12 +1,18 @@
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import numpy as np
 import PIL.Image
 import pytest
+from ispyb.sqlalchemy import _auto_db_schema as ISPyBDB
 from pytest_mock import MockerFixture
-from sqlmodel import Session as SQLModelSession, select
+from sqlalchemy import select as sa_select
+from sqlalchemy.orm import Session as SQLAlchemySession
+from sqlmodel import Session as SQLModelSession, select as sm_select
 
 import murfey.util.db as MurfeyDB
+import murfey.workflows.fib.register_lamella_evaluation_image
+from murfey.server.ispyb import TransportManager
 from murfey.util.config import MachineConfig
 from murfey.workflows.fib.register_lamella_evaluation_image import (
     FIBImageMetadata,
@@ -127,7 +133,7 @@ def test_register_fib_imaging_site_with_db(
     )
 
     # Only one entry should exist
-    found_sites = murfey_db_session.exec(select(MurfeyDB.ImagingSite)).all()
+    found_sites = murfey_db_session.exec(sm_select(MurfeyDB.ImagingSite)).all()
     assert len(found_sites) == 1
 
     # Key parameters should be populated
@@ -145,15 +151,20 @@ def test_run_with_db(
     mocker: MockerFixture,
     visit_dir: Path,
     murfey_db_session: SQLModelSession,
+    ispyb_db_session: SQLAlchemySession,
+    mock_ispyb_credentials,
 ):
     # Register a Session for this test
-    murfey_session = MurfeyDB.Session(
-        id=session_id,
-        visit=visit_name,
-        name=visit_name,
-        instrument_name=instrument_name,
-        started=True,
-    )
+    if not (
+        murfey_session := murfey_db_session.exec(
+            sm_select(MurfeyDB.Session).where(MurfeyDB.Session.id == session_id)
+        ).one_or_none()
+    ):
+        murfey_session = MurfeyDB.Session(id=session_id)
+    murfey_session.name = visit_name
+    murfey_session.visit = visit_name
+    murfey_session.instrument_name = instrument_name
+
     murfey_db_session.add(murfey_session)
     murfey_db_session.commit()
 
@@ -166,6 +177,27 @@ def test_run_with_db(
     mocker.patch(
         "murfey.workflows.fib.register_lamella_evaluation_image.get_machine_config",
         return_value={instrument_name: machine_config},
+    )
+
+    # Mock the ISPyB connection where the TransportManager class is located
+    mocker.patch(
+        "murfey.server.ispyb.get_security_config",
+        return_value=MagicMock(ispyb_credentials=mock_ispyb_credentials),
+    )
+    mocker.patch(
+        "murfey.server.ispyb.ISPyBSession",
+        return_value=ispyb_db_session,
+    )
+
+    # Mock the ISPYB connection when registering data collection group
+    mocker.patch(
+        "murfey.workflows.register_data_collection_group.ISPyBSession",
+        return_value=ispyb_db_session,
+    )
+
+    # Patch the TransportManager object in the workflows called
+    mocker.patch(
+        "murfey.server._transport_object", new=TransportManager("PikaTransport")
     )
 
     # Create the test image files and their thumbnails
@@ -219,7 +251,7 @@ def test_run_with_db(
         "pixel_size_x": 1e-6,
         "pixel_size_y": 1e-6,
     }
-    mocker.patch(
+    mock_parse = mocker.patch(
         "murfey.workflows.fib.register_lamella_evaluation_image.parse_image_metadata",
         return_value=metadata_dict,
     )
@@ -230,6 +262,16 @@ def test_run_with_db(
     )
     mock_open.__enter__.return_value = PIL.Image.fromarray(
         np.ones((1500, 1000), dtype=np.uint8)
+    )
+
+    # Set up spies for the functions called by 'run()'
+    spy_thumbnail = mocker.spy(
+        murfey.workflows.fib.register_lamella_evaluation_image,
+        "_make_thumbnail",
+    )
+    spy_register = mocker.spy(
+        murfey.workflows.fib.register_lamella_evaluation_image,
+        "_register_fib_imaging_site",
     )
 
     # Run function and check that expected calls were made
@@ -244,7 +286,9 @@ def test_run_with_db(
         assert result["success"]
 
     # 'PIL.Image.open' should have been called for each image
-    assert mock_open.call_count == len(files)
+    assert mock_parse.call_count == len(files)
+    assert spy_thumbnail.call_count == len(files)
+    assert spy_register.call_count == len(files)
 
     # Both thumbnails should have been generated
     for thumbnail in thumbnails:
@@ -252,7 +296,7 @@ def test_run_with_db(
 
     # There should only be one ImagingSite entry associated with the visit
     imaging_sites = murfey_db_session.exec(
-        select(MurfeyDB.ImagingSite)
+        sm_select(MurfeyDB.ImagingSite)
         .where(MurfeyDB.ImagingSite.session_id == session_id)
         .where(MurfeyDB.ImagingSite.data_type == "grid_square")
     ).all()
@@ -270,3 +314,44 @@ def test_run_with_db(
 
     # Site name should have been constructed correctly
     assert imaging_site.site_name == f"{visit_name}/grid_2/lamella_1"
+    assert imaging_site.dcg_name == f"{visit_name}/grid_2"
+
+    # Murfey's DataCollectionGroup should have an entry
+    murfey_dcg_search = murfey_db_session.exec(
+        sm_select(MurfeyDB.DataCollectionGroup).where(
+            MurfeyDB.DataCollectionGroup.session_id == session_id
+        )
+    ).all()
+    assert len(murfey_dcg_search) == 1
+
+    # Check that the Murfey DataCollectionGroup entry was populated correctly
+    murfey_dcg = murfey_dcg_search[0]
+    assert murfey_dcg.tag == f"{visit_name}/grid_2"
+
+    # ISPyB's DataCollectionGroup should have an entry
+    ispyb_dcg_search = (
+        ispyb_db_session.execute(
+            sa_select(ISPyBDB.DataCollectionGroup).where(
+                ISPyBDB.DataCollectionGroup.dataCollectionGroupId == murfey_dcg.id
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert len(ispyb_dcg_search) == 1
+
+    # Check that the ISPyB DataCollectionGroup entry was populated correctly
+    ispyb_dcg = ispyb_dcg_search[0]
+    assert ispyb_dcg.experimentTypeId == 46
+
+    # ISPyB's Atlas should have an entry
+    ispyb_atlas_search = (
+        ispyb_db_session.execute(
+            sa_select(ISPyBDB.Atlas).where(
+                ISPyBDB.Atlas.dataCollectionGroupId == ispyb_dcg.dataCollectionGroupId
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert len(ispyb_atlas_search) == 1

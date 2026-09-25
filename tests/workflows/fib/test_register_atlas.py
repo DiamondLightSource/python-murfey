@@ -11,7 +11,9 @@ from sqlalchemy.orm import Session as SQLAlchemySession
 from sqlmodel import Session as SQLModelSession, select as sm_select
 
 import murfey.util.db as MurfeyDB
-from murfey.util.fib import get_slot_number
+import murfey.workflows.fib.register_atlas
+from murfey.server.ispyb import TransportManager
+from murfey.util.fib import get_slot_number, number_from_name
 from murfey.util.models import FIBImageMetadata
 from murfey.workflows.fib.register_atlas import run
 from tests.conftest import ExampleVisit
@@ -44,16 +46,16 @@ def test_run_with_db(
 
     # Add a test visit to the database
     if not (
-        session_entry := murfey_db_session.exec(
+        murfey_session := murfey_db_session.exec(
             sm_select(MurfeyDB.Session).where(MurfeyDB.Session.id == session_id)
         ).one_or_none()
     ):
-        session_entry = MurfeyDB.Session(id=session_id)
-    session_entry.name = visit_name
-    session_entry.visit = visit_name
-    session_entry.instrument_name = instrument_name
+        murfey_session = MurfeyDB.Session(id=session_id)
+    murfey_session.name = visit_name
+    murfey_session.visit = visit_name
+    murfey_session.instrument_name = instrument_name
 
-    murfey_db_session.add(session_entry)
+    murfey_db_session.add(murfey_session)
     murfey_db_session.commit()
 
     # Mock the MachineConfig
@@ -88,15 +90,11 @@ def test_run_with_db(
     )
 
     # Patch the TransportManager object in the workflows called
-    from murfey.server.ispyb import TransportManager
-
     mocker.patch(
         "murfey.server._transport_object", new=TransportManager("PikaTransport")
     )
 
     # Mock the metadata returned from the image file
-    import murfey.workflows.fib.register_atlas
-
     extracted = {
         "voltage": 2000,
         "shift_x": 0,
@@ -109,17 +107,18 @@ def test_run_with_db(
         "rotation": -1.309,
         "tilt_alpha": 0.8,
         "tilt_beta": 0,
-        "pixels_x": 3072,
-        "pixels_y": 2048,
+        "pixels_x": 1500,
+        "pixels_y": 1000,
         "pixel_size_x": 1e-6,
         "pixel_size_y": 1e-6,
     }
-    extracted["slot_number"] = get_slot_number(
+    slot_number = get_slot_number(
         x=extracted["pos_x"],
         y=extracted["pos_y"],
         rotation=extracted["rotation"],
         rotation_offset=rotation_offset,
     )
+    extracted["slot_number"] = slot_number
     mock_metadata = [
         FIBImageMetadata(
             visit_name=visit_name,
@@ -132,15 +131,36 @@ def test_run_with_db(
         "murfey.workflows.fib.register_atlas.parse_image_metadata",
         return_value=extracted,
     )
-    spy_register = mocker.spy(
-        murfey.workflows.fib.register_atlas,
-        "_register_fib_imaging_site",
-    )
 
     # Mock 'PIL.Image.open' and create a test image
     mock_open = mocker.patch("murfey.workflows.fib.register_atlas.PIL.Image.open")
     mock_open.__enter__.return_value = PIL.Image.fromarray(
-        np.ones((2048, 1152), dtype=np.uint8)
+        np.ones((1500, 1000), dtype=np.uint8)
+    )
+    # Build the name of the expected test images
+    thumbnails: list[Path] = []
+    for file in test_files:
+        image_number = number_from_name(file.stem)
+        thumbnail = (
+            visit_dir
+            / "processed"
+            / visit_name
+            / f"grid_{slot_number}"
+            / "atlas"
+            / f"atlas_{str(image_number).zfill(2)}.png"
+        )
+        thumbnail.parent.mkdir(parents=True, exist_ok=True)
+        thumbnail.touch(exist_ok=True)
+        thumbnails.append(thumbnail)
+
+    # Set up spies for the different steps in 'run()'
+    spy_thumbnail = mocker.spy(
+        murfey.workflows.fib.register_atlas,
+        "_make_thumbnail",
+    )
+    spy_register = mocker.spy(
+        murfey.workflows.fib.register_atlas,
+        "_register_fib_imaging_site",
     )
 
     # Run the function and check that it's run through to completion
@@ -154,6 +174,9 @@ def test_run_with_db(
             murfey_db=murfey_db_session,
         )
     assert mock_parse.call_count == len(test_files)
+    assert spy_thumbnail.call_count == len(test_files)
+    for thumbnail in thumbnails:
+        assert thumbnail.is_file()
     assert spy_register.call_count == len(test_files)
 
     # Murfey's ImagingSite should have an entry
