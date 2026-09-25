@@ -472,6 +472,7 @@ def test_run_with_db(
 @pytest.mark.parametrize(
     "test_params",
     (  # TransportManager | Project name | Site number | Site name | Stage info | Preparation site | Slot number
+        # Flip to 'True' one by one going down the list
         (False, False, False, False, False, False, False),
         (True, False, False, False, False, False, False),
         (True, True, False, False, False, False, False),
@@ -533,6 +534,10 @@ def test_run_fails(
         },
     }
 
-    # Run the function and check that the correct message is returned
-    result = run(message, mock_murfey_db)
-    assert result == {"success": False, "requeue": False}
+    # Run the function and check that the correct message or error is detected
+    if not has_transport_object:
+        result = run(message, mock_murfey_db)
+        assert result == {"success": False, "requeue": False}
+    else:
+        with pytest.raises((ValueError, RuntimeError)):
+            run(message, mock_murfey_db)
