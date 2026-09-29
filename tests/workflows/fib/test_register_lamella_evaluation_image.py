@@ -355,3 +355,28 @@ def test_run_with_db(
         .all()
     )
     assert len(ispyb_atlas_search) == 1
+
+    # ISPyB's GridSquare should have an entry
+    ispyb_atlas = ispyb_atlas_search[0]
+    ispyb_gs_search = (
+        ispyb_db_session.execute(
+            sa_select(ISPyBDB.GridSquare).where(
+                ISPyBDB.GridSquare.atlasId == ispyb_atlas.atlasId
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert len(ispyb_gs_search) == 1
+
+    # Murfey's GridSquare should also have an entry
+    murfey_gs_search = murfey_db_session.exec(
+        sm_select(MurfeyDB.GridSquare).where(
+            MurfeyDB.GridSquare.session_id == session_id
+        )
+    ).all()
+    assert len(murfey_gs_search) == 1
+    # Check that it's populated correctly
+    murfey_gs = murfey_gs_search[0]
+    assert murfey_gs.tag == f"{visit_name}/grid_2"
+    assert murfey_gs.name == 1
