@@ -253,9 +253,9 @@ def register_search_map_in_database(
             for hook in search_map_hooks:
                 hook.load()(
                     ispyb_id=search_map.id,
-                    image=search_map_params.image,
-                    pixel_size=search_map_params.pixel_size,
-                    lamella=search_map_params.lamella,
+                    session_id=session_id,
+                    search_map_name=search_map_name,
+                    search_map_params=search_map_params,
                 )
         except Exception as e:
             logger.error(f"Call to search map hook failed with {e}", exc_info=True)

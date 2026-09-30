@@ -1,6 +1,7 @@
 import json
 import logging
 import re
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +23,34 @@ router = APIRouter(
     dependencies=[Depends(validate_instrument_token)],
     tags=["Workflows: CryoSIM"],
 )
+
+
+COLOR_LOOKUP = {
+    452: "blue",
+    525: "green",
+    605: "red",
+    655: "far_red",
+}
+
+
+@lru_cache(maxsize=1)
+def get_otf_files(otf_dir: Path):
+    """
+    Look for OTF files in the specified directory and match them to their wavelengths
+    """
+    otf_files: dict[str, Path] = {}
+    pattern = r"(?<!\d)\d{3}(?!\d)"  # Regex match for EXACTLY 3 consecutive digits (wavelength)
+    for file in otf_dir.glob("*"):
+        if (
+            file.is_file()
+            and file.suffix.endswith((".tif", ".tiff"))
+            and "otf" in file.stem.lower()
+            and (match := re.search(pattern, file.stem))
+        ):
+            wavelength = int(match.group())
+            if color := COLOR_LOOKUP.get(wavelength):
+                otf_files[color] = file
+    return otf_files
 
 
 class SIMDataFile(BaseModel):
@@ -50,27 +79,8 @@ def request_sim_reconstruction(
         logger.error("Error querying session information from database", exc_info=True)
         return None
 
-    # Look for OTF files in the saved directory and match them to wavelengths
-    COLOR_LOOKUP = {
-        452: "blue",
-        525: "green",
-        605: "red",
-        655: "far_red",
-    }
-    otf_files: dict[str, Path] = {}
-    pattern = r"(?<!\d)\d{3}(?!\d)"  # Regex match for EXACTLY 3 consecutive digits (wavelength)
-    for file in otf_dir.glob("*"):
-        if (
-            file.is_file()
-            and file.suffix.endswith((".tif", ".tiff"))
-            and "otf" in file.stem.lower()
-            and (match := re.search(pattern, file.stem))
-        ):
-            wavelength = int(match.group())
-            if color := COLOR_LOOKUP.get(wavelength):
-                otf_files[color] = file
-
     # If 4 matches weren't found, log as an error and exit early
+    otf_files = get_otf_files(otf_dir)
     if len(otf_files) < 4:
         logger.error(
             f"One or more OTF files missing from {otf_dir}\n"

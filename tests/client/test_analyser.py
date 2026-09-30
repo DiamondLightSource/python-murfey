@@ -40,10 +40,10 @@ example_files = {
         # Bright field
         "visit/raw/CtrlApr_G2/20260703_132856_CtrlApr_G2_F3A_BF",
         # Fluorescent
-        "visit/raw/SR002_G1/20260707_112417_SR002G1_F1F_BR",
-        "visit/raw/SR002_G1/20260707_112417_SR002G1_F1F_BFR",
-        "visit/raw/44drug_G2/20260703_114348_44drug_G2_E2DR_GR",
-        "visit/raw/44drug_G2/20260703_113142_44drug_G2_E2DR_GFR",
+        "visit/raw/SR002_G1/20260707_112417_SR002G1_F1F_B_FL",
+        "visit/raw/SR002_G1/20260707_112417_SR002G1_F1F_G_FL",
+        "visit/raw/44drug_G2/20260703_114348_44drug_G2_E2DR_R_FL",
+        "visit/raw/44drug_G2/20260703_113142_44drug_G2_E2DR_FR_FL",
         "visit/raw/SR002_G1/20260707_112417_SR002G1_F1F_BR_FL",
         "visit/raw/SR002_G1/20260707_112417_SR002G1_F1F_BFR_FL",
         "visit/raw/44drug_G2/20260703_114348_44drug_G2_E2DR_GR_FL",

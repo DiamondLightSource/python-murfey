@@ -277,6 +277,13 @@ murfey.server.api.bootstrap.msys2:
     methods:
       - GET
 murfey.server.api.bootstrap.plugins:
+  - path: /plugins/instruments/{instrument_name}/
+    function: show_plugin_wheels
+    path_params:
+      - name: instrument_name
+        type: str
+    methods:
+      - GET
   - path: /plugins/instruments/{instrument_name}/{package}
     function: get_plugin_wheel
     path_params:

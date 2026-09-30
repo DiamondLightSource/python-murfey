@@ -75,6 +75,30 @@ class AtlasContext(Context):
                     session_id=environment.murfey_session,
                     data=dcg_data,
                 )
+                capture_post(
+                    base_url=str(environment.url.geturl()),
+                    router_name="session_control.spa_router",
+                    function_name="register_atlas",
+                    token=self._token,
+                    instrument_name=environment.instrument_name,
+                    session_id=environment.murfey_session,
+                    data={
+                        "name": f"{environment.visit}-slot-{sample}",
+                        "acquisition_uuid": environment.acquisition_uuid,
+                        "register_grid": False,
+                        "tag": str(transferred_file.parent / transferred_file.stem),
+                        "storage_folder": str(
+                            _atlas_destination(
+                                environment,
+                                source,
+                                Path(self._machine_config.get("rsync_basepath", "")),
+                            )
+                            / "atlas"
+                            if source
+                            else ""
+                        ),
+                    },
+                )
                 logger.info(
                     f"Registered data collection group for atlas {str(transferred_file.stem)!r}"
                 )

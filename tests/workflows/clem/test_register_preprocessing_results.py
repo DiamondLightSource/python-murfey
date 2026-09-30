@@ -101,11 +101,7 @@ def generate_preprocessing_messages(
     messages: list[dict[str, Any]] = []
     for series_path, is_stack, is_montage, shape, pixel_size, extent in datasets:
         # Unpack items from list of dataset parameters
-        series_name = (
-            str(series_path.relative_to(processed_dir))
-            .replace("/", "--")
-            .replace(" ", "_")
-        )
+        series_name = str(series_path.relative_to(processed_dir)).replace(" ", "_")
         metadata = series_path / "metadata" / f"{series_path.stem}.xml"
         metadata.parent.mkdir(parents=True, exist_ok=True)
         metadata.touch(exist_ok=True)

@@ -1,16 +1,21 @@
-import json
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import numpy as np
+import PIL.Image
 import pytest
+from ispyb.sqlalchemy import _auto_db_schema as ISPyBDB
 from pytest_mock import MockerFixture
-from sqlmodel import Session as SQLModelSession, select
+from sqlalchemy import select as sa_select
+from sqlalchemy.orm import Session as SQLAlchemySession
+from sqlmodel import Session as SQLModelSession, select as sm_select
 
 import murfey.util.db as MurfeyDB
+import murfey.workflows.fib.register_lamella_evaluation_image
+from murfey.server.ispyb import TransportManager
 from murfey.util.config import MachineConfig
 from murfey.workflows.fib.register_lamella_evaluation_image import (
     FIBImageMetadata,
-    FIBLamellaImageInfo,
     _register_fib_imaging_site,
     run,
 )
@@ -77,6 +82,7 @@ def test_register_fib_imaging_site_with_db(
         "pos_z": 0.01,
         "rotation": 1.833,
         "slot_number": 2,
+        "lamella_number": 1,
         "tilt_alpha": 0,
         "tilt_beta": 0,
         "pixels_x": 3072,
@@ -127,7 +133,7 @@ def test_register_fib_imaging_site_with_db(
     )
 
     # Only one entry should exist
-    found_sites = murfey_db_session.exec(select(MurfeyDB.ImagingSite)).all()
+    found_sites = murfey_db_session.exec(sm_select(MurfeyDB.ImagingSite)).all()
     assert len(found_sites) == 1
 
     # Key parameters should be populated
@@ -141,21 +147,26 @@ def test_register_fib_imaging_site_with_db(
         assert registered_site.image_path == str(file)
 
 
-def test_run(
+def test_run_with_db(
     mocker: MockerFixture,
     visit_dir: Path,
+    murfey_db_session: SQLModelSession,
+    ispyb_db_session: SQLAlchemySession,
+    mock_ispyb_credentials,
 ):
-    # Set up parameters
+    # Register a Session for this test
+    if not (
+        murfey_session := murfey_db_session.exec(
+            sm_select(MurfeyDB.Session).where(MurfeyDB.Session.id == session_id)
+        ).one_or_none()
+    ):
+        murfey_session = MurfeyDB.Session(id=session_id)
+    murfey_session.name = visit_name
+    murfey_session.visit = visit_name
+    murfey_session.instrument_name = instrument_name
 
-    # Mock the logger
-    mock_logger = mocker.patch(
-        "murfey.workflows.fib.register_lamella_evaluation_image.logger"
-    )
-
-    # Mock the database call
-    mock_session = MagicMock(visit=visit_name, instrument_name=instrument_name)
-    mock_murfey_db = MagicMock()
-    mock_murfey_db.exec.return_value.one.return_value = mock_session
+    murfey_db_session.add(murfey_session)
+    murfey_db_session.commit()
 
     # Mock the machine config
     machine_config = MachineConfig(
@@ -168,18 +179,59 @@ def test_run(
         return_value={instrument_name: machine_config},
     )
 
-    # Create the test image file to use
-    file = (
+    # Mock the ISPyB connection where the TransportManager class is located
+    mocker.patch(
+        "murfey.server.ispyb.get_security_config",
+        return_value=MagicMock(ispyb_credentials=mock_ispyb_credentials),
+    )
+    mocker.patch(
+        "murfey.server.ispyb.ISPyBSession",
+        return_value=ispyb_db_session,
+    )
+
+    # Mock the ISPYB connection when registering data collection group
+    mocker.patch(
+        "murfey.workflows.register_data_collection_group.ISPyBSession",
+        return_value=ispyb_db_session,
+    )
+
+    # Patch the TransportManager object in the workflows called
+    mocker.patch(
+        "murfey.server._transport_object", new=TransportManager("PikaTransport")
+    )
+
+    # Create the test image files and their thumbnails
+    raw_lamella_dir = (
         visit_dir
         / "autotem"
         / visit_name
         / "Sites"
         / "Lamella"
         / "LamellaEvaluationImages"
-        / "2026-04-16-02-39-40_drift_corrected_image_Polishing 2 - Electron Image.png"
     )
+    raw_lamella_dir.mkdir(parents=True, exist_ok=True)
+    processed_dir = (
+        visit_dir / "processed" / visit_name / "grid_2" / "lamella_evaluation_images"
+    )
+    processed_dir.mkdir(parents=True, exist_ok=True)
 
-    # Mock the results of 'parse_image_metadata'
+    files: list[Path] = []
+    thumbnails: list[Path] = []
+    for file_name in [
+        "2026-04-16-02-39-38_drift_corrected_image_Finer Milling - Electron Image.png",
+        "2026-04-16-02-39-40_drift_corrected_image_Polishing 2 - Electron Image.png",
+    ]:
+        file = raw_lamella_dir / file_name
+        file.touch()
+        files.append(file)
+
+        timestamp, step_name = file_name.split("_drift_corrected_image_")
+        step_name = step_name.split(" - ")[0].replace(" ", "_").lower()
+        thumbnail = processed_dir / f"lamella_1_{timestamp}_{step_name}.png"
+        thumbnail.touch()
+        thumbnails.append(thumbnail)
+
+    # Mock the expected metadata returns
     metadata_dict = {
         "voltage": 2000,
         "shift_x": 0,
@@ -191,49 +243,115 @@ def test_run(
         "pos_z": 0.01,
         "rotation": 1.833,
         "slot_number": 2,
+        "lamella_number": 1,
         "tilt_alpha": 0,
         "tilt_beta": 0,
-        "pixels_x": 3072,
-        "pixels_y": 2048,
+        "pixels_x": 1500,
+        "pixels_y": 1000,
         "pixel_size_x": 1e-6,
         "pixel_size_y": 1e-6,
     }
-    metadata = FIBImageMetadata(
-        visit_name=visit_name,
-        file=file,
-        **metadata_dict,
-    )
-    mocker.patch(
+    mock_parse = mocker.patch(
         "murfey.workflows.fib.register_lamella_evaluation_image.parse_image_metadata",
         return_value=metadata_dict,
     )
 
-    # Mock the results of '_register_fib_image_site'
-    mock_register_imaging_site = mocker.patch(
-        "murfey.workflows.fib.register_lamella_evaluation_image._register_fib_imaging_site",
-        return_value=MagicMock(),
+    # Mock 'PIL.Image.open' and create a test image
+    mock_open = mocker.patch(
+        "murfey.workflows.fib.register_lamella_evaluation_image.PIL.Image.open"
+    )
+    mock_open.__enter__.return_value = PIL.Image.fromarray(
+        np.ones((1500, 1000), dtype=np.uint8)
     )
 
-    # Construct the message to pass to the function
-    message = {
-        "register": "fib.register_lamella_evaluation_image",
-        "session_id": session_id,
-        "lamella_image_file": str(file),
-    }
-    fib_info = FIBLamellaImageInfo(**message)
+    # Set up spies for the functions called by 'run()'
+    spy_thumbnail = mocker.spy(
+        murfey.workflows.fib.register_lamella_evaluation_image,
+        "_make_thumbnail",
+    )
+    spy_register = mocker.spy(
+        murfey.workflows.fib.register_lamella_evaluation_image,
+        "_register_fib_imaging_site",
+    )
 
     # Run function and check that expected calls were made
-    result = run(message, mock_murfey_db)
+    for file in files:
+        # Construct the message to pass to the function
+        message = {
+            "register": "fib.register_lamella_evaluation_image",
+            "session_id": session_id,
+            "lamella_image_file": str(file),
+        }
+        result = run(message, murfey_db_session)
+        assert result["success"]
 
-    # Metadata should have been extracted and logged
-    mock_logger.info.assert_any_call(
-        "Extracted the following metadata from the image:\n"
-        f"{json.dumps(metadata.model_dump(), indent=2, default=str)}"
+    # 'PIL.Image.open' should have been called for each image
+    assert mock_parse.call_count == len(files)
+    assert spy_thumbnail.call_count == len(files)
+    assert spy_register.call_count == len(files)
+
+    # Both thumbnails should have been generated
+    for thumbnail in thumbnails:
+        assert thumbnail.is_file()
+
+    # There should only be one ImagingSite entry associated with the visit
+    imaging_sites = murfey_db_session.exec(
+        sm_select(MurfeyDB.ImagingSite)
+        .where(MurfeyDB.ImagingSite.session_id == session_id)
+        .where(MurfeyDB.ImagingSite.data_type == "grid_square")
+    ).all()
+    assert len(imaging_sites) == 1
+
+    # The later image ("Polishing 2") should have been registered
+    imaging_site = imaging_sites[0]
+    assert (
+        imaging_site.image_path is not None and "Polishing 2" in imaging_site.image_path
     )
-    # Imaging site registration function should have been called
-    mock_register_imaging_site.assert_called_once_with(
-        fib_info.session_id,
-        metadata,
-        mock_murfey_db,
+    assert (
+        imaging_site.thumbnail_path is not None
+        and "polishing_2" in imaging_site.thumbnail_path
     )
-    assert result["success"]
+
+    # Site name should have been constructed correctly
+    assert imaging_site.site_name == f"{visit_name}/grid_2/lamella_1"
+    assert imaging_site.dcg_name == f"{visit_name}/grid_2"
+
+    # Murfey's DataCollectionGroup should have an entry
+    murfey_dcg_search = murfey_db_session.exec(
+        sm_select(MurfeyDB.DataCollectionGroup).where(
+            MurfeyDB.DataCollectionGroup.session_id == session_id
+        )
+    ).all()
+    assert len(murfey_dcg_search) == 1
+
+    # Check that the Murfey DataCollectionGroup entry was populated correctly
+    murfey_dcg = murfey_dcg_search[0]
+    assert murfey_dcg.tag == f"{visit_name}/grid_2"
+
+    # ISPyB's DataCollectionGroup should have an entry
+    ispyb_dcg_search = (
+        ispyb_db_session.execute(
+            sa_select(ISPyBDB.DataCollectionGroup).where(
+                ISPyBDB.DataCollectionGroup.dataCollectionGroupId == murfey_dcg.id
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert len(ispyb_dcg_search) == 1
+
+    # Check that the ISPyB DataCollectionGroup entry was populated correctly
+    ispyb_dcg = ispyb_dcg_search[0]
+    assert ispyb_dcg.experimentTypeId == 46
+
+    # ISPyB's Atlas should have an entry
+    ispyb_atlas_search = (
+        ispyb_db_session.execute(
+            sa_select(ISPyBDB.Atlas).where(
+                ISPyBDB.Atlas.dataCollectionGroupId == ispyb_dcg.dataCollectionGroupId
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert len(ispyb_atlas_search) == 1

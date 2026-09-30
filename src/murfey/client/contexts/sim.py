@@ -32,16 +32,8 @@ class SIMContext(Context):
             return None
 
         # Look for raw data files
-        # These have no extensions, and end with one of the listed suffixes
-        if not transferred_file.suffix and transferred_file.stem.endswith(
-            (
-                # Only SIM raw data files ending with '_FL' should be processed
-                "_BR_FL",
-                "_BFR_FL",
-                "_GR_FL",
-                "_GFR_FL",
-            )
-        ):
+        # These have no extensions, and end with "_FL"
+        if not transferred_file.suffix and transferred_file.stem.endswith("_FL"):
             source = _get_source(transferred_file, environment)
             if source is None:
                 logger.warning(f"No source found for file {transferred_file}")
