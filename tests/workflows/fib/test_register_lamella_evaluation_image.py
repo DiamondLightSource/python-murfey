@@ -222,6 +222,7 @@ def test_run_with_db(
             session_id=session_id,
             site_name=expected_dcg_name,
             image_path=str(atlas_metadata.file),
+            dcg_name=expected_dcg_name,
             data_type="atlas",
         )
         populate_fib_imaging_site_entry(atlas_entry, atlas_metadata)
