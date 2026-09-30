@@ -209,8 +209,8 @@ def test_run_with_db(
         atlas_metadata_dict = metadata_dict.copy()
         atlas_metadata_dict["len_x"] = 0.002400
         atlas_metadata_dict["len_y"] = 0.001600
-        atlas_metadata_dict["pixels_x"] = atlas_metadata_dict["len_x"] / pixel_size
-        atlas_metadata_dict["pixels_y"] = atlas_metadata_dict["len_y"] / pixel_size
+        atlas_metadata_dict["pixels_x"] = int(atlas_metadata_dict["len_x"] / pixel_size)
+        atlas_metadata_dict["pixels_y"] = int(atlas_metadata_dict["len_y"] / pixel_size)
 
         atlas_metadata = FIBImageMetadata(
             visit_name=visit_name,
