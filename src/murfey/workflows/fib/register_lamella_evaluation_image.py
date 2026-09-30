@@ -179,9 +179,6 @@ def _register_dcg(
     murfey_db.add(imaging_site)
     murfey_db.commit()
 
-    logger.info(
-        f"Return ImagingSite with values: {json.dumps(imaging_site.model_dump(), indent=2, default=str)}"
-    )
     return imaging_site
 
 
@@ -218,10 +215,6 @@ def _register_grid_square(
         )
         return imaging_site
     atlas = atlas_search[-1]
-
-    logger.info(
-        f"Found atlas ImagingSite: {json.dumps(atlas.model_dump(), indent=2, default=str)}"
-    )
 
     # Check if the atlas has the required values for the GridSquare registration
     if not (
@@ -323,10 +316,6 @@ def _register_grid_square(
         grid_square_entry.pixel_size = grid_square_params.pixel_size
         grid_square_entry.image = grid_square_params.image
 
-        logger.info(
-            f"Updated Murfey GridSquare entry: {json.dumps(grid_square_entry.model_dump(), indent=2, default=str)}"
-        )
-
         # Update existing entry on ISPyB
         murfey.server._transport_object.do_update_grid_square(
             grid_square_id=grid_square_entry.id,
@@ -364,9 +353,6 @@ def _register_grid_square(
             pixel_size=grid_square_params.pixel_size,
             image=grid_square_params.image,
         )
-        logger.info(
-            f"Creating new Murfey GridSquare entry: {json.dumps(grid_square_entry.model_dump(), indent=2, default=str)}"
-        )
     murfey_db.add(grid_square_entry)
 
     # Add grid square ID to existing CLEM image series entry
@@ -374,9 +360,6 @@ def _register_grid_square(
     murfey_db.add(imaging_site)
     murfey_db.commit()
 
-    logger.info(
-        f"Updated ImagingSite after GridSquare registration: {json.dumps(imaging_site.model_dump(), indent=2, default=str)}"
-    )
     return imaging_site
 
 
