@@ -179,9 +179,8 @@ def _register_dcg(
     murfey_db.add(imaging_site)
     murfey_db.commit()
 
-    logger.error(
-        "Returning updated ImagingSite with values after DCG registration: \n"
-        f"{json.dumps(imaging_site.model_dump(), indent=2, default=str)}"
+    logger.info(
+        f"Return ImagingSite with values: {json.dumps(imaging_site.model_dump(), indent=2, default=str)}"
     )
     return imaging_site
 
@@ -324,9 +323,8 @@ def _register_grid_square(
         grid_square_entry.pixel_size = grid_square_params.pixel_size
         grid_square_entry.image = grid_square_params.image
 
-        logger.error(
-            "Updated Murfey GridSquare entry:\n"
-            f"{json.dumps(grid_square_entry.model_dump(), indent=2, default=str)}"
+        logger.info(
+            f"Updated Murfey GridSquare entry: {json.dumps(grid_square_entry.model_dump(), indent=2, default=str)}"
         )
 
         # Update existing entry on ISPyB
@@ -366,9 +364,8 @@ def _register_grid_square(
             pixel_size=grid_square_params.pixel_size,
             image=grid_square_params.image,
         )
-        logger.error(
-            "Creating new Murfey GridSquare entry:\n"
-            f"{json.dumps(grid_square_entry.model_dump(), indent=2, default=str)}"
+        logger.info(
+            f"Creating new Murfey GridSquare entry: {json.dumps(grid_square_entry.model_dump(), indent=2, default=str)}"
         )
     murfey_db.add(grid_square_entry)
 
@@ -377,9 +374,8 @@ def _register_grid_square(
     murfey_db.add(imaging_site)
     murfey_db.commit()
 
-    logger.error(
-        "Updated ImagingSite after GridSquare registration:\n"
-        f"{json.dumps(imaging_site.model_dump(), indent=2, default=str)}"
+    logger.info(
+        f"Updated ImagingSite after GridSquare registration: {json.dumps(imaging_site.model_dump(), indent=2, default=str)}"
     )
     return imaging_site
 
