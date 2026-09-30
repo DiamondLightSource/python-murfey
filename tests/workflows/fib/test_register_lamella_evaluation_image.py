@@ -14,8 +14,8 @@ import murfey.util.db as MurfeyDB
 import murfey.workflows.fib.register_lamella_evaluation_image
 from murfey.server.ispyb import TransportManager
 from murfey.util.config import MachineConfig
+from murfey.util.models import FIBImageMetadata
 from murfey.workflows.fib.register_lamella_evaluation_image import (
-    FIBImageMetadata,
     _register_fib_imaging_site,
     run,
 )
@@ -147,13 +147,28 @@ def test_register_fib_imaging_site_with_db(
         assert registered_site.image_path == str(file)
 
 
+@pytest.mark.parametrize(
+    "test_params",
+    (  # Atlas registered | Slot number | Lamella number
+        (True, 1, 1),
+        (False, 2, 2),
+    ),
+)
 def test_run_with_db(
     mocker: MockerFixture,
+    test_params: tuple[bool, int, int],
     visit_dir: Path,
     murfey_db_session: SQLModelSession,
     ispyb_db_session: SQLAlchemySession,
     mock_ispyb_credentials,
 ):
+    # Unpack test params
+    atlas_registered, slot_number, lamella_number = test_params
+
+    # Construct expected tag and site name
+    expected_dcg_name = f"{visit_name}/grid_{slot_number}"
+    expected_site_name = f"{expected_dcg_name}/lamella_{lamella_number}"
+
     # Register a Session for this test
     if not (
         murfey_session := murfey_db_session.exec(
@@ -166,7 +181,59 @@ def test_run_with_db(
     murfey_session.instrument_name = instrument_name
 
     murfey_db_session.add(murfey_session)
+
+    # Create placeholder metadata dictionary
+    pixel_size = 1e-6
+    metadata_dict = {
+        "voltage": 2000,
+        "shift_x": 0,
+        "shift_y": 0,
+        "len_x": 0.001500,
+        "len_y": 0.001000,
+        "pos_x": 0.003 * (-1 if slot_number > 1 else 1),
+        "pos_y": 0.003,
+        "pos_z": 0.01,
+        "rotation": 1.833,
+        "slot_number": slot_number,
+        "lamella_number": lamella_number,
+        "tilt_alpha": 0,
+        "tilt_beta": 0,
+        "pixels_x": 1500,
+        "pixels_y": 1000,
+        "pixel_size_x": pixel_size,
+        "pixel_size_y": pixel_size,
+    }
+
+    # Create and populate an ImagingSite entry for the atlas if toggled
+    if atlas_registered:
+        atlas_metadata_dict = metadata_dict.copy()
+        atlas_metadata_dict["len_x"] = 0.002400
+        atlas_metadata_dict["len_y"] = 0.001600
+        atlas_metadata_dict["pixels_x"] = atlas_metadata_dict["len_x"] / pixel_size
+        atlas_metadata_dict["pixels_y"] = atlas_metadata_dict["len_y"] / pixel_size
+
+        atlas_metadata = FIBImageMetadata(
+            visit_name=visit_name,
+            file=visit_dir / "some_file.tif",
+            **atlas_metadata_dict,
+        )
+
+        atlas_entry = MurfeyDB.ImagingSite(
+            session_id=session_id,
+            site_name=expected_dcg_name,
+            image_path=str(atlas_metadata.file),
+            data_type="atlas",
+        )
+        populate_fib_imaging_site_entry(atlas_entry, atlas_metadata)
+        murfey_db_session.add(atlas_entry)
+
+    # Commit all needed changes
     murfey_db_session.commit()
+
+    # Mock the logger
+    mock_logger = mocker.patch(
+        "murfey.workflows.fib.register_lamella_evaluation_image.logger"
+    )
 
     # Mock the machine config
     machine_config = MachineConfig(
@@ -201,17 +268,24 @@ def test_run_with_db(
     )
 
     # Create the test image files and their thumbnails
+    lamella_folder = "Lamella"
+    if lamella_number > 1:
+        lamella_folder += f" ({lamella_number})"
     raw_lamella_dir = (
         visit_dir
         / "autotem"
         / visit_name
         / "Sites"
-        / "Lamella"
+        / lamella_folder
         / "LamellaEvaluationImages"
     )
     raw_lamella_dir.mkdir(parents=True, exist_ok=True)
     processed_dir = (
-        visit_dir / "processed" / visit_name / "grid_2" / "lamella_evaluation_images"
+        visit_dir
+        / "processed"
+        / visit_name
+        / f"grid_{slot_number}"
+        / "lamella_evaluation_images"
     )
     processed_dir.mkdir(parents=True, exist_ok=True)
 
@@ -227,30 +301,13 @@ def test_run_with_db(
 
         timestamp, step_name = file_name.split("_drift_corrected_image_")
         step_name = step_name.split(" - ")[0].replace(" ", "_").lower()
-        thumbnail = processed_dir / f"lamella_1_{timestamp}_{step_name}.png"
+        thumbnail = (
+            processed_dir / f"lamella_{lamella_number}_{timestamp}_{step_name}.png"
+        )
         thumbnail.touch()
         thumbnails.append(thumbnail)
 
     # Mock the expected metadata returns
-    metadata_dict = {
-        "voltage": 2000,
-        "shift_x": 0,
-        "shift_y": 0,
-        "len_x": 0.003072,
-        "len_y": 0.002048,
-        "pos_x": -0.003,
-        "pos_y": 0.003,
-        "pos_z": 0.01,
-        "rotation": 1.833,
-        "slot_number": 2,
-        "lamella_number": 1,
-        "tilt_alpha": 0,
-        "tilt_beta": 0,
-        "pixels_x": 1500,
-        "pixels_y": 1000,
-        "pixel_size_x": 1e-6,
-        "pixel_size_y": 1e-6,
-    }
     mock_parse = mocker.patch(
         "murfey.workflows.fib.register_lamella_evaluation_image.parse_image_metadata",
         return_value=metadata_dict,
@@ -313,8 +370,8 @@ def test_run_with_db(
     )
 
     # Site name should have been constructed correctly
-    assert imaging_site.site_name == f"{visit_name}/grid_2/lamella_1"
-    assert imaging_site.dcg_name == f"{visit_name}/grid_2"
+    assert imaging_site.dcg_name == expected_dcg_name
+    assert imaging_site.site_name == expected_site_name
 
     # Murfey's DataCollectionGroup should have an entry
     murfey_dcg_search = murfey_db_session.exec(
@@ -326,7 +383,7 @@ def test_run_with_db(
 
     # Check that the Murfey DataCollectionGroup entry was populated correctly
     murfey_dcg = murfey_dcg_search[0]
-    assert murfey_dcg.tag == f"{visit_name}/grid_2"
+    assert murfey_dcg.tag == expected_dcg_name
 
     # ISPyB's DataCollectionGroup should have an entry
     ispyb_dcg_search = (
@@ -356,27 +413,33 @@ def test_run_with_db(
     )
     assert len(ispyb_atlas_search) == 1
 
-    # ISPyB's GridSquare should have an entry
-    ispyb_atlas = ispyb_atlas_search[0]
-    ispyb_gs_search = (
-        ispyb_db_session.execute(
-            sa_select(ISPyBDB.GridSquare).where(
-                ISPyBDB.GridSquare.atlasId == ispyb_atlas.atlasId
+    # GridSquare should be registered if an atlas ImagingSite exists
+    if atlas_registered:
+        # ISPyB's GridSquare should have an entry
+        ispyb_atlas = ispyb_atlas_search[0]
+        ispyb_gs_search = (
+            ispyb_db_session.execute(
+                sa_select(ISPyBDB.GridSquare).where(
+                    ISPyBDB.GridSquare.atlasId == ispyb_atlas.atlasId
+                )
             )
+            .scalars()
+            .all()
         )
-        .scalars()
-        .all()
-    )
-    assert len(ispyb_gs_search) == 1
+        assert len(ispyb_gs_search) == 1
 
-    # Murfey's GridSquare should also have an entry
-    murfey_gs_search = murfey_db_session.exec(
-        sm_select(MurfeyDB.GridSquare).where(
-            MurfeyDB.GridSquare.session_id == session_id
+        # Murfey's GridSquare should also have an entry
+        murfey_gs_search = murfey_db_session.exec(
+            sm_select(MurfeyDB.GridSquare).where(
+                MurfeyDB.GridSquare.session_id == session_id
+            )
+        ).all()
+        assert len(murfey_gs_search) == 1
+        # Check that it's populated correctly
+        murfey_gs = murfey_gs_search[0]
+        assert murfey_gs.tag == expected_dcg_name
+        assert murfey_gs.name == 1
+    else:
+        mock_logger.info.assert_any_call(
+            f"No atlas has been registered for data collection group {expected_dcg_name!r} yet"
         )
-    ).all()
-    assert len(murfey_gs_search) == 1
-    # Check that it's populated correctly
-    murfey_gs = murfey_gs_search[0]
-    assert murfey_gs.tag == f"{visit_name}/grid_2"
-    assert murfey_gs.name == 1
