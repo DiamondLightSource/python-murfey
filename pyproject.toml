@@ -53,7 +53,7 @@ developer = [
     "pytest-mock", # Additional mocking tools for unit tests
 ]
 server = [
-    "ccpem-pipeliner",
+    "ccpem-pipeliner@git+https://gitlab.com/ccpem/ccpem-pipeliner.git@live-processing#egg=ccpem-pipeliner",
     "cryptography",
     "graypy",
     "ispyb>=12.1.0", # Responsible for setting requirements for SQLAlchemy and mysql-connector-python;
