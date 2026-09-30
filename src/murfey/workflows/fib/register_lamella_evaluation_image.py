@@ -179,6 +179,8 @@ def _register_dcg(
     murfey_db.add(imaging_site)
     murfey_db.commit()
 
+    return imaging_site
+
 
 def _register_grid_square(
     session_id: int,
@@ -211,7 +213,7 @@ def _register_grid_square(
         logger.info(
             f"No atlas has been registered for data collection group {dcg_name!r} yet"
         )
-        return
+        return imaging_site
     atlas = atlas_search[-1]
 
     # Check if the atlas has the required values for the GridSquare registration
@@ -227,7 +229,7 @@ def _register_grid_square(
         and atlas.thumbnail_pixels_y is not None
     ):
         logger.warning(f"Atlas {atlas.image_path} not populated with required values")
-        return
+        return imaging_site
     atlas_x1 = atlas.pos_x + (atlas.len_x / 2)
     atlas_y0 = atlas.pos_y - (atlas.len_y / 2)
 
@@ -244,7 +246,7 @@ def _register_grid_square(
         logger.warning(
             f"ImagingSite for {imaging_site.image_path} not populated with required values"
         )
-        return
+        return imaging_site
 
     # Transform the imaging site coordinates into the atlas' frame of reference
     # NOTE: This will require further investigation and tweaking, given the
@@ -358,6 +360,8 @@ def _register_grid_square(
     murfey_db.add(imaging_site)
     murfey_db.commit()
 
+    return imaging_site
+
 
 class FIBLamellaImageInfo(BaseModel):
     session_id: int
@@ -418,7 +422,7 @@ def run(
     fib_img_site = _register_fib_imaging_site(fib_info.session_id, metadata, murfey_db)
 
     # Register data collection group and atlas in ISPyB
-    _register_dcg(
+    fib_img_site = _register_dcg(
         session_id=fib_info.session_id,
         instrument_name=instrument_name,
         visit_name=visit_name,
@@ -427,7 +431,7 @@ def run(
     )
 
     # Register grid square in ISPyB
-    _register_grid_square(
+    fib_img_site = _register_grid_square(
         session_id=fib_info.session_id,
         imaging_site=fib_img_site,
         site_number=metadata.lamella_number,
