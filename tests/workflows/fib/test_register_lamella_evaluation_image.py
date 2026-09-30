@@ -254,7 +254,13 @@ def test_run_with_db(
     )
     mocker.patch(
         "murfey.server.ispyb.ISPyBSession",
-        new=ispyb_db_session,
+        return_value=ispyb_db_session,
+    )
+
+    # Mock the ISPYB connection when registering data collection group
+    mocker.patch(
+        "murfey.workflows.register_data_collection_group.ISPyBSession",
+        return_value=ispyb_db_session,
     )
 
     # Patch the TransportManager object in the workflows called
