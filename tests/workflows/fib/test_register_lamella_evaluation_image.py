@@ -194,10 +194,10 @@ def test_run_with_db(
         "pos_y": 0.003,
         "pos_z": 0.01,
         "rotation": 1.833,
-        "slot_number": slot_number,
-        "lamella_number": lamella_number,
         "tilt_alpha": 0,
         "tilt_beta": 0,
+        "slot_number": slot_number,
+        "lamella_number": lamella_number,
         "pixels_x": 1500,
         "pixels_y": 1000,
         "pixel_size_x": pixel_size,
@@ -215,6 +215,7 @@ def test_run_with_db(
         atlas_metadata = FIBImageMetadata(
             visit_name=visit_name,
             file=visit_dir / "some_file.tif",
+            thumbnail_path=visit_dir / "some_thumbnail.png",
             **atlas_metadata_dict,
         )
 
