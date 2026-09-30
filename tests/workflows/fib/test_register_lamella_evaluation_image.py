@@ -254,7 +254,7 @@ def test_run_with_db(
     )
     mocker.patch(
         "murfey.server.ispyb.ISPyBSession",
-        new=ispyb_db_session,
+        return_value=ispyb_db_session,
     )
 
     # Patch the TransportManager object in the workflows called
@@ -433,7 +433,7 @@ def test_run_with_db(
         # Check that it's populated correctly
         murfey_gs = murfey_gs_search[0]
         assert murfey_gs.tag == expected_dcg_name
-        assert murfey_gs.name == 1
+        assert murfey_gs.name == lamella_number
     else:
         mock_logger.info.assert_any_call(
             f"No atlas has been registered for data collection group {expected_dcg_name!r} yet"
