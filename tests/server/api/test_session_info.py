@@ -66,6 +66,7 @@ def test_create_session_with_db(murfey_db_session: SQLModelSession):
     # Set up the backend server
     backend_server = set_up_test_backend_client(
         router=router,
+        instrument_name=instrument_name,
         mock_db_session=mock_get_db_session,
     )
     # Construct the URL path to poke
