@@ -1116,13 +1116,9 @@ murfey.server.api.session_info.router:
     path_params: []
     methods:
       - GET
-  - path: /session_info/instruments/{instrument_name}/visits/{visit}/sessions/{name}
+  - path: /session_info/instruments/{instrument_name}/sessions/new
     function: create_session
     path_params:
-      - name: visit
-        type: str
-      - name: name
-        type: str
       - name: instrument_name
         type: str
     methods:

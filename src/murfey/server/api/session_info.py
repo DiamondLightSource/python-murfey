@@ -170,32 +170,34 @@ async def get_sessions(db: SQLModelSession = murfey_db):
     return res
 
 
-class VisitEndTime(BaseModel):
+class NewSessionInfo(BaseModel):
+    visit: str
+    name: str
     end_time: Optional[datetime] = None
 
 
-@router.post("/instruments/{instrument_name}/visits/{visit}/sessions/{name}")
+@router.post("/instruments/{instrument_name}/sessions/new")
 def create_session(
     instrument_name: MurfeyInstrumentName,
-    visit: str,
-    name: str,
-    visit_end_time: VisitEndTime,
+    session_info: NewSessionInfo,
     db: SQLModelSession = murfey_db,
 ) -> int:
-    s = MurfeySession(
-        name=name,
-        visit=visit,
+    session = MurfeySession(
+        name=session_info.name,
+        visit=session_info.visit,
         instrument_name=instrument_name,
-        visit_end_time=visit_end_time.end_time,
+        visit_end_time=session_info.end_time,
     )
-    db.add(s)
+    db.add(session)
     db.commit()
-    sid = s.id
+    session_id = session.id
 
-    if visit_end_time.end_time:
-        prom.alert_end_time.labels(visit=visit).set(visit_end_time.end_time.timestamp())
+    if session_info.end_time:
+        prom.alert_end_time.labels(visit=session_info.visit).set(
+            session_info.end_time.timestamp()
+        )
 
-    return sid
+    return session_id
 
 
 @router.post("/sessions/{session_id}")
