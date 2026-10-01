@@ -1,7 +1,6 @@
 from datetime import datetime
 from logging import getLogger
 from pathlib import Path
-from typing import Dict, List, Optional
 
 import requests
 from fastapi import APIRouter, Depends, Request
@@ -74,7 +73,7 @@ def check_smartem_availability(instrument_name: str):
     return {"available": bool(machine_config.smartem_api_url)}
 
 
-@router.get("/instruments/{instrument_name}/visits_raw", response_model=List[Visit])
+@router.get("/instruments/{instrument_name}/visits_raw", response_model=list[Visit])
 def get_current_visits(instrument_name: MurfeyInstrumentName, db=ispyb_db):
     logger.debug(
         f"Received request to look up ongoing visits for {sanitise(instrument_name)}"
@@ -116,7 +115,7 @@ def all_visit_info(
 
 
 @router.get(
-    "/sessions/{session_id}/rsyncers", response_model=List[MurfeyDB.RsyncInstance]
+    "/sessions/{session_id}/rsyncers", response_model=list[MurfeyDB.RsyncInstance]
 )
 def get_rsyncers_for_client(
     session_id: MurfeySessionID, db: SQLModelSession = murfey_db
@@ -131,7 +130,7 @@ def get_rsyncers_for_client(
 
 class SessionClients(BaseModel):
     session: MurfeyDB.Session
-    clients: List[MurfeyDB.ClientEnvironment]
+    clients: list[MurfeyDB.ClientEnvironment]
 
 
 @router.get("/sessions/{session_id}")
@@ -166,7 +165,7 @@ async def get_sessions(db: SQLModelSession = murfey_db):
 class NewSessionInfo(BaseModel):
     visit: str
     name: str
-    end_time: Optional[datetime] = None
+    end_time: datetime | None = None
 
 
 @router.post("/instruments/{instrument_name}/sessions/new")
@@ -220,7 +219,7 @@ def get_sessions_with_visit(
     instrument_name: MurfeyInstrumentName,
     visit_name: str,
     db: SQLModelSession = murfey_db,
-) -> List[MurfeyDB.Session]:
+) -> list[MurfeyDB.Session]:
     sessions = db.exec(
         select(MurfeyDB.Session)
         .where(MurfeyDB.Session.instrument_name == instrument_name)
@@ -232,7 +231,7 @@ def get_sessions_with_visit(
 @router.get("/instruments/{instrument_name}/sessions")
 async def get_sessions_by_instrument_name(
     instrument_name: MurfeyInstrumentName, db: SQLModelSession = murfey_db
-) -> List[MurfeyDB.Session]:
+) -> list[MurfeyDB.Session]:
     sessions = db.exec(
         select(MurfeyDB.Session).where(
             MurfeyDB.Session.instrument_name == instrument_name
@@ -244,7 +243,7 @@ async def get_sessions_by_instrument_name(
 @router.get("/sessions/{session_id}/data_collection_groups")
 def get_dc_groups(
     session_id: MurfeySessionID, db: SQLModelSession = murfey_db
-) -> Dict[str, MurfeyDB.DataCollectionGroup]:
+) -> dict[str, MurfeyDB.DataCollectionGroup]:
     data_collection_groups = db.exec(
         select(MurfeyDB.DataCollectionGroup).where(
             MurfeyDB.DataCollectionGroup.session_id == session_id
@@ -256,7 +255,7 @@ def get_dc_groups(
 @router.get("/sessions/{session_id}/data_collection_groups/{dcgid}/data_collections")
 def get_data_collections(
     session_id: MurfeySessionID, dcgid: int, db: SQLModelSession = murfey_db
-) -> List[MurfeyDB.DataCollection]:
+) -> list[MurfeyDB.DataCollection]:
     data_collections = db.exec(
         select(MurfeyDB.DataCollection).where(MurfeyDB.DataCollection.dcg_id == dcgid)
     ).all()
@@ -394,8 +393,8 @@ spa_router = APIRouter(
 
 class ProcessingDetails(BaseModel):
     data_collection_group: MurfeyDB.DataCollectionGroup
-    data_collections: List[MurfeyDB.DataCollection]
-    processing_jobs: List[MurfeyDB.ProcessingJob]
+    data_collections: list[MurfeyDB.DataCollection]
+    processing_jobs: list[MurfeyDB.ProcessingJob]
     relion_params: MurfeyDB.SPARelionParameters
     feedback_params: MurfeyDB.ClassificationFeedbackParameters
 
@@ -403,7 +402,7 @@ class ProcessingDetails(BaseModel):
 @spa_router.get("/sessions/{session_id}/spa_processing_parameters")
 def get_spa_proc_param_details(
     session_id: MurfeySessionID, db: SQLModelSession = murfey_db
-) -> Optional[List[ProcessingDetails]]:
+) -> list[ProcessingDetails] | None:
     params = db.exec(
         select(
             MurfeyDB.DataCollectionGroup,
@@ -481,7 +480,7 @@ def get_grid_squares(session_id: MurfeySessionID, db: SQLModelSession = murfey_d
 @spa_router.get("/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares")
 def get_grid_squares_from_dcg(
     session_id: MurfeySessionID, dcgid: int, db: SQLModelSession = murfey_db
-) -> List[MurfeyDB.GridSquare]:
+) -> list[MurfeyDB.GridSquare]:
     return _get_grid_squares_from_dcg(session_id, dcgid, db)
 
 
@@ -490,14 +489,14 @@ def get_grid_squares_from_dcg(
 )
 def get_foil_holes_from_grid_square(
     session_id: MurfeySessionID, dcgid: int, gsid: int, db: SQLModelSession = murfey_db
-) -> List[MurfeyDB.FoilHole]:
+) -> list[MurfeyDB.FoilHole]:
     return _get_foil_holes_from_grid_square(session_id, dcgid, gsid, db)
 
 
 @spa_router.get("/sessions/{session_id}/foil_hole/{fh_name}")
 def get_foil_hole(
     session_id: MurfeySessionID, fh_name: int, db: SQLModelSession = murfey_db
-) -> Dict[str, int]:
+) -> dict[str, int]:
     return _get_foil_hole(session_id, fh_name, db)
 
 
@@ -511,14 +510,14 @@ tomo_router = APIRouter(
 @tomo_router.get("/sessions/{session_id}/tilt_series/{tilt_series_tag}/tilts")
 def get_tilts(
     session_id: MurfeySessionID, tilt_series_tag: str, db: SQLModelSession = murfey_db
-) -> Dict[str, List[str]]:
+) -> dict[str, list[str]]:
     res = db.exec(
         select(MurfeyDB.TiltSeries, MurfeyDB.Tilt)
         .where(MurfeyDB.TiltSeries.tag == tilt_series_tag)
         .where(MurfeyDB.TiltSeries.session_id == session_id)
         .where(MurfeyDB.Tilt.tilt_series_id == MurfeyDB.TiltSeries.id)
     ).all()
-    tilts: Dict[str, List[str]] = {}
+    tilts: dict[str, list[str]] = {}
     for el in res:
         if tilts.get(el[1].rsync_source):
             tilts[el[1].rsync_source].append(el[2].movie_path)
