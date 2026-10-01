@@ -22,11 +22,13 @@ from murfey.util.models import UpstreamFileRequestInfo
 from tests.conftest import ExampleVisit
 
 instrument_name = ExampleVisit.instrument_name
-visit_name = f"{ExampleVisit.proposal_code}{ExampleVisit.proposal_number}-{ExampleVisit.visit_number}"
 
 
 def set_up_test_backend_client(
-    router: APIRouter, session_id: int, instrument_name: str, mock_db_session: Callable
+    router: APIRouter,
+    session_id: int | None = None,
+    instrument_name: str | None = None,
+    mock_db_session: Callable | None = None,
 ):
     """
     Helper function to set up a test backend server whose response can be inspected
@@ -35,21 +37,26 @@ def set_up_test_backend_client(
     # Set up the backend server
     backend_app = FastAPI()
 
-    # Override validation and database dependencies
+    # Override validation and database dependencies as needed
     backend_app.dependency_overrides[validate_token] = lambda: None
-    backend_app.dependency_overrides[validate_user_instrument_access] = (
-        lambda: instrument_name
-    )
-    backend_app.dependency_overrides[validate_frontend_session_access] = (
-        lambda: session_id
-    )
-    backend_app.dependency_overrides[murfey_db_session] = mock_db_session
+    if instrument_name:
+        backend_app.dependency_overrides[validate_user_instrument_access] = (
+            lambda: instrument_name
+        )
+    if session_id:
+        backend_app.dependency_overrides[validate_frontend_session_access] = (
+            lambda: session_id
+        )
+    if mock_db_session:
+        backend_app.dependency_overrides[murfey_db_session] = mock_db_session
+
+    # Attach router, initiate object, and return it
     backend_app.include_router(router)
     return TestClient(backend_app)
 
 
 def test_create_session_with_db(murfey_db_session: SQLModelSession):
-    session_id = 10
+    visit_name = "cm23456-7"
     visit_end_time = "2026-10-01T11:13:00"
 
     # Set up a mock Murfey database session
@@ -59,8 +66,6 @@ def test_create_session_with_db(murfey_db_session: SQLModelSession):
     # Set up the backend server
     backend_server = set_up_test_backend_client(
         router=router,
-        session_id=session_id,
-        instrument_name=instrument_name,
         mock_db_session=mock_get_db_session,
     )
     # Construct the URL path to poke
@@ -82,10 +87,9 @@ def test_create_session_with_db(murfey_db_session: SQLModelSession):
 
     # Check that the database insert happened correctly
     murfey_session = murfey_db_session.exec(
-        select(MurfeyDB.Session).where(MurfeyDB.Session.id == session_id)
-    ).one_or_none()
+        select(MurfeyDB.Session).where(MurfeyDB.Session.visit == visit_name)
+    ).one()
     assert murfey_session is not None
-    assert murfey_session.id == session_id
     assert murfey_session.name == "Some string"
     assert murfey_session.visit_end_time == datetime.fromisoformat(visit_end_time)
 
