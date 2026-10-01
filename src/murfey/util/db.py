@@ -45,7 +45,7 @@ class RsyncInstance(SQLModel, table=True):  # type: ignore
 
 
 class Session(SQLModel, table=True):  # type: ignore
-    id: int = Field(primary_key=True)
+    id: int = Field(default=None, primary_key=True)
     name: str
     visit: str = Field(default="")
     started: bool = Field(default=False)
