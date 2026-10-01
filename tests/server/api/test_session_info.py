@@ -1,12 +1,110 @@
+from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from unittest.mock import MagicMock
 
 import pytest
+from fastapi import APIRouter, FastAPI
+from fastapi.testclient import TestClient
 from pytest_mock import MockerFixture
+from sqlmodel import Session as SQLModelSession, select
 
-from murfey.server.api.session_info import gather_upstream_files
+import murfey.util.db as MurfeyDB
+from murfey.server.api.auth import (
+    validate_frontend_session_access,
+    validate_token,
+    validate_user_instrument_access,
+)
+from murfey.server.api.session_info import gather_upstream_files, router
+from murfey.server.murfey_db import murfey_db_session
+from murfey.util.api import url_path_for
 from murfey.util.models import UpstreamFileRequestInfo
+from tests.conftest import ExampleVisit
+
+instrument_name = ExampleVisit.instrument_name
+
+
+def set_up_test_backend_client(
+    router: APIRouter,
+    session_id: int | None = None,
+    instrument_name: str | None = None,
+    mock_db_session: Callable | None = None,
+):
+    """
+    Helper function to set up a test backend server whose response can be inspected
+    to check that the endpoint function works as expected
+    """
+    # Set up the backend server
+    backend_app = FastAPI()
+
+    # Override validation and database dependencies as needed
+    backend_app.dependency_overrides[validate_token] = lambda: None
+    if instrument_name:
+        backend_app.dependency_overrides[validate_user_instrument_access] = (
+            lambda: instrument_name
+        )
+    if session_id:
+        backend_app.dependency_overrides[validate_frontend_session_access] = (
+            lambda: session_id
+        )
+    if mock_db_session:
+        backend_app.dependency_overrides[murfey_db_session] = mock_db_session
+
+    # Attach router, initiate object, and return it
+    backend_app.include_router(router)
+    return TestClient(backend_app)
+
+
+@pytest.mark.parametrize(
+    "test_params",
+    (  # Visit name | Session name | End time
+        ("cm23456-7", "Some string", "2026-10-01T11:13:00"),
+        ("cm34567-8", "New\r\nvisit", None),
+        ("cm45678-9", "New\nvisit", None),
+        ("cm56789-10", "", None),
+    ),
+)
+def test_create_session_with_db(
+    test_params: tuple[str, str, str | None], murfey_db_session: SQLModelSession
+):
+    visit_name, session_name, visit_end_time = test_params
+
+    # Set up a mock Murfey database session
+    def mock_get_db_session():
+        yield murfey_db_session
+
+    # Set up the backend server
+    backend_server = set_up_test_backend_client(
+        router=router,
+        instrument_name=instrument_name,
+        mock_db_session=mock_get_db_session,
+    )
+    # Construct the URL path to poke
+    backend_url_path = url_path_for(
+        "api.session_info.router",
+        "create_session",
+        instrument_name=instrument_name,
+    )
+    # Poke the backend
+    response = backend_server.post(
+        backend_url_path,
+        json={
+            "visit": visit_name,
+            "name": session_name,
+            "end_time": visit_end_time,
+        },
+    )
+    assert response.status_code == 200
+
+    # Check that the database insert happened correctly
+    murfey_session = murfey_db_session.exec(
+        select(MurfeyDB.Session).where(MurfeyDB.Session.visit == visit_name)
+    ).one()
+    assert murfey_session.name == session_name.replace("\r\n", "").replace("\n", "")
+    if visit_end_time is not None:
+        assert murfey_session.visit_end_time == datetime.fromisoformat(visit_end_time)
+    else:
+        assert murfey_session.visit_end_time is None
 
 
 @pytest.mark.parametrize(

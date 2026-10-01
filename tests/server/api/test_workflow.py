@@ -48,7 +48,7 @@ def test_register_dc_group_new_dcg(mock_transport, murfey_db_session: Session):
             "atlas_y_stage_position": None,
             "atlas_width": None,
             "atlas_height": None,
-            "microscope": "",
+            "microscope": ExampleVisit.instrument_name,
             "proposal_code": ExampleVisit.proposal_code,
             "proposal_number": str(ExampleVisit.proposal_number),
             "visit_number": str(ExampleVisit.visit_number),
@@ -275,7 +275,7 @@ def test_register_dc_group_new_dcg_old_atlas(
             "atlas_y_stage_position": None,
             "atlas_width": None,
             "atlas_height": None,
-            "microscope": "",
+            "microscope": ExampleVisit.instrument_name,
             "proposal_code": ExampleVisit.proposal_code,
             "proposal_number": str(ExampleVisit.proposal_number),
             "visit_number": str(ExampleVisit.visit_number),
@@ -353,7 +353,7 @@ def test_register_dc_group_new_atlas_with_searchmaps(
     """
     mock_transport.feedback_queue = "mock_feedback_queue"
     mock_machine_config.return_value = {
-        "": MachineConfig(acquisition_software=["tomo"])
+        ExampleVisit.instrument_name: MachineConfig(acquisition_software=["tomo"])
     }
 
     # Make sure dcg is present with an atlas id
@@ -464,7 +464,9 @@ def test_register_dc_group_new_atlas_with_sxt_roi(
     by adding an atlas, using the same tag, and also update sxt rois
     """
     mock_transport.feedback_queue = "mock_feedback_queue"
-    mock_machine_config.return_value = {"": MachineConfig(acquisition_software=["sxt"])}
+    mock_machine_config.return_value = {
+        ExampleVisit.instrument_name: MachineConfig(acquisition_software=["sxt"])
+    }
 
     # Make sure dcg is present with an atlas id
     dcg = DataCollectionGroup(
@@ -596,7 +598,7 @@ def test_register_dc_group_roi_update(
     """
     mock_transport.feedback_queue = "mock_feedback_queue"
     mock_machine_config.return_value = {
-        "": MachineConfig(acquisition_software=["tomo"])
+        ExampleVisit.instrument_name: MachineConfig(acquisition_software=["tomo"])
     }
 
     # Make sure dcg is present with an atlas id
