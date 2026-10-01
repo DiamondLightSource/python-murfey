@@ -55,9 +55,17 @@ def set_up_test_backend_client(
     return TestClient(backend_app)
 
 
-def test_create_session_with_db(murfey_db_session: SQLModelSession):
-    visit_name = "cm23456-7"
-    visit_end_time = "2026-10-01T11:13:00"
+@pytest.mark.parametrize(
+    "test_params",
+    (  # Visit name | Session name | End time
+        ("cm23456-7", "Some string", "2026-10-01T11:13:00"),
+        ("cm34567-8", "", None),
+    ),
+)
+def test_create_session_with_db(
+    test_params: tuple[str, str, str | None], murfey_db_session: SQLModelSession
+):
+    visit_name, session_name, visit_end_time = test_params
 
     # Set up a mock Murfey database session
     def mock_get_db_session():
@@ -80,7 +88,7 @@ def test_create_session_with_db(murfey_db_session: SQLModelSession):
         backend_url_path,
         json={
             "visit": visit_name,
-            "name": "Some string",
+            "name": session_name,
             "end_time": visit_end_time,
         },
     )
@@ -90,9 +98,11 @@ def test_create_session_with_db(murfey_db_session: SQLModelSession):
     murfey_session = murfey_db_session.exec(
         select(MurfeyDB.Session).where(MurfeyDB.Session.visit == visit_name)
     ).one()
-    assert murfey_session is not None
-    assert murfey_session.name == "Some string"
-    assert murfey_session.visit_end_time == datetime.fromisoformat(visit_end_time)
+    assert murfey_session.name == session_name
+    if visit_end_time is not None:
+        assert murfey_session.visit_end_time == datetime.fromisoformat(visit_end_time)
+    else:
+        assert murfey_session.visit_end_time is None
 
 
 @pytest.mark.parametrize(
