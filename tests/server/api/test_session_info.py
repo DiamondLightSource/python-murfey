@@ -72,7 +72,7 @@ def test_create_session_with_db(murfey_db_session: SQLModelSession):
     # Poke the backend
     response = backend_server.post(
         backend_url_path,
-        data={
+        json={
             "visit": visit_name,
             "name": "Some string",
             "end_time": visit_end_time,
