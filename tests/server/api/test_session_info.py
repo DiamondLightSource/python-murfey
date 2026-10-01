@@ -59,7 +59,9 @@ def set_up_test_backend_client(
     "test_params",
     (  # Visit name | Session name | End time
         ("cm23456-7", "Some string", "2026-10-01T11:13:00"),
-        ("cm34567-8", "", None),
+        ("cm34567-8", "New\r\nvisit", None),
+        ("cm45678-9", "New\nvisit", None),
+        ("cm56789-10", "", None),
     ),
 )
 def test_create_session_with_db(
@@ -98,7 +100,7 @@ def test_create_session_with_db(
     murfey_session = murfey_db_session.exec(
         select(MurfeyDB.Session).where(MurfeyDB.Session.visit == visit_name)
     ).one()
-    assert murfey_session.name == session_name
+    assert murfey_session.name == session_name.replace("\r\n", "").replace("\n", "")
     if visit_end_time is not None:
         assert murfey_session.visit_end_time == datetime.fromisoformat(visit_end_time)
     else:

@@ -175,8 +175,8 @@ def create_session(
     db: SQLModelSession = murfey_db,
 ) -> int:
     session = MurfeyDB.Session(
-        name=session_info.name,
-        visit=session_info.visit,
+        name=sanitise(session_info.name),
+        visit=sanitise(session_info.visit),
         instrument_name=instrument_name,
         visit_end_time=session_info.end_time,
     )
