@@ -133,10 +133,11 @@ def process_sxt_tilt_series(
 
             # Scaling from different pixel size of atlas and roi, and atlas thumbnail size
             x_pixel_location = int(
-                x_location_centered * 1024 / matching_roi.width + 512
+                x_location_centered * 1024 / matching_roi.width  # + 512
             )
             y_pixel_location = int(
                 512 - y_location_centered * 1024 / matching_roi.height
+                # 768 - y_location_centered / matching_roi.height * 768
             )
         else:
             logger.warning(

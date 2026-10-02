@@ -82,6 +82,7 @@ Documentation = "https://github.com/DiamondLightSource/python-murfey"
 GitHub = "https://github.com/DiamondLightSource/python-murfey"
 [project.scripts]
 "murfey.add_user" = "murfey.cli.add_user:run"
+"murfey.check_pipeliner_jobs" = "murfey.cli.check_pipeliner_jobs:run"
 "murfey.create_db" = "murfey.cli.create_db:run"
 "murfey.db_sql" = "murfey.cli.murfey_db_sql:run"
 "murfey.decrypt_password" = "murfey.cli.decrypt_db_password:run"
@@ -96,7 +97,6 @@ GitHub = "https://github.com/DiamondLightSource/python-murfey"
 "murfey.simulate" = "murfey.cli.dummy:run"
 "murfey.spa_inject" = "murfey.cli.inject_spa_processing:run"
 "murfey.transfer" = "murfey.cli.transfer:run"
-"murfey.check_pipeliner_jobs" = "murfey.cli.check_pipeliner_jobs:run"
 [project.entry-points."murfey.config.extraction"]
 "murfey_machine" = "murfey.util.config:get_extended_machine_config"
 [project.entry-points."murfey.contexts"]
@@ -124,6 +124,7 @@ TomographyMetadataContext = "murfey.client.contexts.tomo_metadata:TomographyMeta
 "picked_particles" = "murfey.workflows.spa.picking:particles_picked"
 "picked_tomogram" = "murfey.workflows.tomo.picking:picked_tomogram"
 "processing_job" = "murfey.workflows.register_processing_job:run"
+"run_class3d" = "murfey.workflows.spa.run_class3d:run_class3d"
 "spa.ctf_estimated" = "murfey.workflows.spa.ctf_estimation:ctf_estimated"
 "spa.flush_spa_preprocess" = "murfey.workflows.spa.flush_spa_preprocess:flush_spa_preprocess"
 "spa.motion_corrected" = "murfey.workflows.spa.motion_correction:motion_corrected"
