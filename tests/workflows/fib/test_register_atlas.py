@@ -32,8 +32,10 @@ def visit_dir(tmp_path: Path):
     return visit_dir
 
 
+@pytest.mark.parametrize("has_lamella", (True, False))
 def test_run_with_db(
     mocker: MockerFixture,
+    has_lamella: bool,
     visit_dir: Path,
     murfey_db_session: SQLModelSession,
     ispyb_db_session: SQLAlchemySession,
@@ -103,48 +105,53 @@ def test_run_with_db(
         for file in atlas_files
     ]
 
-    # Add a test lamella image to the database
-    lamella_metadata_dict = metadata.copy()
-    lamella_metadata_dict["file"] = (
-        visit_dir
-        / "autotem"
-        / visit_name
-        / "Sites"
-        / "Lamella"
-        / "LamellaEvaluationImages"
-        / "2026-04-30-15-11-43_drift_corrected_image_Polishing 2 - Electron Image.png"
-    )
-    lamella_metadata_dict["thumbnail_path"] = (
-        visit_dir
-        / "processed"
-        / visit_name
-        / f"grid_{slot_number}"
-        / "lamella_evaluation_images"
-        / "2026-04-30-15-11-43_polishing_2.png"
-    )
-    lamella_metadata_dict["lamella_number"] = 1
-    lamella_metadata_dict["len_x"] = 0.000900
-    lamella_metadata_dict["len_y"] = 0.000600
-    lamella_metadata_dict["pixel_size_x"] = (
-        lamella_metadata_dict["len_x"] / lamella_metadata_dict["pixels_x"]
-    )
-    lamella_metadata_dict["pixel_size_y"] = (
-        lamella_metadata_dict["len_y"] / lamella_metadata_dict["pixels_y"]
-    )
-    lamella_metadata = FIBImageMetadata(visit_name=visit_name, **lamella_metadata_dict)
+    # Construct test lamella metadata if needed
+    lamella_metadata_dict: dict[str, Any] = {}
+    if has_lamella:
+        lamella_metadata_dict = metadata.copy()
+        lamella_metadata_dict["file"] = (
+            visit_dir
+            / "autotem"
+            / visit_name
+            / "Sites"
+            / "Lamella"
+            / "LamellaEvaluationImages"
+            / "2026-04-30-15-11-43_drift_corrected_image_Polishing 2 - Electron Image.png"
+        )
+        lamella_metadata_dict["thumbnail_path"] = (
+            visit_dir
+            / "processed"
+            / visit_name
+            / f"grid_{slot_number}"
+            / "lamella_evaluation_images"
+            / "2026-04-30-15-11-43_polishing_2.png"
+        )
+        lamella_metadata_dict["lamella_number"] = 1
+        lamella_metadata_dict["len_x"] = 0.000900
+        lamella_metadata_dict["len_y"] = 0.000600
+        lamella_metadata_dict["pixel_size_x"] = (
+            lamella_metadata_dict["len_x"] / lamella_metadata_dict["pixels_x"]
+        )
+        lamella_metadata_dict["pixel_size_y"] = (
+            lamella_metadata_dict["len_y"] / lamella_metadata_dict["pixels_y"]
+        )
+        lamella_metadata = FIBImageMetadata(
+            visit_name=visit_name, **lamella_metadata_dict
+        )
 
-    lamella_site = MurfeyDB.ImagingSite(
-        session_id=session_id,
-        site_name=lamella_metadata.site_name,
-        data_type="grid_square",
-        dcg_name=mock_atlas_metadata[0].site_name,
-    )
-    lamella_site = populate_fib_imaging_site_entry(
-        lamella_site,
-        metadata=lamella_metadata,
-    )
+        # Create and populate the lamella entry
+        lamella_site = MurfeyDB.ImagingSite(
+            session_id=session_id,
+            site_name=lamella_metadata.site_name,
+            data_type="grid_square",
+            dcg_name=mock_atlas_metadata[0].site_name,
+        )
+        lamella_site = populate_fib_imaging_site_entry(
+            lamella_site,
+            metadata=lamella_metadata,
+        )
 
-    murfey_db_session.add(lamella_site)
+        murfey_db_session.add(lamella_site)
 
     # Commit all database changes
     murfey_db_session.commit()
@@ -239,25 +246,18 @@ def test_run_with_db(
     assert spy_register.call_count == len(atlas_files)
 
     # Murfey's ImagingSite table should have an entry
-    atlas = murfey_db_session.exec(
+    murfey_atlas = murfey_db_session.exec(
         sm_select(MurfeyDB.ImagingSite)
         .where(MurfeyDB.ImagingSite.session_id == session_id)
         .where(MurfeyDB.ImagingSite.data_type == "atlas")
     ).one()
-    assert atlas.image_path == str(mock_atlas_metadata[-1].file)
+    assert murfey_atlas.image_path == str(mock_atlas_metadata[-1].file)
 
     # Murfey's DataCollectionGroup table should have an entry
     murfey_dcg = murfey_db_session.exec(
         sm_select(MurfeyDB.DataCollectionGroup)
         .where(MurfeyDB.DataCollectionGroup.session_id == session_id)
         .where(MurfeyDB.DataCollectionGroup.tag == mock_atlas_metadata[-1].site_name)
-    ).one()
-
-    # Murfey's GridSquare table should have an entry
-    murfey_gs = murfey_db_session.exec(
-        sm_select(MurfeyDB.GridSquare)
-        .where(MurfeyDB.GridSquare.session_id == session_id)
-        .where(MurfeyDB.GridSquare.tag == mock_atlas_metadata[-1].site_name)
     ).one()
 
     # ISPyB's DataCollectionGroup table should have an entry
@@ -285,14 +285,39 @@ def test_run_with_db(
         f"atlas_{str(mock_atlas_metadata[-1].slot_number).zfill(2)}.png"
     )
 
-    # ISPyB's GridSquare table should have an entry
-    ispyb_gs = (
-        ispyb_db_session.execute(
-            sa_select(ISPyBDB.GridSquare).where(
-                ISPyBDB.GridSquare.gridSquareId == murfey_gs.id
+    # Different GridSquare verification logic depending on if there was a lamella image
+    murfey_gs = murfey_db_session.exec(
+        sm_select(MurfeyDB.GridSquare)
+        .where(MurfeyDB.GridSquare.session_id == session_id)
+        .where(MurfeyDB.GridSquare.tag == mock_atlas_metadata[-1].site_name)
+    ).one_or_none()
+    if has_lamella:
+        # Murfey's GridSquare table should have an entry
+        assert murfey_gs is not None
+
+        # ISPyB's GridSquare table should have an entry
+        ispyb_gs = (
+            ispyb_db_session.execute(
+                sa_select(ISPyBDB.GridSquare).where(
+                    ISPyBDB.GridSquare.gridSquareId == murfey_gs.id
+                )
             )
+            .scalars()
+            .one()
         )
-        .scalars()
-        .one()
-    )
-    assert ispyb_gs.gridSquareImage == str(lamella_metadata_dict["thumbnail_path"])
+        assert ispyb_gs.gridSquareImage == str(lamella_metadata_dict["thumbnail_path"])
+    else:
+        # Murfey's GridSquare table should be empty
+        assert murfey_gs is None
+
+        # ISPyB's GridSquare table should be empty
+        ispyb_gs = (
+            ispyb_db_session.execute(
+                sa_select(ISPyBDB.GridSquare).where(
+                    ISPyBDB.GridSquare.atlasId == ispyb_atlas.atlasId
+                )
+            )
+            .scalars()
+            .one_or_none()
+        )
+        assert ispyb_gs is None
