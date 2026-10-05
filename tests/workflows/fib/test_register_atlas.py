@@ -97,10 +97,10 @@ def test_run_with_db(
     mock_atlas_metadata = [
         FIBImageMetadata(
             visit_name=visit_name,
-            file=test_file,
+            file=file,
             **atlas_metadata_dict,
         )
-        for test_file in atlas_files
+        for file in atlas_files
     ]
 
     # Add a test lamella image to the database
@@ -131,7 +131,7 @@ def test_run_with_db(
     lamella_metadata_dict["pixel_size_y"] = (
         lamella_metadata_dict["len_y"] / lamella_metadata_dict["pixels_y"]
     )
-    lamella_metadata = FIBImageMetadata(**lamella_metadata_dict)
+    lamella_metadata = FIBImageMetadata(visit_name=visit_name, **lamella_metadata_dict)
 
     lamella_site = MurfeyDB.ImagingSite(
         session_id=session_id,
