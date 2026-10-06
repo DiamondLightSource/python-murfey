@@ -180,6 +180,7 @@ def create_session(
 
     # For 'name' (human-readable description), keep:
     # - alphanumerics
+    # - spaces
     # - hyphens
     # - underscores
     # - forward slashes
