@@ -57,17 +57,24 @@ def set_up_test_backend_client(
 
 @pytest.mark.parametrize(
     "test_params",
-    (  # Visit name | Session name | End time
-        ("cm23456-7", "Some string", "2026-10-01T11:13:00"),
-        ("cm34567-8", "New\r\nvisit", None),
-        ("cm45678-9", "New\nvisit", None),
-        ("cm56789-10", "", None),
+    (  # Visit name | Cleaned visit | Session name | Cleaned name | End time
+        ("cm23456-7", "cm23456-7", "Some string", "Some string", "2026-10-01T11:13:00"),
+        ("cm34567-8", "cm34567-8", "New\r\n visit", "New visit", None),
+        ("cm45678-9", "cm45678-9", "New\n visit", "New visit", None),
+        (
+            "a[s]d<f>g!h@j#k$l%^&*()+|`~",
+            "asdfghjkl",
+            "Quick; {brown} \\f\\o\\x (jumps) [over] 'lazy' $dog$",
+            "Quick brown fox (jumps) [over] 'lazy' dog",
+            None,
+        ),
     ),
 )
 def test_create_session_with_db(
-    test_params: tuple[str, str, str | None], murfey_db_session: SQLModelSession
+    test_params: tuple[str, str, str, str, str | None],
+    murfey_db_session: SQLModelSession,
 ):
-    visit_name, session_name, visit_end_time = test_params
+    visit_name, visit_clean, session_name, name_clean, visit_end_time = test_params
 
     # Set up a mock Murfey database session
     def mock_get_db_session():
@@ -98,9 +105,9 @@ def test_create_session_with_db(
 
     # Check that the database insert happened correctly
     murfey_session = murfey_db_session.exec(
-        select(MurfeyDB.Session).where(MurfeyDB.Session.visit == visit_name)
+        select(MurfeyDB.Session).where(MurfeyDB.Session.visit == visit_clean)
     ).one()
-    assert murfey_session.name == session_name.replace("\r\n", "").replace("\n", "")
+    assert murfey_session.name == name_clean
     if visit_end_time is not None:
         assert murfey_session.visit_end_time == datetime.fromisoformat(visit_end_time)
     else:
