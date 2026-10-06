@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 from logging import getLogger
 from pathlib import Path
@@ -163,8 +164,8 @@ async def get_sessions(db: SQLModelSession = murfey_db):
 
 
 class NewSessionInfo(BaseModel):
-    visit: str
-    name: str
+    visit: str  # Alphanumeric hyphenated code
+    name: str  # Human-readable description
     end_time: datetime | None = None
 
 
@@ -174,9 +175,30 @@ def create_session(
     session_info: NewSessionInfo,
     db: SQLModelSession = murfey_db,
 ) -> int:
+    # For 'visit', keep only alphanumerics, hyphens, and underscores
+    visit_cleaned = re.sub(r"[^A-Za-z0-9_-]", "", sanitise(session_info.visit))
+
+    # For 'name' (human-readable description), keep:
+    # - alphanumerics
+    # - hyphens
+    # - underscores
+    # - forward slashes
+    # - round and square brackets
+    # - periods
+    # - commas
+    # - ampersands
+    # - pluses
+    # - single/double quotes
+    name_cleaned = re.sub(
+        r'[^\w\s\-/()\[\].,&+\'"]',
+        "",
+        sanitise(session_info.name),
+    )
+
+    # Add to database
     session = MurfeyDB.Session(
-        name=sanitise(session_info.name),
-        visit=sanitise(session_info.visit),
+        name=name_cleaned,
+        visit=visit_cleaned,
         instrument_name=instrument_name,
         visit_end_time=session_info.end_time,
     )
@@ -184,6 +206,7 @@ def create_session(
     db.commit()
     session_id = session.id
 
+    # Add a Prometheus label for the session if an end time is set
     if session_info.end_time:
         prom.alert_end_time.labels(visit=session_info.visit).set(
             session_info.end_time.timestamp()
