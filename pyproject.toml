@@ -65,8 +65,7 @@ server = [
     "passlib",
     "pillow",
     "prometheus_client",
-    "psycopg2-binary",
-    "sqlalchemy[postgresql]", # Add as explicit dependency
+    "sqlalchemy[postgresql]>=2.1.0",
     "sqlmodel",
     "stomp-py>8.1.1", # 8.1.1 (released 2024-04-06) doesn't work with our project
     "zocalo>=1",
