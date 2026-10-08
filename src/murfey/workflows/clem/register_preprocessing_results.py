@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import json
 import logging
-import traceback
 from collections.abc import Collection
 from functools import cached_property
 from importlib.metadata import entry_points
@@ -557,162 +556,100 @@ def _register_grid_square(
 def run(message: dict, murfey_db: Session) -> dict[str, bool]:
     # Early exit if no TransportManager object is configured
     if not murfey.server._transport_object:
-        logger.error("No TransportManager object was set up")
-        return {"success": False, "requeue": False}
+        raise RuntimeError("No TransportManager object was set up")
 
     # Parse the incoming message
-    try:
-        session_id = int(message["session_id"])
-        if isinstance(message["result"], str):
-            json_obj: dict = json.loads(message["result"])
-            result = CLEMPreprocessingResult(**json_obj)
-        elif isinstance(message["result"], dict):
-            result = CLEMPreprocessingResult(**message["result"])
-        else:
-            logger.error(
-                f"Invalid type for TIFF preprocessing result: {type(message['result'])}"
-            )
-            return {"success": False, "requeue": False}
-    except Exception:
-        logger.error(
-            "Exception encountered when parsing TIFF preprocessing result: \n"
-            f"{traceback.format_exc()}"
+    session_id = int(message["session_id"])
+    if isinstance(message["result"], str):
+        json_obj: dict = json.loads(message["result"])
+        result = CLEMPreprocessingResult(**json_obj)
+    elif isinstance(message["result"], dict):
+        result = CLEMPreprocessingResult(**message["result"])
+    else:
+        raise ValueError(
+            f"Invalid type for TIFF preprocessing result: {type(message['result'])}"
         )
 
     # Check that output files were included
     if not result.output_files:
-        logger.error("No files were provided in the incoming message")
-        return {"success": False, "requeue": False}
+        raise ValueError("No files were provided in the incoming message")
 
-    # Outer try-finally block for tidying up database-related section of function
-    try:
-        try:
-            # Load current session from database
-            murfey_session = murfey_db.exec(
-                select(MurfeyDB.Session).where(MurfeyDB.Session.id == session_id)
-            ).one()
-            instrument_name = murfey_session.instrument_name
-            visit_name = murfey_session.visit
-        except Exception:
-            logger.error(
-                "Exception encountered when loading Murfey session information: \n",
-                f"{traceback.format_exc()}",
-            )
-            return {"success": False, "requeue": False}
-        try:
-            # Register items in Murfey database
-            clem_img_site = _register_clem_imaging_site(
-                session_id=session_id,
-                result=result,
-                murfey_db=murfey_db,
-            )
-        except Exception:
-            logger.error(
-                "Exception encountered when registering CLEM preprocessing result for "
-                f"{result.series_name!r}: \n"
-                f"{traceback.format_exc()}"
-            )
-            return {"success": False, "requeue": False}
-        try:
-            # Register data collection group and atlas in ISPyB
-            _register_dcg_and_atlas(
-                session_id=session_id,
-                instrument_name=instrument_name,
-                visit_name=visit_name,
-                imaging_site=clem_img_site,
-                murfey_db=murfey_db,
-            )
-        except Exception:
-            # Log error but allow workflow to proceed
-            logger.error(
-                "Exception encountered when registering data collection group for CLEM workflow "
-                f"using {result.series_name!r}: \n"
-                f"{traceback.format_exc()}"
-            )
+    # Load current session from database
+    murfey_session = murfey_db.exec(
+        select(MurfeyDB.Session).where(MurfeyDB.Session.id == session_id)
+    ).one()
+    instrument_name = murfey_session.instrument_name
+    visit_name = murfey_session.visit
 
-        try:
-            # Register CLEM image series as grid squares
-            _register_grid_square(
-                session_id=session_id,
-                imaging_site=clem_img_site,
-                murfey_db=murfey_db,
-            )
-        except Exception:
-            # Log error but allow workflow to proceed
-            logger.error(
-                f"Exception encountered when registering grid square for {result.series_name}: \n"
-                f"{traceback.format_exc()}"
-            )
+    # Register items in Murfey database
+    clem_img_site = _register_clem_imaging_site(
+        session_id=session_id,
+        result=result,
+        murfey_db=murfey_db,
+    )
 
-        # Construct list of files to use for image alignment and merging steps
-        image_combos_to_process = [
-            list(result.output_files.values())  # Composite image of all channels
-        ]
-        if ("gray" in result.output_files.keys()) and len(result.output_files) > 1:
-            # Create additional fluorescent-only composite image
-            image_combos_to_process.append(
-                [
-                    file
-                    for channel, file in result.output_files.items()
-                    if channel != "gray"
-                ]
-            )
-            # Create additional bright field-only image
-            image_combos_to_process.append(
-                [
-                    file
-                    for channel, file in result.output_files.items()
-                    if channel == "gray"
-                ]
-            )
+    # Register data collection group and atlas in ISPyB
+    _register_dcg_and_atlas(
+        session_id=session_id,
+        instrument_name=instrument_name,
+        visit_name=visit_name,
+        imaging_site=clem_img_site,
+        murfey_db=murfey_db,
+    )
 
-        # Request for image alignment and processing for the requested combinations
-        try:
-            ref_file = list(result.output_files.values())[0]
-            visit_idx = ref_file.parts.index(visit_name)
-            visit_dir = Path(
-                "/".join(
-                    ""
-                    if part == "/"  # Replace root "/" with "" for Linux paths
-                    else part
-                    for part in ref_file.parts[: visit_idx + 1]
-                )
-            )
-        except Exception:
-            logger.error("Could not construct visit directory", exc_info=True)
-            return {"success": False, "requeue": False}
-        for image_combo in image_combos_to_process:
-            try:
-                murfey.server._transport_object.send(
-                    "processing_recipe",
-                    {
-                        "recipes": ["clem-align-and-merge"],
-                        "parameters": {
-                            # Job parameters
-                            "series_name": result.series_name,
-                            "images": [str(file) for file in image_combo],
-                            "metadata": str(result.metadata),
-                            # Other recipe parameters
-                            "session_dir": str(visit_dir),
-                            "session_id": session_id,
-                            "job_name": result.series_name,
-                            "feedback_queue": murfey.server._transport_object.feedback_queue,
-                        },
-                    },
-                    new_connection=True,
-                )
-            except Exception:
-                logger.error(
-                    "Error requesting image alignment and merging job for "
-                    f"{result.series_name!r} series",
-                    exc_info=True,
-                )
-                return {"success": False, "requeue": False}
-        logger.info(
-            "Successfully requested image alignment and merging job for "
-            f"{result.series_name!r} series"
+    # Register CLEM image series as grid squares
+    _register_grid_square(
+        session_id=session_id,
+        imaging_site=clem_img_site,
+        murfey_db=murfey_db,
+    )
+
+    # Construct list of files to use for image alignment and merging steps
+    image_combos_to_process = [
+        list(result.output_files.values())  # Composite image of all channels
+    ]
+    if ("gray" in result.output_files.keys()) and len(result.output_files) > 1:
+        # Create additional fluorescent-only composite image
+        image_combos_to_process.append(
+            [file for channel, file in result.output_files.items() if channel != "gray"]
         )
-        return {"success": True}
+        # Create additional bright field-only image
+        image_combos_to_process.append(
+            [file for channel, file in result.output_files.items() if channel == "gray"]
+        )
 
-    finally:
-        murfey_db.close()
+    # Request for image alignment and processing for the requested combinations
+    ref_file = list(result.output_files.values())[0]
+    visit_idx = ref_file.parts.index(visit_name)
+    visit_dir = Path(
+        "/".join(
+            ""
+            if part == "/"  # Replace root "/" with "" for Linux paths
+            else part
+            for part in ref_file.parts[: visit_idx + 1]
+        )
+    )
+    for image_combo in image_combos_to_process:
+        murfey.server._transport_object.send(
+            "processing_recipe",
+            {
+                "recipes": ["clem-align-and-merge"],
+                "parameters": {
+                    # Job parameters
+                    "series_name": result.series_name,
+                    "images": [str(file) for file in image_combo],
+                    "metadata": str(result.metadata),
+                    # Other recipe parameters
+                    "session_dir": str(visit_dir),
+                    "session_id": session_id,
+                    "job_name": result.series_name,
+                    "feedback_queue": murfey.server._transport_object.feedback_queue,
+                },
+            },
+            new_connection=True,
+        )
+    logger.info(
+        "Successfully requested image alignment and merging job for "
+        f"{result.series_name!r} series"
+    )
+    return {"success": True}
