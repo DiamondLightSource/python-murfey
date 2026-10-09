@@ -55,6 +55,12 @@ class Session(SQLModel, table=True):  # type: ignore
     visit_end_time: Optional[datetime] = Field(
         default=None, sa_type=DateTime(timezone=False)
     )
+    last_active: Optional[datetime] = Field(
+        default=None, sa_type=DateTime(timezone=False)
+    )
+
+    # Relationships
+    # -------------
     smartem_acquisition_uuid: str | None = Field(default=None)
 
     # Image sites associated with this session
