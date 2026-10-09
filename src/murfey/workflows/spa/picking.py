@@ -58,7 +58,9 @@ def _register_picked_particles_use_diameter(message: dict, _db: Session):
     # Add this message to the table of seen messages
     params_to_forward = message.get("extraction_parameters")
     assert isinstance(params_to_forward, dict)
-    pj_id = _pj_id(message["program_id"], _db)
+
+    program_id = int(message["program_id"])
+    pj_id = _pj_id(program_id, _db)
     ctf_params = CtfParameters(
         pj_id=pj_id,
         micrographs_file=params_to_forward["micrographs_file"],
@@ -133,7 +135,7 @@ def _register_picked_particles_use_diameter(message: dict, _db: Session):
                         "node_creator_queue": machine_config.node_creator_queue,
                         "session_id": message["session_id"],
                         "autoproc_program_id": _app_id(
-                            _pj_id(message["program_id"], _db, recipe="em-spa-extract"),
+                            _pj_id(program_id, _db, recipe="em-spa-extract"),
                             _db,
                         ),
                         "batch_size": default_spa_parameters.batch_size_2d,
@@ -174,7 +176,7 @@ def _register_picked_particles_use_diameter(message: dict, _db: Session):
                     "node_creator_queue": machine_config.node_creator_queue,
                     "session_id": message["session_id"],
                     "autoproc_program_id": _app_id(
-                        _pj_id(message["program_id"], _db, recipe="em-spa-extract"), _db
+                        _pj_id(program_id, _db, recipe="em-spa-extract"), _db
                     ),
                     "batch_size": default_spa_parameters.batch_size_2d,
                 },
@@ -213,7 +215,8 @@ def _register_picked_particles_use_boxsize(message: dict, _db: Session):
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
-    pj_id = _pj_id(message["program_id"], _db)
+    program_id = int(message["program_id"])
+    pj_id = _pj_id(program_id, _db)
     ctf_params = CtfParameters(
         pj_id=pj_id,
         micrographs_file=params_to_forward["micrographs_file"],
@@ -256,7 +259,7 @@ def _register_picked_particles_use_boxsize(message: dict, _db: Session):
             "node_creator_queue": machine_config.node_creator_queue,
             "session_id": message["session_id"],
             "autoproc_program_id": _app_id(
-                _pj_id(message["program_id"], _db, recipe="em-spa-extract"), _db
+                _pj_id(program_id, _db, recipe="em-spa-extract"), _db
             ),
             "batch_size": default_spa_parameters.batch_size_2d,
         },
@@ -299,11 +302,12 @@ def _request_email(
 
 
 def _check_notifications(message: dict, murfey_db: Session) -> None:
+    program_id = int(message["program_id"])
     data_collection_hierarchy = murfey_db.exec(
         select(DataCollection, ProcessingJob, AutoProcProgram)
         .where(ProcessingJob.dc_id == DataCollection.id)
         .where(AutoProcProgram.pj_id == ProcessingJob.id)
-        .where(AutoProcProgram.id == message["program_id"])
+        .where(AutoProcProgram.id == program_id)
     ).all()
     dcgid = data_collection_hierarchy[0][0].dcg_id
     notification_parameters = murfey_db.exec(
@@ -466,18 +470,16 @@ def particles_picked(message: dict, murfey_db: Session) -> dict[str, bool]:
                 "Failed to emit particle picking complete event to smartem",
                 exc_info=True,
             )
+    program_id = int(message["program_id"])
     feedback_params = murfey_db.exec(
         select(ClassificationFeedbackParameters).where(
-            ClassificationFeedbackParameters.pj_id
-            == _pj_id(message["program_id"], murfey_db)
+            ClassificationFeedbackParameters.pj_id == _pj_id(program_id, murfey_db)
         )
     ).one()
     if feedback_params.estimate_particle_diameter:
         _register_picked_particles_use_diameter(message, murfey_db)
     else:
         _register_picked_particles_use_boxsize(message, murfey_db)
-    prom.preprocessed_movies.labels(
-        processing_job=_pj_id(message["program_id"], murfey_db)
-    ).inc()
+    prom.preprocessed_movies.labels(processing_job=_pj_id(program_id, murfey_db)).inc()
     _check_notifications(message, murfey_db)
     return {"success": True}

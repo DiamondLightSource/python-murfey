@@ -52,9 +52,8 @@ def _ids_tomo_classification(
 def _register_picked_tomogram_use_diameter(message: dict, murfey_db: Session):
     """Received picked particles from the tomogram autopick service"""
     # Add this message to the table of seen messages
-    dcg_id, pj_id = _ids_tomo_classification(
-        message["program_id"], "em-tomo-class2d", murfey_db
-    )
+    program_id = int(message["program_id"])
+    dcg_id, pj_id = _ids_tomo_classification(program_id, "em-tomo-class2d", murfey_db)
 
     pick_params = TomogramPicks(
         pj_id=pj_id,
