@@ -2006,6 +2006,13 @@ def feedback_callback(
                 ).one()
                 session_id = collected_ids[0].session_id
 
+                # Update the 'last_active' column for the associated Murfey session
+                murfey_session = _db.exec(
+                    select(db.Session).where(db.Session.id == session_id)
+                ).one()
+                murfey_session.last_active = datetime.now()
+                _db.add(murfey_session)
+
                 # Find the autoprocprogram id for the alignment recipe
                 alignment_ids = _db.exec(
                     select(
@@ -2035,11 +2042,7 @@ def feedback_callback(
                     and not relevant_tilt_series.processing_requested
                     and relevant_tilt_series.tilt_series_length > 2
                 ):
-                    instrument_name = (
-                        _db.exec(select(db.Session).where(db.Session.id == session_id))
-                        .one()
-                        .instrument_name
-                    )
+                    instrument_name = murfey_session.instrument_name
                     machine_config = get_machine_config(
                         instrument_name=instrument_name
                     )[instrument_name]
