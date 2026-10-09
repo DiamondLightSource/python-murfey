@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime
 from logging import getLogger
 from typing import List
 
@@ -388,6 +389,13 @@ def _check_notifications(message: dict, murfey_db: Session) -> None:
 
 
 def particles_picked(message: dict, murfey_db: Session) -> dict[str, bool]:
+    # Update the last_active' column for the session
+    session = murfey_db.exec(
+        select(MurfeySession).where(MurfeySession.id == message["session_id"])
+    ).one()
+    session.last_active = datetime.now()
+    murfey_db.add(session)
+
     movie = murfey_db.exec(
         select(Movie).where(Movie.murfey_id == message["motion_correction_id"])
     ).one()
@@ -396,9 +404,6 @@ def particles_picked(message: dict, murfey_db: Session) -> dict[str, bool]:
     murfey_db.commit()
     if SMARTEM_ACTIVE and movie.smartem_uuid:
         try:
-            session = murfey_db.exec(
-                select(MurfeySession).where(MurfeySession.id == message["session_id"])
-            ).one()
             machine_config = get_machine_config(
                 instrument_name=session.instrument_name
             )[session.instrument_name]
