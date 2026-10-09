@@ -306,7 +306,7 @@ Fixtures for setting up test Murfey database
 def murfey_db_url():
     try:
         return (
-            f"postgresql+psycopg2://{os.environ['POSTGRES_USER']}:{os.environ['POSTGRES_PASSWORD']}"
+            f"postgresql://{os.environ['POSTGRES_USER']}:{os.environ['POSTGRES_PASSWORD']}"
             f"@{os.environ['POSTGRES_HOST']}:{os.environ['POSTGRES_PORT']}/{os.environ['POSTGRES_DB']}"
         )
     # Skip Murfey database-related tests if the environment for it hasn't been set up
