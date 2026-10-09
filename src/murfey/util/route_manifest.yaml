@@ -507,6 +507,15 @@ murfey.server.api.hub.router:
         type: str
     methods:
       - GET
+  - path: /instrument/{instrument_name}/mag/{mag}/shifts
+    function: get_instrument_mag_image_shift
+    path_params:
+      - name: instrument_name
+        type: str
+      - name: mag
+        type: int
+    methods:
+      - GET
 murfey.server.api.instrument.router:
   - path: /instrument_server/instruments/{instrument_name}/sessions/{session_id}/activate_instrument_server
     function: activate_instrument_server_for_session
