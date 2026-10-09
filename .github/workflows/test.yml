@@ -3,10 +3,11 @@ name: Build and test
 on: [push]
 
 env:
-  ISPYB_DATABASE_SCHEMA: 5.1.0
+  ISPYB_DATABASE_SCHEMA: 5.2.0
   # Installs from GitHub
   # Versions: https://github.com/DiamondLightSource/ispyb-database/tags
   # Previous version(s):
+  # 5.1.0
   # 4.11.0
   # 4.8.0
   # 4.2.1 # released 2024-08-19
