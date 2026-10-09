@@ -41,7 +41,7 @@ def url(security_config: Security | None = None) -> str:
         return f"sqlite:///{creds['database']}"
     f = Fernet(security_config.crypto_key.encode("ascii"))
     p = f.decrypt(creds["password"].encode("ascii"))
-    return f"postgresql+psycopg2://{creds['username']}:{p.decode()}@{creds['host']}:{creds['port']}/{creds['database']}"
+    return f"postgresql://{creds['username']}:{p.decode()}@{creds['host']}:{creds['port']}/{creds['database']}"
 
 
 def get_murfey_db_session(
