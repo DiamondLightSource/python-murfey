@@ -5,8 +5,8 @@ import ispyb.sqlalchemy._auto_db_schema as ISPyBDB
 from sqlmodel import select
 from sqlmodel.orm.session import Session as SQLModelSession
 
-import murfey.util.db as MurfeyDB
 import murfey.server
+import murfey.util.db as MurfeyDB
 from murfey.server.ispyb import ISPyBSession, get_session_id
 from murfey.util import sanitise
 
@@ -21,7 +21,7 @@ def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
 
     logger.info(f"Registering the following data collection: \n{message}")
 
-    murfey_session_id = message["session_id"]
+    murfey_session_id = int(message["session_id"])
     ispyb_session_id = get_session_id(
         microscope=message["microscope"],
         proposal_code=message["proposal_code"],

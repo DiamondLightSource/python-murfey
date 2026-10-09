@@ -59,6 +59,7 @@ def _register_picked_particles_use_diameter(message: dict, _db: Session):
     params_to_forward = message.get("extraction_parameters")
     assert isinstance(params_to_forward, dict)
 
+    session_id = int(message["session_id"])
     program_id = int(message["program_id"])
     pj_id = _pj_id(program_id, _db)
     ctf_params = CtfParameters(
@@ -83,9 +84,7 @@ def _register_picked_particles_use_diameter(message: dict, _db: Session):
     if picking_db_len > default_spa_parameters.nr_picks_before_diameter:
         # If there are enough particles to get a diameter
         instrument_name = (
-            _db.exec(
-                select(MurfeySession).where(MurfeySession.id == message["session_id"])
-            )
+            _db.exec(select(MurfeySession).where(MurfeySession.id == session_id))
             .one()
             .instrument_name
         )
@@ -133,7 +132,7 @@ def _register_picked_particles_use_diameter(message: dict, _db: Session):
                         "downscale": relion_options["downscale"],
                         "kv": relion_options["voltage"],
                         "node_creator_queue": machine_config.node_creator_queue,
-                        "session_id": message["session_id"],
+                        "session_id": session_id,
                         "autoproc_program_id": _app_id(
                             _pj_id(program_id, _db, recipe="em-spa-extract"),
                             _db,
@@ -174,7 +173,7 @@ def _register_picked_particles_use_diameter(message: dict, _db: Session):
                     "downscale": relion_options["downscale"],
                     "kv": relion_options["voltage"],
                     "node_creator_queue": machine_config.node_creator_queue,
-                    "session_id": message["session_id"],
+                    "session_id": session_id,
                     "autoproc_program_id": _app_id(
                         _pj_id(program_id, _db, recipe="em-spa-extract"), _db
                     ),
@@ -207,8 +206,9 @@ def _register_picked_particles_use_boxsize(message: dict, _db: Session):
     params_to_forward = message.get("extraction_parameters")
     assert isinstance(params_to_forward, dict)
 
+    session_id = int(message["session_id"])
     instrument_name = (
-        _db.exec(select(MurfeySession).where(MurfeySession.id == message["session_id"]))
+        _db.exec(select(MurfeySession).where(MurfeySession.id == session_id))
         .one()
         .instrument_name
     )
@@ -257,7 +257,7 @@ def _register_picked_particles_use_boxsize(message: dict, _db: Session):
             "downscale": relion_params.downscale,
             "kv": relion_params.voltage,
             "node_creator_queue": machine_config.node_creator_queue,
-            "session_id": message["session_id"],
+            "session_id": session_id,
             "autoproc_program_id": _app_id(
                 _pj_id(program_id, _db, recipe="em-spa-extract"), _db
             ),
@@ -302,6 +302,7 @@ def _request_email(
 
 
 def _check_notifications(message: dict, murfey_db: Session) -> None:
+    session_id = int(message["session_id"])
     program_id = int(message["program_id"])
     data_collection_hierarchy = murfey_db.exec(
         select(DataCollection, ProcessingJob, AutoProcProgram)
@@ -388,14 +389,15 @@ def _check_notifications(message: dict, murfey_db: Session) -> None:
             "Requested email notification for the following abnormal parameters: \n"
             f"{', '.join([f'{p}' for p in failures])}"
         )
-        _request_email(failures, dcgid, message["session_id"], murfey_db)
+        _request_email(failures, dcgid, session_id, murfey_db)
     return None
 
 
 def particles_picked(message: dict, murfey_db: Session) -> dict[str, bool]:
     # Update the last_active' column for the session
+    session_id = int(message["session_id"])
     session = murfey_db.exec(
-        select(MurfeySession).where(MurfeySession.id == message["session_id"])
+        select(MurfeySession).where(MurfeySession.id == session_id)
     ).one()
     session.last_active = datetime.now()
     murfey_db.add(session)

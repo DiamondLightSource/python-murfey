@@ -302,7 +302,7 @@ def _flush_position_analysis(
 
 
 def flush_spa_preprocess(message: dict, murfey_db: Session) -> dict[str, bool]:
-    session_id = message["session_id"]
+    session_id = int(message["session_id"])
     stashed_files = murfey_db.exec(
         select(PreprocessStash)
         .where(PreprocessStash.session_id == session_id)
@@ -312,7 +312,7 @@ def flush_spa_preprocess(message: dict, murfey_db: Session) -> dict[str, bool]:
         return {"success": True}
 
     murfey_session = murfey_db.exec(
-        select(MurfeySession).where(MurfeySession.id == message["session_id"])
+        select(MurfeySession).where(MurfeySession.id == session_id)
     ).one()
     machine_config = get_machine_config(instrument_name=murfey_session.instrument_name)[
         murfey_session.instrument_name

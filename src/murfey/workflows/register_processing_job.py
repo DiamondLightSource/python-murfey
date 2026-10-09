@@ -5,9 +5,9 @@ import ispyb.sqlalchemy._auto_db_schema as ISPyBDB
 from sqlmodel import select
 from sqlmodel.orm.session import Session as SQLModelSession
 
+import murfey.server
 import murfey.server.prometheus as prom
 import murfey.util.db as MurfeyDB
-import murfey.server
 from murfey.server.ispyb import ISPyBSession
 from murfey.util import sanitise
 
@@ -22,7 +22,7 @@ def run(message: dict, murfey_db: SQLModelSession):
 
     logger.info(f"Registering the following processing job: \n{message}")
 
-    murfey_session_id = message["session_id"]
+    murfey_session_id = int(message["session_id"])
     dc = murfey_db.exec(
         select(MurfeyDB.DataCollection, MurfeyDB.DataCollectionGroup)
         .where(MurfeyDB.DataCollection.dcg_id == MurfeyDB.DataCollectionGroup.id)
@@ -86,9 +86,9 @@ def run(message: dict, murfey_db: SQLModelSession):
             record = ISPyBDB.AutoProcProgram(
                 processingJobId=pid, processingStartTime=datetime.now()
             )
-            appid = murfey.server._transport_object.do_update_processing_status(record).get(
-                "return_value", None
-            )
+            appid = murfey.server._transport_object.do_update_processing_status(
+                record
+            ).get("return_value", None)
             if appid is None:
                 return {"success": False, "requeue": True}
             murfey_app = MurfeyDB.AutoProcProgram(id=appid, pj_id=pid)

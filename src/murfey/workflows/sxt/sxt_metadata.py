@@ -130,7 +130,7 @@ def register_sxt_roi(
 
 def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
     return register_sxt_roi(
-        message["session_id"],
+        int(message["session_id"]),
         message["roi_name"],
         SearchMapParameters(**message["roi_info"]),
         murfey_db,

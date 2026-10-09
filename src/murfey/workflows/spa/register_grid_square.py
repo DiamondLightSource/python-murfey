@@ -218,7 +218,7 @@ def register_grid_square(
 
 def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
     return register_grid_square(
-        message["session_id"],
+        int(message["session_id"]),
         message["gsid"],
         GridSquareParameters(**message["grid_square_params"]),
         murfey_db,
