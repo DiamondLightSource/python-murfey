@@ -51,12 +51,12 @@ def _read_counter(pipeline_dir) -> int:
         return project.job_counter
 
 
-def test_reserve_advances_counter_and_returns_base(feedback, tmp_path):
+def test_reserve_advances_counter_and_returns_first(feedback, tmp_path):
     _make_pipeline(tmp_path, job_counter=12)
 
     base = feedback._reserve_pipeline_job_numbers(str(tmp_path), 3, 1)
 
-    assert base == 15
+    assert base == 12
     # The counter is consumed now, not when the job later registers.
     assert _read_counter(tmp_path) == 15
 
@@ -67,8 +67,8 @@ def test_reserve_blocks_are_contiguous_and_non_overlapping(feedback, tmp_path):
     first = feedback._reserve_pipeline_job_numbers(str(tmp_path), 2, 1)
     second = feedback._reserve_pipeline_job_numbers(str(tmp_path), 2, 1)
 
-    assert first == 14
-    assert second == 16  # strictly after the first block — never reused
+    assert first == 12
+    assert second == 14  # strictly after the first block — never reused
     assert _read_counter(tmp_path) == 16
 
 
@@ -79,16 +79,16 @@ def test_reserve_floors_at_input(feedback, tmp_path):
 
     base = feedback._reserve_pipeline_job_numbers(str(tmp_path), 2, 7)
 
-    assert base == 9
+    assert base == 7
     assert _read_counter(tmp_path) == 9
 
 
 def test_reserve_missing_pipeline_falls_back_without_creating(feedback, tmp_path):
     base = feedback._reserve_pipeline_job_numbers(
-        str(tmp_path), 2, feedback.FIRST_FEEDBACK_JOB
+        str(tmp_path), 2, feedback._first_feedback_job()
     )
 
-    assert base == feedback.FIRST_FEEDBACK_JOB + 2
+    assert base == feedback._first_feedback_job()
     assert not (tmp_path / "default_pipeline.star").exists()
 
 
@@ -124,19 +124,21 @@ def test_reserve_2d_classification_block(
     ):
         # First batch reserves Class2D (+IceBreaker) + autoselect + shared combine.
         base1 = feedback._reserve_2d_classification_jobs(str(tmp_path), fp)
-        assert base1 == 10
+        assert base1.class2d == 10
+        assert base1.autoselect == 10 + (2 if icebreaker else 1)
         assert fp.next_job == 10 + first_block
         assert fp.star_combination_job == 10 + combine_offset
         assert _read_counter(tmp_path) == 10 + first_block
 
         # select_classes places autoselect at class2d + (2 if icebreaker else 1),
         # which must equal combine - 1 so the layout stays contiguous.
-        autoselect = base1 + (2 if icebreaker else 1)
+        autoselect = base1.class2d + (2 if icebreaker else 1)
         assert autoselect == fp.star_combination_job - 1
 
         # Second batch: combine already exists (shared) → only Class2D + autoselect.
         combine_before = fp.star_combination_job
         base2 = feedback._reserve_2d_classification_jobs(str(tmp_path), fp)
-        assert base2 == 10 + first_block  # strictly after the first block
+        assert base2.class2d == 10 + first_block  # strictly after the first block
+        assert base2.autoselect == 10 + first_block + (2 if icebreaker else 1)
         assert fp.star_combination_job == combine_before  # combine unchanged
-        assert _read_counter(tmp_path) == base2 + subsequent_block
+        assert _read_counter(tmp_path) == base2.class2d + subsequent_block
