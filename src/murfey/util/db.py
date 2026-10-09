@@ -26,6 +26,13 @@ class MagnificationLookup(SQLModel, table=True):  # type: ignore
     pixel_size: float = Field(primary_key=True)
 
 
+class MagnificationImageShift(SQLModel, table=True):  # type: ignore
+    magnification: int = Field(primary_key=True)
+    instrument_name: str = Field(primary_key=True)
+    x_shift: float  # in microns
+    y_shift: float  # in microns
+
+
 class ClientEnvironment(SQLModel, table=True):  # type: ignore
     client_id: Optional[int] = Field(primary_key=True, unique=True)
     visit: str = Field(default="")
