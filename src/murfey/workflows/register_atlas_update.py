@@ -20,7 +20,7 @@ def run(
         return {"success": False, "requeue": False}
 
     logger.info(f"Registering updated atlas: \n{message}")
-
+    murfey_session_id = int(message["session_id"])
     murfey.server._transport_object.do_update_atlas(
         atlas_id=message["atlas_id"],
         atlas_image=message["atlas"],
@@ -39,7 +39,7 @@ def run(
     ):
         dcgs_atlas = murfey_db.exec(
             select(DataCollectionGroup)
-            .where(DataCollectionGroup.session_id == message["session_id"])
+            .where(DataCollectionGroup.session_id == murfey_session_id)
             .where(DataCollectionGroup.atlas == message["atlas"])
             .where(DataCollectionGroup.sample == message["sample"])
         ).all()
@@ -54,7 +54,7 @@ def run(
     ):
         try:
             for hook in dcg_hooks:
-                hook.load()(message["dcgid"], session_id=message["session_id"])
+                hook.load()(message["dcgid"], session_id=murfey_session_id)
         except Exception:
             logger.error("Call to data collection group hook failed", exc_info=True)
     return {"success": True}

@@ -14,6 +14,7 @@ def test_run(
     mock_murfey_db = MagicMock()
     message = {
         "register": "atlas_update",
+        "session_id": 1,
         "atlas_id": mock.sentinel,
         "atlas": mock.sentinel,
         "atlas_pixel_size": mock.sentinel,

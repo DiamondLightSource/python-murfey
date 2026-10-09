@@ -52,9 +52,9 @@ def _ids_tomo_classification(
 def _register_picked_tomogram_use_diameter(message: dict, murfey_db: Session):
     """Received picked particles from the tomogram autopick service"""
     # Add this message to the table of seen messages
-    dcg_id, pj_id = _ids_tomo_classification(
-        message["program_id"], "em-tomo-class2d", murfey_db
-    )
+    session_id = int(message["session_id"])
+    program_id = int(message["program_id"])
+    dcg_id, pj_id = _ids_tomo_classification(program_id, "em-tomo-class2d", murfey_db)
 
     pick_params = TomogramPicks(
         pj_id=pj_id,
@@ -72,9 +72,7 @@ def _register_picked_tomogram_use_diameter(message: dict, murfey_db: Session):
     if picking_db_len > default_tomo_parameters.batch_size_2d:
         # If there are enough particles to get a diameter
         instrument_name = (
-            murfey_db.exec(
-                select(MurfeySession).where(MurfeySession.id == message["session_id"])
-            )
+            murfey_db.exec(select(MurfeySession).where(MurfeySession.id == session_id))
             .one()
             .instrument_name
         )
@@ -131,7 +129,7 @@ def _register_picked_tomogram_use_diameter(message: dict, murfey_db: Session):
                         "particle_diameter": particle_diameter,
                         "kv": tomo_params.voltage,
                         "node_creator_queue": machine_config.node_creator_queue,
-                        "session_id": message["session_id"],
+                        "session_id": session_id,
                         "autoproc_program_id": _app_id(pj_id, murfey_db),
                         "batch_size": default_tomo_parameters.batch_size_2d,
                         "nr_classes": default_tomo_parameters.nr_classes_2d,
@@ -172,7 +170,7 @@ def _register_picked_tomogram_use_diameter(message: dict, murfey_db: Session):
                     "particle_diameter": particle_diameter,
                     "kv": tomo_params.voltage,
                     "node_creator_queue": machine_config.node_creator_queue,
-                    "session_id": message["session_id"],
+                    "session_id": session_id,
                     "autoproc_program_id": _app_id(pj_id, murfey_db),
                     "batch_size": default_tomo_parameters.batch_size_2d,
                     "nr_classes": default_tomo_parameters.nr_classes_2d,
