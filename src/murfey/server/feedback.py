@@ -2035,6 +2035,15 @@ def feedback_callback(
                     and not relevant_tilt_series.processing_requested
                     and relevant_tilt_series.tilt_series_length > 2
                 ):
+                    lamella_angle = None
+                    if relevant_tilt_series.search_map_id:
+                        relevant_search_map = _db.exec(
+                            select(db.SearchMap).where(
+                                db.SearchMap.id == relevant_tilt_series.search_map_id
+                            )
+                        ).one()
+                        lamella_angle = relevant_search_map.angle
+
                     instrument_name = (
                         _db.exec(select(db.Session).where(db.Session.id == session_id))
                         .one()
@@ -2074,6 +2083,7 @@ def feedback_callback(
                             "search_map_id": relevant_tilt_series.search_map_id,
                             "x_location": relevant_tilt_series.x_location,
                             "y_location": relevant_tilt_series.y_location,
+                            "lamella_angle": lamella_angle,
                         },
                     }
                     if murfey.server._transport_object:

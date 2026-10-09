@@ -1067,6 +1067,13 @@ def register_completed_tilt_series(
             ts.processing_requested = True
             db.add(ts)
 
+            lamella_angle = None
+            if ts.search_map_id:
+                relevant_search_map = db.exec(
+                    select(SearchMap).where(SearchMap.id == ts.search_map_id)
+                ).one()
+                lamella_angle = relevant_search_map.angle
+
             collected_ids = db.exec(
                 select(
                     DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram
@@ -1131,6 +1138,7 @@ def register_completed_tilt_series(
                     "search_map_id": ts.search_map_id,
                     "x_location": ts.x_location,
                     "y_location": ts.y_location,
+                    "lamella_angle": lamella_angle,
                 },
             }
             if murfey.server._transport_object:
