@@ -9,11 +9,13 @@ import PIL.Image
 from pydantic import BaseModel
 from sqlmodel import Session as SQLModelSession, select
 
+import murfey.server
 import murfey.util.db as MurfeyDB
 from murfey.util.config import get_machine_config
 from murfey.util.models import FIBImageMetadata
 from murfey.workflows.fib.shared import (
     parse_image_metadata,
+    populate_fib_grid_square_entry,
     populate_fib_imaging_site_entry,
 )
 from murfey.workflows.register_data_collection_group import register_dcg
@@ -177,6 +179,62 @@ def _register_dcg(
     murfey_db.add(imaging_site)
     murfey_db.commit()
 
+    return imaging_site
+
+
+def _register_grid_square(
+    session_id: int,
+    imaging_site: MurfeyDB.ImagingSite,
+    lamella_number: int,
+    murfey_db: SQLModelSession,
+):
+    """
+    Helper function to create a GridSquare entry in ISPyB if one doesn't already
+    exist, and to link it to the corresopnding ImagingSite entry.
+    """
+    # Early exits if values are missing/not configured
+    if murfey.server._transport_object is None:
+        raise RuntimeError("No TransportManager object was set up")
+    dcg_name = imaging_site.dcg_name
+    if dcg_name is None:
+        raise ValueError(
+            f"'dcg_name' field in ImagingSite entry for {imaging_site.image_path} is empty"
+        )
+
+    # Check if an atlas has been registered
+    atlas_search = murfey_db.exec(
+        select(MurfeyDB.ImagingSite)
+        .where(MurfeyDB.ImagingSite.session_id == session_id)
+        .where(MurfeyDB.ImagingSite.dcg_name == dcg_name)
+        .where(MurfeyDB.ImagingSite.data_type == "atlas")
+        .order_by(MurfeyDB.ImagingSite.id)  # Sort in ascending insertion order
+    ).all()
+    if not atlas_search:
+        logger.info(
+            f"No atlas has been registered for data collection group {dcg_name!r} yet"
+        )
+        return imaging_site
+    atlas = atlas_search[-1]
+
+    # Create/update the GridSquare entry in ISPyB
+    grid_square_entry = populate_fib_grid_square_entry(
+        session_id=session_id,
+        dcg_name=dcg_name,
+        atlas=atlas,
+        lamella=imaging_site,
+        lamella_number=lamella_number,
+        transport_object=murfey.server._transport_object,
+        murfey_db=murfey_db,
+    )
+    murfey_db.add(grid_square_entry)
+
+    # Add grid square ID to existing CLEM image series entry
+    imaging_site.grid_square_id = grid_square_entry.id
+    murfey_db.add(imaging_site)
+    murfey_db.commit()
+
+    return imaging_site
+
 
 class FIBLamellaImageInfo(BaseModel):
     session_id: int
@@ -217,6 +275,10 @@ def run(
             rotation_offset=rotation_offset,
         ),
     )
+    if metadata.lamella_number is None:
+        raise ValueError(
+            f"No lamella number associated with lamella image {fib_info.lamella_image_file}"
+        )
     logger.info(
         "Extracted the following metadata from the image:\n"
         f"{json.dumps(metadata.model_dump(), indent=2, default=str)}"
@@ -231,13 +293,9 @@ def run(
 
     # Register imaging site to Murfey, or update existing one
     fib_img_site = _register_fib_imaging_site(fib_info.session_id, metadata, murfey_db)
-    logger.info(
-        f"Registered lamella evaluation image {fib_info.lamella_image_file} "
-        f"for slot {metadata.slot_number} in Murfey database"
-    )
 
     # Register data collection group and atlas in ISPyB
-    _register_dcg(
+    fib_img_site = _register_dcg(
         session_id=fib_info.session_id,
         instrument_name=instrument_name,
         visit_name=visit_name,
@@ -245,4 +303,16 @@ def run(
         murfey_db=murfey_db,
     )
 
+    # Register grid square in ISPyB
+    fib_img_site = _register_grid_square(
+        session_id=fib_info.session_id,
+        imaging_site=fib_img_site,
+        lamella_number=metadata.lamella_number,
+        murfey_db=murfey_db,
+    )
+
+    logger.info(
+        f"Registered lamella evaluation image {fib_info.lamella_image_file} "
+        f"for slot {metadata.slot_number} in Murfey database"
+    )
     return {"success": True}
