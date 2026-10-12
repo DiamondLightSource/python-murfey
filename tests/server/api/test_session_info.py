@@ -129,13 +129,14 @@ def test_get_preprocessed_movie_count(
             tag=dcg_name,
         )
         murfey_db_session.add(dcg_entry)
-
+        murfey_db_session.commit()
         for j in range(3):
             dc_entry = MurfeyDB.DataCollection(
                 dcg_id=dcg_entry.id,
                 tag=dcg_name,
             )
             murfey_db_session.add(dc_entry)
+            murfey_db_session.commit()
             for k in range(4):
                 movie_entry = MurfeyDB.Movie(
                     dataCollectionId=dc_entry.id,
