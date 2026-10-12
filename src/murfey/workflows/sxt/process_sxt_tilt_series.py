@@ -205,7 +205,7 @@ def process_sxt_tilt_series(
 def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
     return process_sxt_tilt_series(
         message["visit_name"],
-        message["session_id"],
+        int(message["session_id"]),
         SXTTiltSeriesInfo(**message["tilt_series_info"]),
         murfey_db,
     )

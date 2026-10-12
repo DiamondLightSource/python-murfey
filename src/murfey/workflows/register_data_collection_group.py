@@ -22,6 +22,7 @@ def register_dcg(
         logger.error("Unable to find transport manager")
         return None
 
+    murfey_session_id = int(message["session_id"])
     ispyb_session_id = get_session_id(
         microscope=message["microscope"],
         proposal_code=message["proposal_code"],
@@ -31,7 +32,7 @@ def register_dcg(
     )
     if ispyb_session_id is None:
         murfey_dcg = DataCollectionGroup(
-            session_id=message["session_id"],
+            session_id=murfey_session_id,
             tag=message.get("tag"),
             smartem_grid_uuid=message.get("smartem_grid_uuid"),
         )
@@ -70,7 +71,7 @@ def register_dcg(
             atlas=message.get("atlas", ""),
             atlas_pixel_size=message.get("atlas_pixel_size"),
             sample=message.get("sample"),
-            session_id=message["session_id"],
+            session_id=murfey_session_id,
             tag=message.get("tag"),
             smartem_grid_uuid=message.get("smartem_grid_uuid"),
         )
@@ -78,7 +79,7 @@ def register_dcg(
     if dcgid is not None and message.get("atlas_x_stage_position"):
         atlas_site = ImagingSite(
             dcg_id=dcgid,
-            session_id=message["session_id"],
+            session_id=murfey_session_id,
             site_name=message.get("tag"),
             data_type="atlas",
             pos_x=message.get("atlas_x_stage_position"),
@@ -99,10 +100,10 @@ def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
         return {"success": False, "requeue": False}
 
     logger.info(f"Registering the following data collection group: \n{message}")
-
+    murfey_session_id = int(message["session_id"])
     if dcg_murfey := murfey_db.exec(
         select(DataCollectionGroup)
-        .where(DataCollectionGroup.session_id == message["session_id"])
+        .where(DataCollectionGroup.session_id == murfey_session_id)
         .where(DataCollectionGroup.tag == message.get("tag"))
     ).all():
         dcgid = dcg_murfey[0].id
@@ -128,7 +129,7 @@ def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
     ):
         dcgs_atlas = murfey_db.exec(
             select(DataCollectionGroup)
-            .where(DataCollectionGroup.session_id == message["session_id"])
+            .where(DataCollectionGroup.session_id == murfey_session_id)
             .where(DataCollectionGroup.atlas == message["atlas"])
             .where(DataCollectionGroup.sample == message["sample"])
         ).all()
@@ -140,7 +141,7 @@ def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
     if dcg_hooks := entry_points(group="murfey.hooks", name="data_collection_group"):
         try:
             for hook in dcg_hooks:
-                hook.load()(dcgid, session_id=message["session_id"])
+                hook.load()(dcgid, session_id=murfey_session_id)
         except Exception:
             logger.error("Call to data collection group hook failed", exc_info=True)
 

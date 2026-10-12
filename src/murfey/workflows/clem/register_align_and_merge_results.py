@@ -72,11 +72,7 @@ def run(message: dict, murfey_db: Session) -> dict[str, bool]:
         ...
     """
 
-    session_id: int = (
-        int(message["session_id"])
-        if not isinstance(message["session_id"], int)
-        else message["session_id"]
-    )
+    session_id = int(message["session_id"])
 
     # Validate message and try and load results
     try:
