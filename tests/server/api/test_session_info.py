@@ -135,7 +135,7 @@ def test_get_preprocessed_movie_count(
         )
         murfey_db_session.add(dcg_entry)
         for j in range(num_dcs):
-            dc_id = (i * num_dcs) + j
+            dc_id = (i * num_dcs) + j + 1
             dc_entry = MurfeyDB.DataCollection(
                 dataCollectionId=dc_id,
                 dataCollectionGroupId=dcg_id,
@@ -145,7 +145,7 @@ def test_get_preprocessed_movie_count(
             for k in range(num_movies):
                 # Add prerequisite table entriees
                 # ProcessingJob
-                pj_id = (i * num_dcs * num_movies) + (j * num_movies) + k
+                pj_id = (i * num_dcs * num_movies) + (j * num_movies) + k + 1
                 pj_entry = MurfeyDB.ProcessingJob(
                     processingJobId=pj_id,
                     recipe="dummy",
@@ -172,7 +172,9 @@ def test_get_preprocessed_movie_count(
                     movieId=ledger_entry.id,
                     movieNumber=ledger_entry.id,
                     dataCollectionId=dc_id,
-                    path=str(tmp_path / dcg_name / f"movie_{(j * num_movies) + k}.mrc"),
+                    path=str(
+                        tmp_path / dcg_name / f"movie_{(j * num_movies) + k + 1}.mrc"
+                    ),
                     tag=dcg_name,
                     preprocessed=bool(j % 2),
                 )
