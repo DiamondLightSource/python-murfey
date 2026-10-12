@@ -42,13 +42,14 @@ except ImportError:
 def ctf_estimated(message: dict, murfey_db: Session) -> dict[str, bool]:
     if not SMARTEM_ACTIVE:
         return {"success": True}
+    session_id = int(message["session_id"])
     movie = murfey_db.exec(
         select(Movie).where(Movie.murfey_id == message["mc_uuid"])
     ).one()
     if movie.smartem_uuid:
         try:
             session = murfey_db.exec(
-                select(MurfeySession).where(MurfeySession.id == message["session_id"])
+                select(MurfeySession).where(MurfeySession.id == session_id)
             ).one()
             machine_config = get_machine_config(
                 instrument_name=session.instrument_name
