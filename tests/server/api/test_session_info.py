@@ -143,10 +143,34 @@ def test_get_preprocessed_movie_count(
             )
             murfey_db_session.add(dc_entry)
             for k in range(num_movies):
-                movie_id = (i * num_dcs) + (j * num_movies) + k
+                # Add prerequisite table entriees
+                # ProcessingJob
+                pj_id = (i * num_dcs) + (j * num_movies) + k
+                pj_entry = MurfeyDB.ProcessingJob(
+                    processingJobId=pj_id,
+                    recipe="dummy",
+                    dataCollectionId=dc_id,
+                )
+                murfey_db_session.add(pj_entry)
+
+                # AutoProcProgram
+                app_entry = MurfeyDB.AutoProcProgram(
+                    autoProcProgramId=pj_entry.id,
+                    pj_id=pj_entry.id,
+                )
+                murfey_db_session.add(app_entry)
+
+                # MurfeyLedger
+                ledger_entry = MurfeyDB.MurfeyLedger(
+                    id=app_entry.id,
+                    app_id=app_entry.id,
+                )
+                murfey_db_session.add(ledger_entry)
+
+                # Add test Movie entry
                 movie_entry = MurfeyDB.Movie(
-                    movieId=movie_id,
-                    movieNumber=movie_id,
+                    movieId=ledger_entry.id,
+                    movieNumber=ledger_entry.id,
                     dataCollectionId=dc_id,
                     path=str(tmp_path / dcg_name / f"movie_{(j * num_movies) + k}.mrc"),
                     tag=dcg_name,
