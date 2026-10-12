@@ -21,7 +21,7 @@ jobs:
     name: Static Analysis
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Set up Python 3.14
         uses: actions/setup-python@v6
         with:
@@ -38,7 +38,7 @@ jobs:
     name: Build package
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Set up Python 3.14
         uses: actions/setup-python@v6
         with:
@@ -56,7 +56,7 @@ jobs:
     name: Build package
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Download ISPyB DB schema v${{ env.ISPYB_DATABASE_SCHEMA }} for tests
         run: |
           mkdir database
