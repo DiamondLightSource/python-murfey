@@ -21,7 +21,7 @@ from typing import NamedTuple
 
 import mrcfile
 import numpy as np
-from gemmi import cif
+from gemmi import cif  # type: ignore
 from pipeliner.project_graph import ProjectGraph
 from pipeliner.star_keys import GENERAL_BLOCK, JOB_COUNTER
 from sqlalchemy import func
