@@ -1,13 +1,13 @@
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Sequence
 from unittest.mock import MagicMock
 
 import pytest
 from fastapi import APIRouter, FastAPI
 from fastapi.testclient import TestClient
 from pytest_mock import MockerFixture
-from sqlmodel import Session as SQLModelSession, select
+from sqlmodel import Session as SQLModelSession, insert, select
 
 import murfey.util.db as MurfeyDB
 from murfey.server.api.auth import (
@@ -125,60 +125,98 @@ def test_get_preprocessed_movie_count(
     num_dcgs = 3
     num_dcs = 3
     num_movies = 4
-    for i in range(num_dcgs):
-        dcg_id = i
-        dcg_name = f"dcg_{dcg_id}"
-        dcg_entry = MurfeyDB.DataCollectionGroup(
-            dataCollectionGroupId=dcg_id,
-            session_id=session_id,
-            tag=dcg_name,
+
+    # Insert all DataCollectionGroup rows and return inserted rows
+    dcgs: Sequence[MurfeyDB.DataCollectionGroup] = murfey_db_session.exec(
+        insert(MurfeyDB.DataCollectionGroup)
+        .values(
+            [
+                {
+                    "session_id": session_id,
+                    "tag": f"dcg_{i}",
+                }
+                for i in range(num_dcgs)
+            ]
         )
-        murfey_db_session.add(dcg_entry)
-        for j in range(num_dcs):
-            dc_id = (i * num_dcs) + j
-            dc_entry = MurfeyDB.DataCollection(
-                dataCollectionId=dc_id,
-                dataCollectionGroupId=dcg_id,
-                tag=dcg_name,
+        .returning(MurfeyDB.DataCollectionGroup)
+    ).all()
+
+    # Insert all DataCollection rows and return inserted rows
+    dcs: Sequence[MurfeyDB.DataCollection] = murfey_db_session.exec(
+        insert(MurfeyDB.DataCollection)
+        .values(
+            [
+                {
+                    "dataCollectionGroupId": dcg.id,
+                    "tag": dcg.tag,
+                }
+                for dcg in dcgs
+                for _ in range(num_dcs)
+            ]
+        )
+        .returning(MurfeyDB.DataCollection)
+    ).all()
+
+    for n, dc in enumerate(dcs):
+        # Insert all ProcessingJob rows and return inserted rows
+        pjs: Sequence[MurfeyDB.ProcessingJob] = murfey_db_session.exec(
+            insert(MurfeyDB.ProcessingJob)
+            .values(
+                [
+                    {
+                        "dataCollectionId": dc.id,
+                        "recipe": "dummy",
+                    }
+                    for _ in range(num_movies)
+                ]
             )
-            murfey_db_session.add(dc_entry)
-            for k in range(num_movies):
-                # Add prerequisite table entriees
-                # ProcessingJob
-                pj_id = (i * num_dcs) + (j * num_movies) + k
-                pj_entry = MurfeyDB.ProcessingJob(
-                    processingJobId=pj_id,
-                    recipe="dummy",
-                    dataCollectionId=dc_id,
-                )
-                murfey_db_session.add(pj_entry)
+            .returning(MurfeyDB.ProcessingJob)
+        ).all()
 
-                # AutoProcProgram
-                app_entry = MurfeyDB.AutoProcProgram(
-                    autoProcProgramId=pj_entry.id,
-                    pj_id=pj_entry.id,
-                )
-                murfey_db_session.add(app_entry)
+        # Insert all ProcessingJob rows and return inserted rows
+        apps: Sequence[MurfeyDB.AutoProcProgram] = murfey_db_session.exec(
+            insert(MurfeyDB.AutoProcProgram)
+            .values(
+                [
+                    {
+                        "pj_id": pj.id,
+                    }
+                    for pj in pjs
+                ]
+            )
+            .returning(MurfeyDB.AutoProcProgram)
+        ).all()
 
-                # MurfeyLedger
-                ledger_entry = MurfeyDB.MurfeyLedger(
-                    id=app_entry.id,
-                    app_id=app_entry.id,
-                )
-                murfey_db_session.add(ledger_entry)
+        ledgers: Sequence[MurfeyDB.MurfeyLedger] = murfey_db_session.exec(
+            insert(MurfeyDB.MurfeyLedger)
+            .values(
+                [
+                    {
+                        "app_id": app.id,
+                    }
+                    for app in apps
+                ]
+            )
+            .returning(MurfeyDB.MurfeyLedger)
+        ).all()
 
-                # Add test Movie entry
-                movie_entry = MurfeyDB.Movie(
-                    movieId=ledger_entry.id,
-                    movieNumber=ledger_entry.id,
-                    dataCollectionId=dc_id,
-                    path=str(tmp_path / dcg_name / f"movie_{(j * num_movies) + k}.mrc"),
-                    tag=dcg_name,
-                    preprocessed=bool(j % 2),
-                )
-                murfey_db_session.add(movie_entry)
-    # Commit all at once
-    murfey_db_session.commit()
+        # Insert all Movie rows
+        murfey_db_session.exec(
+            insert(MurfeyDB.Movie).values(
+                [
+                    {
+                        "movieId": ledger.id,
+                        "dataCollectionId": dc.id,
+                        "path": str(tmp_path)
+                        / dc.tag
+                        / f"movie_{(n * num_movies) + l}.mrc",
+                        "tag": dc.tag,
+                        "preprocessed": bool(n % 2),
+                    }
+                    for l, ledger in enumerate(ledgers)
+                ]
+            )
+        )
 
     # Set up a mock Murfey database session
     def mock_get_db_session():
@@ -203,8 +241,8 @@ def test_get_preprocessed_movie_count(
     )
     assert response.status_code == 200
     data: dict[str, int] = response.json()
-    assert data["complete"] == 12
-    assert data["incomplete"] == 24
+    assert data["complete"] == 16
+    assert data["incomplete"] == 20
 
 
 @pytest.mark.parametrize(
