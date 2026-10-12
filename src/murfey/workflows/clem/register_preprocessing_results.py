@@ -265,18 +265,18 @@ def _register_dcg_and_atlas(
     # Determine values for atlas
     if is_atlas := imaging_site.data_type == "atlas":
         # Register using thumbnail values
-        if (
+        if not (
             imaging_site.thumbnail_path is not None
             and imaging_site.thumbnail_pixel_size is not None
         ):
-            atlas_path = imaging_site.thumbnail_path
-            atlas_pixel_size = imaging_site.thumbnail_pixel_size
-        else:
             raise ValueError(
                 f"ImagingSIte entry for {imaging_site.image_path} missing one or more required values:\n"
                 "  'thumbnail_path'\n"
                 "  'thumbnail_pixel_size'\n"
             )
+        atlas_path = imaging_site.thumbnail_path
+        atlas_pixel_size = imaging_site.thumbnail_pixel_size
+
         # Translate colour flags into ISPyB convention
         color_flags = {
             COLOR_FLAGS_MURFEY_TO_ISPYB[key]: getattr(imaging_site, key, 0)
@@ -376,7 +376,7 @@ def _register_grid_square(
         .where(MurfeyDB.ImagingSite.dcg_name == dcg_name)
         .where(MurfeyDB.ImagingSite.data_type == "grid_square")
     ).all():
-        if (
+        if not (
             atlas_entry.x0 is not None
             and atlas_entry.x1 is not None
             and atlas_entry.y0 is not None
@@ -384,63 +384,61 @@ def _register_grid_square(
             and atlas_entry.thumbnail_pixels_x is not None
             and atlas_entry.thumbnail_pixels_y is not None
         ):
-            atlas_width_real = atlas_entry.x1 - atlas_entry.x0
-            atlas_height_real = atlas_entry.y1 - atlas_entry.y0
-        else:
             logger.warning("Atlas entry not populated with required values")
             return imaging_site
+        atlas_width_real = atlas_entry.x1 - atlas_entry.x0
+        atlas_height_real = atlas_entry.y1 - atlas_entry.y0
 
         for clem_img_site in clem_img_site_to_register:
             try:
                 # Register datasets using thumbnail sizes and scales
-                if (
+                if not (
                     clem_img_site.x0 is not None
                     and clem_img_site.x1 is not None
                     and clem_img_site.y0 is not None
                     and clem_img_site.y1 is not None
                 ):
-                    # Find the real coordinates of the image midpoint
-                    x_mid_real = 0.5 * (clem_img_site.x0 + clem_img_site.x1)
-                    y_mid_real = 0.5 * (clem_img_site.y0 + clem_img_site.y1)
-
-                    # Find pixel coordinates corresponding to image midpoint on atlas
-                    x_mid_px = int(
-                        round(
-                            (x_mid_real - atlas_entry.x0)
-                            / atlas_width_real
-                            * atlas_entry.thumbnail_pixels_x
-                        )
-                    )
-                    y_mid_px = int(
-                        round(
-                            (y_mid_real - atlas_entry.y0)
-                            / atlas_height_real
-                            * atlas_entry.thumbnail_pixels_y
-                        )
-                    )
-
-                    # Find the size of the image, in pixels, when overlaid on the atlas
-                    width_scaled = int(
-                        round(
-                            (clem_img_site.x1 - clem_img_site.x0)
-                            / atlas_width_real
-                            * atlas_entry.thumbnail_pixels_x
-                        )
-                        or 1
-                    )
-                    height_scaled = int(
-                        round(
-                            (clem_img_site.y1 - clem_img_site.y0)
-                            / atlas_height_real
-                            * atlas_entry.thumbnail_pixels_y
-                        )
-                        or 1
-                    )
-                else:
                     logger.warning(
                         f"Image series {clem_img_site.site_name!r} not populated with required values"
                     )
                     continue
+                # Find the real coordinates of the image midpoint
+                x_mid_real = 0.5 * (clem_img_site.x0 + clem_img_site.x1)
+                y_mid_real = 0.5 * (clem_img_site.y0 + clem_img_site.y1)
+
+                # Find pixel coordinates corresponding to image midpoint on atlas
+                x_mid_px = int(
+                    round(
+                        (x_mid_real - atlas_entry.x0)
+                        / atlas_width_real
+                        * atlas_entry.thumbnail_pixels_x
+                    )
+                )
+                y_mid_px = int(
+                    round(
+                        (y_mid_real - atlas_entry.y0)
+                        / atlas_height_real
+                        * atlas_entry.thumbnail_pixels_y
+                    )
+                )
+
+                # Find the size of the image, in pixels, when overlaid on the atlas
+                width_scaled = int(
+                    round(
+                        (clem_img_site.x1 - clem_img_site.x0)
+                        / atlas_width_real
+                        * atlas_entry.thumbnail_pixels_x
+                    )
+                    or 1
+                )
+                height_scaled = int(
+                    round(
+                        (clem_img_site.y1 - clem_img_site.y0)
+                        / atlas_height_real
+                        * atlas_entry.thumbnail_pixels_y
+                    )
+                    or 1
+                )
 
                 # Populate grid square Pydantic model
                 grid_square_params = GridSquareParameters(
