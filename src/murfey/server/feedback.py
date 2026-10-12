@@ -2390,7 +2390,9 @@ def feedback_callback(
             )  # should be True
     except Exception:
         logger.warning(
-            "Exception encountered in server RabbitMQ callback", exc_info=True
+            "Exception encountered in server-RabbitMQ callback for workflow "
+            f"'{message.get('register')}'",
+            exc_info=True,
         )
         if murfey.server._transport_object:
             murfey.server._transport_object.transport.nack(header, requeue=False)
