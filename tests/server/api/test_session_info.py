@@ -114,6 +114,66 @@ def test_create_session_with_db(
         assert murfey_session.visit_end_time is None
 
 
+async def test_get_preprocessed_movie_count(
+    tmp_path: Path,
+    murfey_db_session: SQLModelSession,
+):
+    # Set up parameters
+    session_id = ExampleVisit.murfey_session_id
+
+    # Create some DataCollectionGroups, DataCollections, and Movies
+    for i in range(3):
+        dcg_name = f"dcg_{i}"
+        dcg_entry = MurfeyDB.DataCollectionGroup(
+            session_id=session_id,
+            tag=dcg_name,
+        )
+        murfey_db_session.add(dcg_entry)
+
+        for j in range(3):
+            dc_entry = MurfeyDB.DataCollection(
+                dcg_id=dcg_entry.id,
+                tag=dcg_name,
+            )
+            murfey_db_session.add(dc_entry)
+            for k in range(4):
+                movie_entry = MurfeyDB.Movie(
+                    dataCollectionId=dc_entry.id,
+                    path=str(tmp_path / dcg_name / f"movie_{j + k}.mrc"),
+                    tag=dcg_name,
+                    preprocessed=bool(j % 2),
+                )
+                murfey_db_session.add(movie_entry)
+    # Commit all at once
+    murfey_db_session.commit()
+
+    # Set up a mock Murfey database session
+    def mock_get_db_session():
+        yield murfey_db_session
+
+    # Set up the backend server
+    backend_server = set_up_test_backend_client(
+        router=router,
+        instrument_name=instrument_name,
+        session_id=session_id,
+        mock_db_session=mock_get_db_session,
+    )
+    # Construct the URL path to poke
+    backend_url_path = url_path_for(
+        "api.session_info.router",
+        "get_preprocessed_movie_count",
+        session_id=session_id,
+    )
+    # Poke the backend
+    response = backend_server.get(
+        backend_url_path,
+    )
+    assert response.status_code == 200
+    data: dict[str, int] = response.json()
+    assert data["complete"] == 12
+    assert data["incomplete"] == 24
+
+
 @pytest.mark.parametrize(
     "search_strings",
     (
