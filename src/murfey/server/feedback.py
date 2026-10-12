@@ -2118,6 +2118,14 @@ def feedback_callback(
                     relevant_tilt_series.processing_requested = True
                     _db.add(relevant_tilt_series)
 
+                    # Update all related Movie rows and mark as preprocessed
+                    relevant_movies = _db.exec(
+                        select(db.Movie).where(db.Movie.path == message["movie"])
+                    ).all()
+                    for movie in relevant_movies:
+                        movie.preprocessed = True
+                        _db.add(movie)
+
                 prom.preprocessed_movies.labels(
                     processing_job=collected_ids[2].id
                 ).inc()
