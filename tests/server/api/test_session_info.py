@@ -114,7 +114,7 @@ def test_create_session_with_db(
         assert murfey_session.visit_end_time is None
 
 
-async def test_get_preprocessed_movie_count(
+def test_get_preprocessed_movie_count(
     tmp_path: Path,
     murfey_db_session: SQLModelSession,
 ):
