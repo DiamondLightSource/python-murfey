@@ -264,14 +264,13 @@ def _register_dcg_and_atlas(
 
     # Determine values for atlas
     if is_atlas := imaging_site.data_type == "atlas":
-        # Register using thumbnail values if they are provided
+        # Register using thumbnail values
         if (
             imaging_site.thumbnail_path is not None
             and imaging_site.thumbnail_pixel_size is not None
         ):
             atlas_path = imaging_site.thumbnail_path
             atlas_pixel_size = imaging_site.thumbnail_pixel_size
-        # Otherwise, register the TIFF files themselves
         else:
             raise ValueError(
                 f"ImagingSIte entry for {imaging_site.image_path} missing one or more required values:\n"
