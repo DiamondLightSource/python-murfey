@@ -1178,6 +1178,13 @@ murfey.server.api.session_info.router:
         type: int
     methods:
       - GET
+  - path: /session_info/sessions/{session_id}/movies/preprocessed
+    function: get_preprocessed_movie_count
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - GET
   - path: /session_info/clients
     function: get_clients
     path_params: []
