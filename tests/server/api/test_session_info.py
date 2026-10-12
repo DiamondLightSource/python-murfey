@@ -122,25 +122,31 @@ def test_get_preprocessed_movie_count(
     session_id = ExampleVisit.murfey_session_id
 
     # Create some DataCollectionGroups, DataCollections, and Movies
-    for i in range(3):
-        dcg_name = f"dcg_{i}"
+    num_dcgs = 3
+    num_dcs = 3
+    num_movies = 4
+    for i in range(num_dcgs):
+        dcg_id = i
+        dcg_name = f"dcg_{dcg_id}"
         dcg_entry = MurfeyDB.DataCollectionGroup(
+            dataCollectionGroupId=dcg_id,
             session_id=session_id,
             tag=dcg_name,
         )
         murfey_db_session.add(dcg_entry)
-        murfey_db_session.commit()
-        for j in range(3):
+        for j in range(num_dcs):
+            dc_id = (i * num_dcs) + j
             dc_entry = MurfeyDB.DataCollection(
-                dcg_id=dcg_entry.id,
+                dataCollectionId=dc_id,
+                dataCollectionGroupId=dcg_id,
                 tag=dcg_name,
             )
             murfey_db_session.add(dc_entry)
-            murfey_db_session.commit()
-            for k in range(4):
+            for k in range(num_movies):
                 movie_entry = MurfeyDB.Movie(
-                    dataCollectionId=dc_entry.id,
-                    path=str(tmp_path / dcg_name / f"movie_{j + k}.mrc"),
+                    movieId=(i * num_dcs) + (j * num_movies) + k,
+                    dataCollectionId=dc_id,
+                    path=str(tmp_path / dcg_name / f"movie_{(j * num_movies) + k}.mrc"),
                     tag=dcg_name,
                     preprocessed=bool(j % 2),
                 )
