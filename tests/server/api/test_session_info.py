@@ -143,8 +143,10 @@ def test_get_preprocessed_movie_count(
             )
             murfey_db_session.add(dc_entry)
             for k in range(num_movies):
+                movie_id = (i * num_dcs) + (j * num_movies) + k
                 movie_entry = MurfeyDB.Movie(
-                    movieId=(i * num_dcs) + (j * num_movies) + k,
+                    movieId=movie_id,
+                    movieNumber=movie_id,
                     dataCollectionId=dc_id,
                     path=str(tmp_path / dcg_name / f"movie_{(j * num_movies) + k}.mrc"),
                     tag=dcg_name,
