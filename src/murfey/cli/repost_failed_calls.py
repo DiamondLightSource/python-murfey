@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import json
+import os
 from datetime import datetime
 from functools import partial
 from inspect import getfullargspec, iscoroutinefunction
@@ -9,10 +10,6 @@ from queue import Empty, Queue
 
 from sqlmodel import Session, create_engine
 from workflows.transport.pika_transport import PikaTransport
-
-from murfey.server.murfey_db import url
-from murfey.server.run import _set_up_transport
-from murfey.util.config import security_from_file
 
 
 def dlq_purge(
@@ -93,7 +90,6 @@ def handle_failed_posts(messages_path: list[Path], murfey_db: Session):
     # These imports need to happen after transport object is configured
     import murfey.server.api.auth
     import murfey.server.api.bootstrap
-    import murfey.server.api.clem
     import murfey.server.api.display
     import murfey.server.api.file_io_frontend
     import murfey.server.api.file_io_instrument
@@ -106,6 +102,7 @@ def handle_failed_posts(messages_path: list[Path], murfey_db: Session):
     import murfey.server.api.session_info
     import murfey.server.api.websocket
     import murfey.server.api.workflow
+    import murfey.server.api.workflow_clem
 
     for json_file in messages_path:
         with open(json_file, "r") as json_data:
@@ -136,10 +133,19 @@ def handle_failed_posts(messages_path: list[Path], murfey_db: Session):
             for call_arg in expected_args.args:
                 call_arg_type = expected_args.annotations.get(call_arg, str)
                 if call_arg in call_kwargs.keys():
-                    function_call_dict[call_arg] = call_arg_type(call_kwargs[call_arg])
+                    function_call_dict[call_arg] = (
+                        call_arg_type(call_kwargs[call_arg])
+                        if str(call_arg_type) != "str"
+                        else call_kwargs[call_arg]
+                    )
                 elif call_arg == "db":
                     function_call_dict["db"] = murfey_db
                 else:
+                    if isinstance(call_arg_type, str):
+                        try:
+                            call_arg_type = getattr(murfey.util.models, call_arg_type)
+                        except Exception as e:
+                            print(f"Failed to find type: {e}")
                     print(call_data, call_arg_type, call_arg)
                     function_call_dict[call_arg] = call_arg_type(**call_data)
         except TypeError as e:
@@ -182,10 +188,17 @@ def run():
     args = parser.parse_args()
 
     # Read the security config file
+    os.environ["MURFEY_SECURITY_CONFIGURATION"] = args.config
+
+    from murfey.util.config import security_from_file
+
     security_config = security_from_file(args.config)
 
     # Configure the transport
     PikaTransport().load_configuration_file(security_config.rabbitmq_credentials)
+
+    from murfey.server.run import _set_up_transport
+
     _set_up_transport("PikaTransport")
 
     # Now import transport object which was set up in the above step
@@ -203,6 +216,8 @@ def run():
     )
 
     # Set up database and retry api calls
+    from murfey.server.murfey_db import url
+
     _url = url(security_config)
     engine = create_engine(_url)
     with Session(engine) as murfey_db:

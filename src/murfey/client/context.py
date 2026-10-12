@@ -76,6 +76,7 @@ def ensure_dcg_exists(
     token: str,
 ) -> str | None:
     """Create  a data collection group"""
+    session_file: Path | None = None
     if collection_type == "tomo":
         experiment_type_id = 36
         session_file = metadata_source / "Session.dm"
@@ -97,13 +98,18 @@ def ensure_dcg_exists(
                 logger.warning(f"Get EPU session hook failed: {e}")
     elif collection_type == "sxt":
         experiment_type_id = 47
-        session_file = metadata_source / "Session.dm"
         source_visit_dir = metadata_source.parent
     else:
         logger.error(f"Unknown collection type {collection_type}")
         return None
 
-    if not session_file.is_file():
+    if session_file is None:
+        dcg_tag = "/".join(metadata_source.parts).replace("//", "/")
+        dcg_data = {
+            "experiment_type_id": experiment_type_id,
+            "tag": dcg_tag,
+        }
+    elif not session_file.is_file():
         logger.warning(f"Cannot find session file {str(session_file)}")
         dcg_tag = "/".join(
             [part for part in metadata_source.parts if part != environment.visit]
@@ -118,6 +124,14 @@ def ensure_dcg_exists(
 
         if collection_type == "tomo":
             windows_path = session_data["TomographySession"]["AtlasId"]
+            if (
+                session_data.get("TomographySession", {}).get("LamellaWorkflow", None)
+                == "true"
+            ):
+                # Lamella tomography experiment type
+                experiment_type_id = 49
+            else:
+                logger.warning("Cannot find tomography Session.dm file")
         else:
             windows_path = session_data["EpuSessionXml"]["Samples"]["_items"][
                 "SampleXml"

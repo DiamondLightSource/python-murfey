@@ -78,6 +78,7 @@ async def process_gain(
             env,
             rescale=gain_reference_params.rescale,
             tag=gain_reference_params.tag,
+            chmod=machine_config.mkdir_chmod,
         )
     if new_gain_ref and new_gain_ref_superres:
         return {

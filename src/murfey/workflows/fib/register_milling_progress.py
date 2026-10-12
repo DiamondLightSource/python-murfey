@@ -1,0 +1,388 @@
+from __future__ import annotations
+
+import json
+import logging
+from typing import TYPE_CHECKING, Any, cast
+
+from sqlmodel import Session as SQLModelSession, select
+
+import murfey.server
+import murfey.util.db as MurfeyDB
+from murfey.util.config import get_machine_config
+from murfey.util.fib import get_slot_number
+from murfey.util.models import (
+    GridSquareParameters,
+    LamellaSiteInfo,
+    MillingStepInfo,
+    MillingSteps,
+    StagePositionInfo,
+    StagePositionValues,
+)
+from murfey.workflows.register_data_collection_group import register_dcg
+
+if TYPE_CHECKING:
+    from murfey.server.ispyb import TransportManager
+
+
+logger = logging.getLogger("murfey.workflows.fib.register_milling_progress")
+
+
+def _ensure_prerequisites(
+    session_id: int,
+    instrument_name: str,
+    visit_name: str,
+    project_name: str,
+    slot_number: int,
+    site_number: int,
+    transport_object: TransportManager,
+    murfey_db: SQLModelSession,
+):
+    """
+    Uses the FIB milling metadata provided to create the necessary DataCollectionGroup,
+    Atlas, and GridSquare placeholders in Murfey if they don't already exist
+
+    """
+    # Construct the DataCollectionGroup and GridSquare lookup tags
+    dcg_tag = f"{project_name}/grid_{slot_number}"
+
+    # Determine variables to register data collection group and atlas with
+    proposal_code = "".join(char for char in visit_name.split("-")[0] if char.isalpha())
+    proposal_number = "".join(
+        char for char in visit_name.split("-")[0] if char.isdigit()
+    )
+    visit_number = visit_name.split("-")[-1]
+
+    # Register the DataCollectionGroup and Atlas placeholder if it doesn't already exist
+    if (
+        murfey_db.exec(
+            select(MurfeyDB.DataCollectionGroup)
+            .where(MurfeyDB.DataCollectionGroup.session_id == session_id)
+            .where(MurfeyDB.DataCollectionGroup.tag == dcg_tag)
+        ).one_or_none()
+        is None
+    ):
+        dcg_message = {
+            "microscope": instrument_name,
+            "proposal_code": proposal_code,
+            "proposal_number": proposal_number,
+            "visit_number": visit_number,
+            "session_id": session_id,
+            "tag": dcg_tag,
+            "experiment_type_id": 46,
+            "atlas": "",
+            "atlas_pixel_size": 0.0,
+            "sample": slot_number,
+            "color_flags": None,
+            "collection_mode": None,
+        }
+        register_dcg(
+            message=dcg_message,
+            murfey_db=murfey_db,
+        )
+
+    # Register the GridSquare if it doesn't already exist
+    grid_square_entry = murfey_db.exec(
+        select(MurfeyDB.GridSquare)
+        .where(MurfeyDB.GridSquare.session_id == session_id)
+        .where(MurfeyDB.GridSquare.name == site_number)
+        .where(MurfeyDB.GridSquare.tag == dcg_tag)
+    ).one_or_none()
+    if grid_square_entry is None:
+        dcg_entry = murfey_db.exec(
+            select(MurfeyDB.DataCollectionGroup)
+            .where(MurfeyDB.DataCollectionGroup.session_id == session_id)
+            .where(MurfeyDB.DataCollectionGroup.tag == dcg_tag)
+        ).one()
+        grid_square_ispyb_result = transport_object.do_insert_grid_square(
+            atlas_id=dcg_entry.atlas_id,
+            grid_square_id=site_number,
+            grid_square_parameters=GridSquareParameters(
+                tag=dcg_tag,
+            ),
+        )
+        # Register to Murfey
+        grid_square_entry = MurfeyDB.GridSquare(
+            id=grid_square_ispyb_result.get("return_value", None),
+            name=site_number,
+            session_id=session_id,
+            tag=dcg_tag,
+        )
+        murfey_db.add(grid_square_entry)
+        murfey_db.commit()
+
+    return grid_square_entry
+
+
+MILLING_STEP_NAMES = list(MillingSteps.model_fields.keys())
+STAGE_POSITION_NAMES = list(StagePositionInfo.model_fields.keys())
+
+
+def _register_milling_step(
+    milling_steps: MillingSteps,
+    stage_info: StagePositionInfo,
+    grid_square: MurfeyDB.GridSquare,
+    transport_object: TransportManager,
+    murfey_db: SQLModelSession,
+):
+    """
+    Registers FIB milling metadata for the current lamella site as MillingStep entries
+    in ISPyB. If successful, will proceed to create a backup copy of the inserted row
+    in Murfey.
+    """
+    # Check that GridSquare has ID (for type checking)
+    if grid_square.id is None:
+        logger.error("Current GridSquare entry has no ID")
+        return None
+
+    # Iteratively go through the LamellaSiteInfo model and insert for each step
+    for step_name in MILLING_STEP_NAMES:
+        step_info: MillingStepInfo | None = milling_steps.__getattribute__(step_name)
+        # Early continues if key information is missing
+        if step_info is None:
+            logger.debug(f"No step info found for {step_name}")
+            continue
+        if step_info.recipe_name is None:
+            logger.debug(f"No recipe name found for {step_name}")
+            continue
+        if step_info.step_name is None:
+            logger.debug(f"No step name found for {step_name}")
+            continue
+        # Use the latest available stage position value
+        stage_values: StagePositionValues | None = None
+        for stage_name in reversed(STAGE_POSITION_NAMES):
+            stage_values = stage_info.__getattribute__(stage_name)
+            if stage_values is not None:
+                break
+        # Use an empty 'StagePositionValues' placeholder if no stage values found
+        if stage_values is None:
+            stage_values = StagePositionValues()
+
+        # Check if the step has already been registered in Murfey
+        milling_step_entry = murfey_db.exec(
+            select(MurfeyDB.MillingStep)
+            .where(MurfeyDB.MillingStep.grid_square_id == grid_square.id)
+            .where(MurfeyDB.MillingStep.recipe_name == step_info.recipe_name)
+            .where(MurfeyDB.MillingStep.activity_name == step_info.step_name)
+        ).one_or_none()
+
+        if milling_step_entry is None:
+            # Create a new ISPyB entry if no Murfey one is found
+            result = transport_object.do_insert_milling_step(
+                # IDs
+                recipe_name=step_info.recipe_name,
+                activity_name=step_info.step_name,
+                grid_square_id=grid_square.id,
+                # Values
+                is_enabled=step_info.is_enabled,
+                status=step_info.status,
+                execution_time=step_info.execution_time,
+                stage_x=stage_values.x,
+                stage_y=stage_values.y,
+                stage_z=stage_values.z,
+                rotation=stage_values.rotation,
+                tilt_alpha=stage_values.tilt_alpha,
+                beam_type=step_info.beam_type,
+                beam_voltage=step_info.voltage,
+                beam_current=step_info.current,
+                milling_angle=step_info.milling_angle,
+                depth_correction=step_info.depth_correction,
+                lamella_offset=step_info.lamella_offset,
+                trench_height_front=step_info.trench_height_front,
+                trench_height_rear=step_info.trench_height_rear,
+                width_overlap_front_left=step_info.width_overlap_front_left,
+                width_overlap_front_right=step_info.width_overlap_front_right,
+                width_overlap_rear_left=step_info.width_overlap_rear_left,
+                width_overlap_rear_right=step_info.width_overlap_rear_right,
+            )
+            if result.get("return_value") is None:
+                logger.error(f"No MillingStep entry created for {step_info.step_name}")
+                continue
+
+            # Create a corresponding record in Murfey
+            milling_step_entry = MurfeyDB.MillingStep(
+                id=int(result["return_value"]),
+                grid_square_id=grid_square.id,
+                recipe_name=step_info.recipe_name,
+                activity_name=step_info.step_name,
+                is_enabled=step_info.is_enabled,
+                status=step_info.status,
+                execution_time=step_info.execution_time,
+                stage_x=stage_values.x,
+                stage_y=stage_values.y,
+                stage_z=stage_values.z,
+                rotation=stage_values.rotation,
+                tilt_alpha=stage_values.tilt_alpha,
+                beam_type=step_info.beam_type,
+                beam_voltage=step_info.voltage,
+                beam_current=step_info.current,
+                milling_angle=step_info.milling_angle,
+                depth_correction=step_info.depth_correction,
+                lamella_offset=step_info.lamella_offset,
+                trench_height_front=step_info.trench_height_front,
+                trench_height_rear=step_info.trench_height_rear,
+                width_overlap_front_left=step_info.width_overlap_front_left,
+                width_overlap_front_right=step_info.width_overlap_front_right,
+                width_overlap_rear_left=step_info.width_overlap_rear_left,
+                width_overlap_rear_right=step_info.width_overlap_rear_right,
+            )
+        else:
+            # Update the existing ISPyB one if it already exists
+            result = transport_object.do_update_milling_step(
+                milling_step_id=milling_step_entry.id,
+                is_enabled=step_info.is_enabled,
+                status=step_info.status,
+                execution_time=step_info.execution_time,
+                stage_x=stage_values.x,
+                stage_y=stage_values.y,
+                stage_z=stage_values.z,
+                rotation=stage_values.rotation,
+                tilt_alpha=stage_values.tilt_alpha,
+                beam_type=step_info.beam_type,
+                beam_voltage=step_info.voltage,
+                beam_current=step_info.current,
+                milling_angle=step_info.milling_angle,
+                depth_correction=step_info.depth_correction,
+                lamella_offset=step_info.lamella_offset,
+                trench_height_front=step_info.trench_height_front,
+                trench_height_rear=step_info.trench_height_rear,
+                width_overlap_front_left=step_info.width_overlap_front_left,
+                width_overlap_front_right=step_info.width_overlap_front_right,
+                width_overlap_rear_left=step_info.width_overlap_rear_left,
+                width_overlap_rear_right=step_info.width_overlap_rear_right,
+            )
+            if result.get("return_value", None) is None:
+                logger.error(
+                    f"Could not update MillingStep entry for {step_info.step_name}"
+                )
+                continue
+
+            # Update the existing Murfey one
+            milling_step_entry.is_enabled = step_info.is_enabled
+            milling_step_entry.status = step_info.status
+            milling_step_entry.execution_time = step_info.execution_time
+            milling_step_entry.stage_x = stage_values.x
+            milling_step_entry.stage_y = stage_values.y
+            milling_step_entry.stage_z = stage_values.z
+            milling_step_entry.rotation = stage_values.rotation
+            milling_step_entry.tilt_alpha = stage_values.tilt_alpha
+            milling_step_entry.beam_type = step_info.beam_type
+            milling_step_entry.beam_voltage = step_info.voltage
+            milling_step_entry.beam_current = step_info.current
+            milling_step_entry.milling_angle = step_info.milling_angle
+            milling_step_entry.depth_correction = step_info.depth_correction
+            milling_step_entry.lamella_offset = step_info.lamella_offset
+            milling_step_entry.trench_height_front = step_info.trench_height_front
+            milling_step_entry.trench_height_rear = step_info.trench_height_rear
+            milling_step_entry.width_overlap_front_left = (
+                step_info.width_overlap_front_left
+            )
+            milling_step_entry.width_overlap_front_right = (
+                step_info.width_overlap_front_right
+            )
+            milling_step_entry.width_overlap_rear_left = (
+                step_info.width_overlap_rear_left
+            )
+            milling_step_entry.width_overlap_rear_right = (
+                step_info.width_overlap_rear_right
+            )
+        # Mark entry for committing
+        murfey_db.add(milling_step_entry)
+
+    # Commit all changes at once
+    murfey_db.commit()
+    return None
+
+
+def run(message: dict[str, Any], murfey_db: SQLModelSession):
+    # Early exit if no TransportManager was set up
+    if murfey.server._transport_object is None:
+        logger.error("No TransportManager object was configured")
+        return {"success": False, "requeue": False}
+
+    # Parse and unpack incoming message
+    session_id = int(message["session_id"])
+    site_info = LamellaSiteInfo(**message["site_info"])
+    logger.debug(
+        "Received the following FIB metadata for registration:\n"
+        f"{json.dumps(site_info.model_dump(exclude_none=True), indent=2, default=str)}"
+    )
+
+    # Early exits if information needed to construct lookup tags are missing
+    # Project and site values
+    if site_info.project_name is None:
+        raise ValueError("Could not construct lookup tags; 'project_name' is missing")
+    project_name = site_info.project_name
+    if site_info.site_number is None:
+        raise ValueError("Could not construct lookup tags; 'site_number' is missing")
+    site_number = site_info.site_number
+    if site_info.site_name is None:
+        raise ValueError("Could not construct lookup tags; 'site_name' is missing")
+    site_name = site_info.site_name
+
+    # Stage information
+    if site_info.stage_info is None:
+        raise ValueError("Could not construct lookup tags; 'stage_info' is missing")
+    stage_info = site_info.stage_info
+    # Use the latest available stage position value
+    latest_stage_position: StagePositionValues | None = None
+    for stage_name in reversed(STAGE_POSITION_NAMES):
+        latest_stage_position = stage_info.__getattribute__(stage_name)
+        if latest_stage_position is not None:
+            break
+    if latest_stage_position is None:
+        raise ValueError(
+            "Could not construct lookup tags; no stage position information found"
+        )
+
+    # Milling step information
+    if site_info.steps is None:
+        raise ValueError("No milling step info found in current message")
+    milling_steps = site_info.steps
+
+    # Load instrument name and visit ID
+    murfey_session = murfey_db.exec(
+        select(MurfeyDB.Session).where(MurfeyDB.Session.id == session_id)
+    ).one()
+    visit_name = murfey_session.visit
+    instrument_name = murfey_session.instrument_name
+
+    # Load the machine config
+    machine_config = get_machine_config(instrument_name)[instrument_name]
+    rotation_offset = cast(float, machine_config.calibrations.get("rotation_offset", 0))
+
+    # Calculate the slot number
+    slot_number = get_slot_number(
+        x=latest_stage_position.x,
+        y=latest_stage_position.y,
+        rotation=latest_stage_position.rotation,
+        rotation_offset=rotation_offset,
+    )
+    if slot_number is None:
+        raise ValueError("Could not construct lookup tags; 'slot_number' is missing")
+
+    # Register the prerequisite information for this site
+    grid_square_entry = _ensure_prerequisites(
+        session_id=session_id,
+        instrument_name=instrument_name,
+        visit_name=visit_name,
+        project_name=project_name,
+        slot_number=slot_number,
+        site_number=site_number,
+        transport_object=murfey.server._transport_object,
+        murfey_db=murfey_db,
+    )
+    if grid_square_entry is None:
+        raise RuntimeError(
+            f"Could not create GridSquare database entry for site {site_name}"
+        )
+
+    # Insert or update MillingStep entries
+    _register_milling_step(
+        milling_steps=milling_steps,
+        stage_info=stage_info,
+        grid_square=grid_square_entry,
+        transport_object=murfey.server._transport_object,
+        murfey_db=murfey_db,
+    )
+    logger.info(f"Successfully registered milling progress of site {site_name}")
+    return {"success": True}

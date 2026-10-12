@@ -1,0 +1,183 @@
+from __future__ import annotations
+
+import json
+from logging import getLogger
+from pathlib import Path
+
+from fastapi import APIRouter
+from pydantic import BaseModel
+from sqlmodel import Session, select
+
+import murfey.server
+import murfey.util.db as MurfeyDB
+from murfey.server.murfey_db import murfey_db
+from murfey.util import sanitise_path
+
+# Set up logger
+logger = getLogger("murfey.server.api.workflow_clem")
+
+# Create APIRouter class object
+router = APIRouter(
+    prefix="/workflow/clem",
+    tags=["Workflows: CLEM"],
+)
+
+
+class LifFileInfo(BaseModel):
+    lif_file: Path
+
+
+@router.post("/sessions/{session_id}/process_raw_lifs")  # API posts to this URL
+def process_raw_lifs(
+    session_id: int,
+    lif_info: LifFileInfo,
+    murfey_db: Session = murfey_db,
+):
+    if murfey.server._transport_object is None:
+        logger.error("No TransportManager object was set up")
+        return False
+
+    # Load the visit name from the database
+    try:
+        murfey_session = murfey_db.exec(
+            select(MurfeyDB.Session).where(MurfeyDB.Session.id == session_id)
+        ).one()
+        visit_name = murfey_session.visit
+    except Exception as e:
+        logger.error("Error querying session information from database", exc_info=True)
+        print(e)
+        return False
+
+    # Find the visit directory, the raw directory name, and the job name
+    try:
+        visit_idx = lif_info.lif_file.parts.index(visit_name)
+        visit_dir = Path(
+            "/".join(
+                ""
+                if part == "/"  # Replace root "/" with "" for Linux paths
+                else part
+                for part in lif_info.lif_file.parts[: visit_idx + 1]
+            )
+        )
+        raw_dir = lif_info.lif_file.parts[visit_idx + 1]
+        job_name = str(
+            (lif_info.lif_file.parent / lif_info.lif_file.stem).relative_to(
+                visit_dir.parent
+            )
+        )
+    except Exception:
+        logger.error(
+            "Could not determine the visit directory from LIF file "
+            f"{sanitise_path(lif_info.lif_file)}",
+            exc_info=True,
+        )
+        return False
+
+    # Construct recipe and submit it for processing
+    recipe = {
+        "recipes": ["clem-process-raw-lifs"],
+        "parameters": {
+            # Job parameters
+            "lif_file": f"{str(lif_info.lif_file)}",
+            "root_folder": raw_dir,
+            # Other recipe parameters
+            "session_dir": f"{str(visit_dir)}",
+            "session_id": session_id,
+            "job_name": job_name,
+            "feedback_queue": murfey.server._transport_object.feedback_queue,
+        },
+    }
+    logger.info(
+        f"Submitting LIF processing request to 'processing_recipe': \n"
+        f"{json.dumps(recipe, indent=2, default=str)}"
+    )
+    murfey.server._transport_object.send(
+        queue="processing_recipe",
+        message=recipe,
+        new_connection=True,
+    )
+    return True
+
+
+class TIFFSeriesInfo(BaseModel):
+    series_name: str
+    tiff_files: list[Path]
+    series_metadata: Path
+
+
+@router.post("/sessions/{session_id}/process_raw_tiffs")
+def process_raw_tiffs(
+    session_id: int,
+    tiff_info: TIFFSeriesInfo,
+    murfey_db: Session = murfey_db,
+):
+    if murfey.server._transport_object is None:
+        logger.error("No TransportManager object was set up")
+        return False
+    if not tiff_info.tiff_files:
+        logger.error("No TIFF files were included in the incoming message")
+        return False
+
+    # Load the visit name from the database
+    try:
+        murfey_session = murfey_db.exec(
+            select(MurfeyDB.Session).where(MurfeyDB.Session.id == session_id)
+        ).one()
+        visit_name = murfey_session.visit
+    except Exception as e:
+        logger.error("Error querying session information from database", exc_info=True)
+        print(e)
+        return False
+
+    # Find the visit directory, the raw directory name, and the job name
+    try:
+        tiff_file = tiff_info.tiff_files[0]
+        visit_idx = tiff_file.parts.index(visit_name)
+        visit_dir = Path(
+            "/".join(
+                ""
+                if part == "/"  # Replace root "/" with "" for Linux paths
+                else part
+                for part in tiff_file.parts[: visit_idx + 1]
+            )
+        )
+        raw_dir = tiff_file.parts[visit_idx + 1]
+        job_name = str(
+            (tiff_file.parent / tiff_file.stem.split("--")[0]).relative_to(
+                visit_dir.parent
+            )
+        )
+    except Exception:
+        logger.error(
+            "Could not determine the visit directory from TIFF file "
+            f"{sanitise_path(tiff_file)}",
+            exc_info=True,
+        )
+        return False
+
+    # Construct recipe and submit it for processing
+    recipe = {
+        "recipes": ["clem-process-raw-tiffs"],
+        "parameters": {
+            # Job parameters
+            "tiff_list": "null",
+            "tiff_file": f"{str(tiff_file)}",
+            "root_folder": raw_dir,
+            "metadata": f"{str(tiff_info.series_metadata)}",
+            # Other recipe parameters
+            "session_dir": f"{str(visit_dir)}",
+            "session_id": session_id,
+            "job_name": job_name,
+            "feedback_queue": murfey.server._transport_object.feedback_queue,
+        },
+    }
+    logger.info(
+        f"Submitting TIFF processing request to 'processing_recipe': \n"
+        f"{json.dumps(recipe, indent=2, default=str)}"
+    )
+    murfey.server._transport_object.send(
+        queue="processing_recipe",
+        message=recipe,
+        new_connection=True,
+    )
+    return True

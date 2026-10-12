@@ -5,8 +5,8 @@ import ispyb.sqlalchemy._auto_db_schema as ISPyBDB
 from sqlmodel import select
 from sqlmodel.orm.session import Session as SQLModelSession
 
+import murfey.server
 import murfey.util.db as MurfeyDB
-from murfey.server import _transport_object
 from murfey.server.ispyb import ISPyBSession, get_session_id
 from murfey.util import sanitise
 
@@ -15,13 +15,13 @@ logger = logging.getLogger("murfey.workflows.register_data_collection")
 
 def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
     # Fail immediately if transport manager was not provided
-    if _transport_object is None:
+    if murfey.server._transport_object is None:
         logger.error("Unable to find transport manager")
         return {"success": False, "requeue": False}
 
     logger.info(f"Registering the following data collection: \n{message}")
 
-    murfey_session_id = message["session_id"]
+    murfey_session_id = int(message["session_id"])
     ispyb_session_id = get_session_id(
         microscope=message["microscope"],
         proposal_code=message["proposal_code"],
@@ -65,6 +65,7 @@ def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
                 imageDirectory=message["image_directory"],
                 imageSuffix=message["image_suffix"],
                 voltage=message["voltage"],
+                wavelength=message["energy"],
                 dataCollectionGroupId=dcgid,
                 pixelSizeOnImage=message["pixel_size"],
                 imageSizeX=message["image_size_x"],
@@ -75,13 +76,20 @@ def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
                 totalExposedDose=message.get("total_exposed_dose"),
                 c2aperture=message.get("c2aperture"),
                 phasePlate=int(message.get("phase_plate", 0)),
+                axisStart=message.get("axis_start"),
+                axisEnd=message.get("axis_end"),
+                numberOfImages=message.get("tilt_series_length"),
             )
-            dcid = _transport_object.do_insert_data_collection(
+            dcid = murfey.server._transport_object.do_insert_data_collection(
                 record,
                 tag=(
                     message.get("tag")
                     if message["experiment_type"] == "tomography"
-                    else ""
+                    else (
+                        message.get("tag", "").split("_angle")[0]
+                        if message["experiment_type"] == "sxt"
+                        else ""
+                    )
                 ),
             ).get("return_value", None)
             if dcid is None:

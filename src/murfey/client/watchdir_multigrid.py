@@ -49,34 +49,40 @@ class MultigridDirWatcher(Observer):
             self.thread.join()
         log.debug("MultigridDirWatcher thread stop completed")
 
-    def _handle_metadata(self, directory: Path, extra_directory: str):
+    def _handle_metadata(self, directory: Path, extra_directory: str, limited=True):
+        """
+        Handles all unknown directories in the visit folder
+        These are transferred into a raw folder as subdirectories
+        named using "extra_directory"
+        For SPA and Tomo this is metadata, for SXT this will be both metadata and data
+        """
         self.notify(
             directory,
             extra_directory=extra_directory,
             analyse=self._analyse,
-            limited=True,
+            limited=limited,
             tag="metadata",
         )
         self._seen_dirs.append(directory)
 
     def _handle_fractions(self, directory: Path):
         processing_started = False
-        for d02 in directory.glob("Images-Disc*"):
-            if d02 not in self._seen_dirs:
-                self.notify(
-                    d02,
-                    remove_files=True,
-                    analyse=self._analyse,
-                    tag="fractions",
-                )
-                self._seen_dirs.append(d02)
-            processing_started = d02 in self._seen_dirs
-        if not processing_started:
-            if (
-                directory.is_dir()
-                and directory not in self._seen_dirs
-                and list(directory.iterdir())
-            ):
+        if directory.is_dir() and directory not in self._seen_dirs:
+            # Check contents, and skip .gain files written by EPU
+            directory_children = [d for d in directory.iterdir() if d.suffix != ".gain"]
+            for d02 in directory_children:
+                # Transfer each Images-Disc folder as a separate rsyncer
+                if d02.name.startswith("Images-Disc") and d02 not in self._seen_dirs:
+                    self.notify(
+                        d02,
+                        remove_files=True,
+                        analyse=self._analyse,
+                        tag="fractions",
+                    )
+                    self._seen_dirs.append(d02)
+                processing_started = d02 in self._seen_dirs
+            if not processing_started and directory_children:
+                # Tomography case of full directory transfer if no Images-Disc1
                 self.notify(
                     directory,
                     analyse=self._analyse,
@@ -87,7 +93,9 @@ class MultigridDirWatcher(Observer):
     def _process(self):
         while not self._stopping:
             for d in self._basepath.glob("*"):
-                if d.name in self._machine_config["create_directories"]:
+                if d.name.startswith("New folder"):
+                    self._seen_dirs.append(d)
+                elif d.name in self._machine_config["create_directories"]:
                     if d.is_dir() and d not in self._seen_dirs:
                         self.notify(
                             d,
@@ -110,7 +118,8 @@ class MultigridDirWatcher(Observer):
                     sample_dirs = list(d.glob("Sample*"))
                     if d.is_dir() and len(sample_dirs):
                         for sample in sample_dirs:
-                            if len(list(sample.glob("*.mdoc"))):
+                            if (sample / "Session.dm").is_file():
+                                # Transfer only folders where a tomo session exists
                                 if sample not in self._seen_dirs:
                                     self._handle_metadata(
                                         sample,
@@ -120,6 +129,12 @@ class MultigridDirWatcher(Observer):
                                     sample.parent.parent.parent
                                     / f"{sample.parent.name}_{sample.name}",
                                 )
+
+                    elif self._machine_config["single_data_directory"]:
+                        if d.is_dir() and d not in self._seen_dirs:
+                            self._handle_metadata(
+                                d, extra_directory=f"{d.name}", limited=False
+                            )
 
                     else:
                         if d.is_dir() and d not in self._seen_dirs:

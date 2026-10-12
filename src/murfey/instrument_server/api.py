@@ -383,6 +383,133 @@ def register_processing_parameters(
     return {"success": True}
 
 
+@router.get("/instruments/{instrument_name}/sessions/{session_id}/possible_otf_dirs")
+def get_possible_otf_dirs(
+    instrument_name: str,
+    session_id: MurfeySessionID,
+) -> list[File]:
+    """
+    Looks under the configured reference file directory for all top-level directories,
+    and returns them as a list of Pydantic models.
+    """
+    # Get the machine config from the backend server
+    url_path = url_path_for(
+        "session_control.router",
+        "machine_info_by_instrument",
+        instrument_name=sanitise_nonpath(instrument_name),
+    )
+    machine_config: dict[str, Any] = requests.get(
+        f"{_get_murfey_url()}{url_path}",
+        headers={"Authorization": f"Bearer {tokens[session_id]}"},
+    ).json()
+
+    # Look for OTF directories under the specified directory
+    candidates: list[File] = []
+    otf_dir = machine_config.get("gain_reference_directory", None)
+    if otf_dir is not None:
+        for item in secure_path(Path(otf_dir), keep_spaces=True).glob("*"):
+            if item.is_dir():
+                dir_stats = item.stat()
+                candidates.append(
+                    File(
+                        name=item.name,
+                        description="",
+                        size=dir_stats.st_size / 1e6,
+                        timestamp=datetime.fromtimestamp(dir_stats.st_mtime),
+                        full_path=str(item),
+                    )
+                )
+        candidates.sort(key=lambda x: x.timestamp, reverse=True)
+    else:
+        logger.error(f"No OTF directory was configured for {instrument_name}")
+    return candidates
+
+
+class OTFDirectoryUploadInfo(BaseModel):
+    dir_path: Path  # Full client-side path to OTF directory
+    visit_path: str  # Path fragment from rsync module to visit directory
+    destination_dir: str = "setup"  # Folder in visit directory to save to
+
+
+@router.post("/instruments/{instrument_name}/sessions/{session_id}/upload_otf_dir")
+def upload_otf_dir(
+    instrument_name: str,
+    session_id: MurfeySessionID,
+    otf_dir_info: OTFDirectoryUploadInfo,
+):
+    # Sanitise incoming values
+    otf_dir_path = sanitise(str(otf_dir_info.dir_path))
+    visit_path = sanitise(otf_dir_info.visit_path)
+    destination_dir = sanitise(otf_dir_info.destination_dir)
+
+    # Load machine config and other needed properties
+    machine_config_url_path = url_path_for(
+        "session_control.router",
+        "machine_info_by_instrument",
+        instrument_name=sanitise_nonpath(instrument_name),
+    )
+    machine_config: dict[str, Any] = requests.get(
+        f"{_get_murfey_url()}{machine_config_url_path}",
+        headers={"Authorization": f"Bearer {tokens[session_id]}"},
+    ).json()
+
+    # Validate that file passed is from the gain reference directory
+    otf_dir = machine_config.get("gain_reference_directory", "")
+    if not otf_dir_path.startswith(otf_dir):
+        raise ValueError(
+            "Gain reference file does not originate from the gain reference directory "
+            f"{otf_dir!r}"
+        )
+
+    # Construct the rsync path to use
+    # Return the rsync URL if set, otherwise assume you are syncing via Murfey
+    rsync_url = urlparse(
+        str(machine_config["rsync_url"])
+        if machine_config.get("rsync_url", "")
+        else _get_murfey_url()
+    )
+    rsync_module = machine_config.get("rsync_module", "data")
+    rsync_path = f"{rsync_url.hostname}::{rsync_module}/{visit_path}/{destination_dir}"
+
+    # Construct the expected destination path on the server side
+    rsync_basepath: str | None = machine_config.get("rsync_basepath")
+    if not rsync_basepath:
+        logger.error(f"No rsync base path was configured for {instrument_name}")
+        return {"success": False}
+    destination_path = (
+        f"{rsync_basepath}/{visit_path}/{destination_dir}/"
+        f"{secure_filename(otf_dir_info.dir_path.name)}"
+    )
+
+    # Run rsync subprocess to transfer OTF directory and contents
+    cmd = [
+        "rsync",
+        "-a",  # Sync folder contents
+    ]
+    if rsync_chmod := machine_config.get("rsync_chmod"):
+        cmd.append(f"--chmod={rsync_chmod}")
+    cmd.extend([posix_path(Path(otf_dir_path)), rsync_path])
+    process = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+    )
+    if process.returncode:
+        logger.warning(
+            f"Failed to transfer OTF directory {otf_dir_path!r} to {f'{destination_path}'!r} \n"
+            f"Executed the following command: {' '.join(cmd)!r} \n"
+            f"Returned the following error: \n"
+            f"{process.stderr}"
+        )
+        return {"success": False}
+
+    # Return the full path as part of the message
+    return {
+        "success": True,
+        "destination_path": str(destination_path),
+    }
+
+
 @router.get(
     "/instruments/{instrument_name}/sessions/{session_id}/possible_gain_references"
 )
@@ -476,17 +603,22 @@ class UpstreamFileDownloadInfo(BaseModel):
     download_dir: Path
     upstream_instrument: str
     upstream_visit_path: Path
+    search_strings: list[str] | None = None
 
 
 @router.post("/visits/{visit_name}/sessions/{session_id}/upstream_file_data_request")
-def gather_upstream_files(
+def run_upstream_file_download_request(
     visit_name: str,
     session_id: MurfeySessionID,
     upstream_file_download: UpstreamFileDownloadInfo,
 ):
     """
-    Instrument server endpoint that will query the backend for files in the chosen
-    visit directory
+    Instrument server endpoint that will receive an order from the backend server
+    to trigger an upstream file download request.
+
+    It will get the list of files matching the provided list of search strings,
+    then iteratively request for those files, saving them locally at the specified
+    download directory.
     """
     # Check for forbidden characters
     if any(c in visit_name for c in ("/", "\\", ":", ";")):
@@ -518,6 +650,7 @@ def gather_upstream_files(
         json={
             "upstream_instrument": upstream_instrument,
             "upstream_visit_path": str(upstream_visit_path),
+            "search_strings": upstream_file_download.search_strings,
         },
     ).json()
 

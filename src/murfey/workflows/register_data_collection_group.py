@@ -7,21 +7,22 @@ import ispyb.sqlalchemy._auto_db_schema as ISPyBDB
 from sqlmodel import select
 from sqlmodel.orm.session import Session as SQLModelSession
 
-from murfey.server import _transport_object
+import murfey.server
 from murfey.server.ispyb import ISPyBSession, get_session_id
-from murfey.util.db import DataCollectionGroup
+from murfey.util.db import DataCollectionGroup, ImagingSite
 
 logger = logging.getLogger("murfey.workflows.register_data_collection_group")
 
 
-def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
+def register_dcg(
+    message: dict, murfey_db: SQLModelSession
+) -> DataCollectionGroup | None:
     # Fail immediately if no transport wrapper is found
-    if _transport_object is None:
+    if murfey.server._transport_object is None:
         logger.error("Unable to find transport manager")
-        return {"success": False, "requeue": False}
+        return None
 
-    logger.info(f"Registering the following data collection group: \n{message}")
-
+    murfey_session_id = int(message["session_id"])
     ispyb_session_id = get_session_id(
         microscope=message["microscope"],
         proposal_code=message["proposal_code"],
@@ -29,68 +30,95 @@ def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
         visit_number=message["visit_number"],
         db=ISPyBSession(),
     )
+    if ispyb_session_id is None:
+        murfey_dcg = DataCollectionGroup(
+            session_id=murfey_session_id,
+            tag=message.get("tag"),
+            smartem_grid_uuid=message.get("smartem_grid_uuid"),
+        )
+        dcgid = murfey_dcg.id
+    else:
+        record = ISPyBDB.DataCollectionGroup(
+            sessionId=ispyb_session_id,
+            experimentTypeId=message["experiment_type_id"],
+        )
 
+        dcgid = murfey.server._transport_object.do_insert_data_collection_group(
+            record
+        ).get("return_value", None)
+        if dcgid is None:
+            return None
+
+        atlas_record = ISPyBDB.Atlas(
+            dataCollectionGroupId=dcgid,
+            atlasImage=message.get("atlas", ""),
+            pixelSize=message.get("atlas_pixel_size", 0),
+            cassetteSlot=message.get("sample"),
+        )
+        # Optionally set the collection mode and color flags
+        if collection_mode := message.get("collection_mode"):
+            atlas_record.mode = collection_mode
+        if color_flags := message.get("color_flags", {}):
+            for col_name, value in color_flags.items():
+                setattr(atlas_record, col_name, value)
+        atlas_id = murfey.server._transport_object.do_insert_atlas(atlas_record).get(
+            "return_value", None
+        )
+
+        murfey_dcg = DataCollectionGroup(
+            id=dcgid,
+            atlas_id=atlas_id,
+            atlas=message.get("atlas", ""),
+            atlas_pixel_size=message.get("atlas_pixel_size"),
+            sample=message.get("sample"),
+            session_id=murfey_session_id,
+            tag=message.get("tag"),
+            smartem_grid_uuid=message.get("smartem_grid_uuid"),
+        )
+    murfey_db.add(murfey_dcg)
+    if dcgid is not None and message.get("atlas_x_stage_position"):
+        atlas_site = ImagingSite(
+            dcg_id=dcgid,
+            session_id=murfey_session_id,
+            site_name=message.get("tag"),
+            data_type="atlas",
+            pos_x=message.get("atlas_x_stage_position"),
+            pos_y=message.get("atlas_y_stage_position"),
+            image_pixels_x=message.get("atlas_width"),
+            image_pixels_y=message.get("atlas_height"),
+            image_pixel_size=message.get("atlas_pixel_size"),
+        )
+        murfey_db.add(atlas_site)
+    murfey_db.commit()
+    return murfey_dcg
+
+
+def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
+    # Fail immediately if no transport wrapper is found
+    if murfey.server._transport_object is None:
+        logger.error("Unable to find transport manager")
+        return {"success": False, "requeue": False}
+
+    logger.info(f"Registering the following data collection group: \n{message}")
+    murfey_session_id = int(message["session_id"])
     if dcg_murfey := murfey_db.exec(
         select(DataCollectionGroup)
-        .where(DataCollectionGroup.session_id == message["session_id"])
+        .where(DataCollectionGroup.session_id == murfey_session_id)
         .where(DataCollectionGroup.tag == message.get("tag"))
     ).all():
         dcgid = dcg_murfey[0].id
     else:
-        if ispyb_session_id is None:
-            murfey_dcg = DataCollectionGroup(
-                session_id=message["session_id"],
-                tag=message.get("tag"),
-                smartem_grid_uuid=message.get("smartem_grid_uuid"),
+        murfey_dcg = register_dcg(message, murfey_db)
+        if murfey_dcg is None:
+            time.sleep(2)
+            logger.error(
+                "Failed to register the following data collection group: \n"
+                f"{message} \n"
+                "Requeuing message"
             )
-            dcgid = murfey_dcg.id
-        else:
-            record = ISPyBDB.DataCollectionGroup(
-                sessionId=ispyb_session_id,
-                experimentTypeId=message["experiment_type_id"],
-            )
+            return {"success": False, "requeue": True}
 
-            dcgid = _transport_object.do_insert_data_collection_group(record).get(
-                "return_value", None
-            )
-
-            if dcgid is None:
-                time.sleep(2)
-                logger.error(
-                    "Failed to register the following data collection group: \n"
-                    f"{message} \n"
-                    "Requeuing message"
-                )
-                return {"success": False, "requeue": True}
-
-            atlas_record = ISPyBDB.Atlas(
-                dataCollectionGroupId=dcgid,
-                atlasImage=message.get("atlas", ""),
-                pixelSize=message.get("atlas_pixel_size", 0),
-                cassetteSlot=message.get("sample"),
-            )
-            # Optionally set the collection mode and color flags
-            if collection_mode := message.get("collection_mode"):
-                atlas_record.mode = collection_mode
-            if color_flags := message.get("color_flags", {}):
-                for col_name, value in color_flags.items():
-                    setattr(atlas_record, col_name, value)
-            atlas_id = _transport_object.do_insert_atlas(atlas_record).get(
-                "return_value", None
-            )
-
-            murfey_dcg = DataCollectionGroup(
-                id=dcgid,
-                atlas_id=atlas_id,
-                atlas=message.get("atlas", ""),
-                atlas_pixel_size=message.get("atlas_pixel_size"),
-                sample=message.get("sample"),
-                session_id=message["session_id"],
-                tag=message.get("tag"),
-                smartem_grid_uuid=message.get("smartem_grid_uuid"),
-            )
-        murfey_db.add(murfey_dcg)
-        murfey_db.commit()
+        dcgid = murfey_dcg.id
         murfey_db.close()
 
     # Find out how many dcgs we have with this atlas
@@ -101,7 +129,7 @@ def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
     ):
         dcgs_atlas = murfey_db.exec(
             select(DataCollectionGroup)
-            .where(DataCollectionGroup.session_id == message["session_id"])
+            .where(DataCollectionGroup.session_id == murfey_session_id)
             .where(DataCollectionGroup.atlas == message["atlas"])
             .where(DataCollectionGroup.sample == message["sample"])
         ).all()
@@ -113,7 +141,7 @@ def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
     if dcg_hooks := entry_points(group="murfey.hooks", name="data_collection_group"):
         try:
             for hook in dcg_hooks:
-                hook.load()(dcgid, session_id=message["session_id"])
+                hook.load()(dcgid, session_id=murfey_session_id)
         except Exception:
             logger.error("Call to data collection group hook failed", exc_info=True)
 

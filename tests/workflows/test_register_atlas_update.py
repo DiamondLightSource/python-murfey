@@ -10,12 +10,11 @@ def test_run(
     mocker: MockerFixture,
 ):
     # Set up mocks and the dummy message to be registered
-    mock_transport_object = mocker.patch(
-        "murfey.workflows.register_atlas_update._transport_object"
-    )
+    mock_transport_object = mocker.patch("murfey.server._transport_object")
     mock_murfey_db = MagicMock()
     message = {
         "register": "atlas_update",
+        "session_id": 1,
         "atlas_id": mock.sentinel,
         "atlas": mock.sentinel,
         "atlas_pixel_size": mock.sentinel,

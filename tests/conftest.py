@@ -306,7 +306,7 @@ Fixtures for setting up test Murfey database
 def murfey_db_url():
     try:
         return (
-            f"postgresql+psycopg2://{os.environ['POSTGRES_USER']}:{os.environ['POSTGRES_PASSWORD']}"
+            f"postgresql://{os.environ['POSTGRES_USER']}:{os.environ['POSTGRES_PASSWORD']}"
             f"@{os.environ['POSTGRES_HOST']}:{os.environ['POSTGRES_PORT']}/{os.environ['POSTGRES_DB']}"
         )
     # Skip Murfey database-related tests if the environment for it hasn't been set up
@@ -336,13 +336,15 @@ def murfey_db_session_factory(murfey_db_engine):
 @pytest.fixture(scope="session")
 def seed_murfey_db(murfey_db_session_factory):
     # Populate Murfey database with initial values
+    visit_name = f"{ExampleVisit.proposal_code}{ExampleVisit.proposal_number}-{ExampleVisit.visit_number}"
     session: SQLModelSession = murfey_db_session_factory()
     _ = get_or_create_db_entry(
         session=session,
         table=MurfeySession,
         lookup_kwargs={
-            "id": ExampleVisit.murfey_session_id,
-            "name": f"{ExampleVisit.proposal_code}{ExampleVisit.proposal_number}-{ExampleVisit.visit_number}",
+            "name": visit_name,
+            "visit": visit_name,
+            "instrument_name": ExampleVisit.instrument_name,
         },
     )
     session.close()

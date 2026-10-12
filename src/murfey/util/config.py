@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import configparser
 import copy
 import os
 import socket
@@ -7,10 +8,18 @@ from functools import lru_cache
 from importlib.metadata import entry_points
 from pathlib import Path
 from typing import Any, Literal, Optional
+from urllib.parse import quote
 
 import yaml
 from pydantic import BaseModel, ConfigDict, RootModel, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings
+
+try:
+    from smartem_backend.keycloak_client import KeycloakClient, load_keycloak_config
+
+    SMARTEM_ACTIVE = True
+except ImportError:
+    SMARTEM_ACTIVE = False
 
 
 class MagnificationTable(RootModel[dict[int, float]]):
@@ -50,6 +59,7 @@ class MachineConfig(BaseModel):  # type: ignore
     analyse_created_directories: list[str] = []
     gain_reference_directory: Optional[Path] = None
     eer_fractionation_file_template: str = ""
+    single_data_directory: bool = False
 
     # Data transfer setup -------------------------------------------------------------
     # General setup
@@ -58,11 +68,14 @@ class MachineConfig(BaseModel):  # type: ignore
         "directories": [],
         "files": [],
     }
+    mkdir_chmod: int = 0o2750
+    gain_directory_name: str = "processing"
 
     # Rsync setup
     rsync_url: str = ""
     rsync_module: str = ""
     rsync_basepath: Optional[Path] = None
+    rsync_chmod: str = "D0750,F0750"
     allow_removal: bool = False
 
     # Upstream data download setup
@@ -75,7 +88,6 @@ class MachineConfig(BaseModel):  # type: ignore
     # General processing setup
     processing_enabled: bool = True
     process_by_default: bool = True
-    gain_directory_name: str = "processing"
     process_multiple_datasets: bool = True
     processed_directory_name: str = "processed"
     processed_extra_directory: str = ""
@@ -107,6 +119,7 @@ class MachineConfig(BaseModel):  # type: ignore
     frontend_url: str = "http://localhost:3000"
     instrument_server_url: str = "http://localhost:8001"
     smartem_api_url: str = ""
+    alertmanager_url: str = ""
 
     # Messaging queues
     failure_queue: str = ""
@@ -150,6 +163,15 @@ class MachineConfig(BaseModel):  # type: ignore
             return validated
         # Let it validate and fail as-is
         return v
+
+    @field_validator("mkdir_chmod", mode="before")
+    @classmethod
+    def parse_octal_int(cls, value):
+        # Attempt to parse the string as an octal int
+        if isinstance(value, str) and value.startswith("0o") and value[2:].isdigit():
+            return int(value, 8)
+        # Return value as-is otherwise
+        return value
 
 
 @lru_cache(maxsize=1)
@@ -237,7 +259,7 @@ class Security(BaseModel):
 
     # Murfey server connection settings
     auth_url: str = ""
-    auth_type: Literal["password", "cookie"] = "password"
+    auth_type: Literal["password", "cookie", "none"] = "password"
     auth_algorithm: str = ""
     auth_key: str = ""
     cookie_key: str = ""
@@ -247,6 +269,9 @@ class Security(BaseModel):
     session_validation: str = ""
     session_token_timeout: Optional[int] = None
     allow_origins: list[str] = ["*"]
+
+    # SmartEM keycloak config file
+    smartem_keycloak_config: str = ""
 
     # RabbitMQ settings
     rabbitmq_credentials: Path
@@ -337,3 +362,40 @@ def get_extended_machine_config(
     model = list(entry_points(group="murfey.config", name=extension_name))[0].load()
     data = getattr(machine_config, extension_name, {})
     return model(**data)
+
+
+def get_smartem_keycloak_client():
+    keycloak_client = None
+    if SMARTEM_ACTIVE:
+        if keycloak_config := (
+            os.getenv("SMARTEM_KEYCLOAK_CONFIGURATION")
+            or get_security_config().smartem_keycloak_config
+        ):
+            keycloak_client = KeycloakClient(
+                load_keycloak_config(Path(keycloak_config))
+            )
+    return keycloak_client
+
+
+@lru_cache(maxsize=1)
+def get_rabbitmq_url() -> str:
+    rabbitmq_defaults = {
+        "host": "localhost",
+        "port": "5672",
+        "username": "guest",
+        "password": "guest",
+        "vhost": "/",
+    }
+    rabbitmq_credentials_file = get_security_config().rabbitmq_credentials
+    cfgparser = configparser.ConfigParser(allow_no_value=True)
+    if rabbitmq_credentials_file:
+        cfgparser.read(rabbitmq_credentials_file)
+        rabbitmq_creds = (
+            {**rabbitmq_defaults, **cfgparser["rabbit"]}
+            if cfgparser.has_section("rabbit")
+            else rabbitmq_defaults
+        )
+    user = quote(rabbitmq_creds["username"], safe="")
+    password = quote(rabbitmq_creds["password"], safe="")
+    vhost = quote(rabbitmq_creds["vhost"], safe="")
+    return f"amqp://{user}:{password}@{rabbitmq_creds['host']}:{rabbitmq_creds['port']}/{vhost}"

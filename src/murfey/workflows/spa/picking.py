@@ -1,3 +1,5 @@
+import asyncio
+from datetime import datetime
 from logging import getLogger
 from typing import List
 
@@ -5,13 +7,13 @@ import numpy as np
 from sqlalchemy import func
 from sqlmodel import Session, select
 
+import murfey.server
 import murfey.server.prometheus as prom
-from murfey.server import _transport_object
 from murfey.server.feedback import (
     _app_id,
     _pj_id,
 )
-from murfey.util.config import get_machine_config
+from murfey.util.config import get_machine_config, get_rabbitmq_url
 from murfey.util.db import (
     AutoProcProgram,
     ClassificationFeedbackParameters,
@@ -33,10 +35,21 @@ try:
     from smartem_backend.api_client import SmartEMAPIClient
     from smartem_backend.model.http_request import MicrographUpdateRequest
     from smartem_backend.model.http_response import MicrographResponse
+    from smartem_backend.model.mq_event import (
+        MessageQueueEventType,
+        ParticlePickingCompleteBody,
+    )
+    from smartem_backend.rmq.publisher import AioPikaPublisher
     from smartem_common.entity_status import MicrographStatus
 
-    SMARTEM_ACTIVE = True
+    from murfey.util.config import get_smartem_keycloak_client
+
+    if keycloak_client := get_smartem_keycloak_client():
+        SMARTEM_ACTIVE = True
+    else:
+        SMARTEM_ACTIVE = False
 except ImportError:
+    keycloak_client = None
     SMARTEM_ACTIVE = False
 
 
@@ -45,7 +58,10 @@ def _register_picked_particles_use_diameter(message: dict, _db: Session):
     # Add this message to the table of seen messages
     params_to_forward = message.get("extraction_parameters")
     assert isinstance(params_to_forward, dict)
-    pj_id = _pj_id(message["program_id"], _db)
+
+    session_id = int(message["session_id"])
+    program_id = int(message["program_id"])
+    pj_id = _pj_id(program_id, _db)
     ctf_params = CtfParameters(
         pj_id=pj_id,
         micrographs_file=params_to_forward["micrographs_file"],
@@ -68,9 +84,7 @@ def _register_picked_particles_use_diameter(message: dict, _db: Session):
     if picking_db_len > default_spa_parameters.nr_picks_before_diameter:
         # If there are enough particles to get a diameter
         instrument_name = (
-            _db.exec(
-                select(MurfeySession).where(MurfeySession.id == message["session_id"])
-            )
+            _db.exec(select(MurfeySession).where(MurfeySession.id == session_id))
             .one()
             .instrument_name
         )
@@ -118,20 +132,20 @@ def _register_picked_particles_use_diameter(message: dict, _db: Session):
                         "downscale": relion_options["downscale"],
                         "kv": relion_options["voltage"],
                         "node_creator_queue": machine_config.node_creator_queue,
-                        "session_id": message["session_id"],
+                        "session_id": session_id,
                         "autoproc_program_id": _app_id(
-                            _pj_id(message["program_id"], _db, recipe="em-spa-extract"),
+                            _pj_id(program_id, _db, recipe="em-spa-extract"),
                             _db,
                         ),
                         "batch_size": default_spa_parameters.batch_size_2d,
                     },
                     "recipes": ["em-spa-extract"],
                 }
-                if _transport_object:
+                if murfey.server._transport_object:
                     zocalo_message["parameters"]["feedback_queue"] = (
-                        _transport_object.feedback_queue
+                        murfey.server._transport_object.feedback_queue
                     )
-                    _transport_object.send(
+                    murfey.server._transport_object.send(
                         "processing_recipe", zocalo_message, new_connection=True
                     )
         else:
@@ -159,19 +173,19 @@ def _register_picked_particles_use_diameter(message: dict, _db: Session):
                     "downscale": relion_options["downscale"],
                     "kv": relion_options["voltage"],
                     "node_creator_queue": machine_config.node_creator_queue,
-                    "session_id": message["session_id"],
+                    "session_id": session_id,
                     "autoproc_program_id": _app_id(
-                        _pj_id(message["program_id"], _db, recipe="em-spa-extract"), _db
+                        _pj_id(program_id, _db, recipe="em-spa-extract"), _db
                     ),
                     "batch_size": default_spa_parameters.batch_size_2d,
                 },
                 "recipes": ["em-spa-extract"],
             }
-            if _transport_object:
+            if murfey.server._transport_object:
                 zocalo_message["parameters"]["feedback_queue"] = (
-                    _transport_object.feedback_queue
+                    murfey.server._transport_object.feedback_queue
                 )
-                _transport_object.send(
+                murfey.server._transport_object.send(
                     "processing_recipe", zocalo_message, new_connection=True
                 )
 
@@ -192,15 +206,17 @@ def _register_picked_particles_use_boxsize(message: dict, _db: Session):
     params_to_forward = message.get("extraction_parameters")
     assert isinstance(params_to_forward, dict)
 
+    session_id = int(message["session_id"])
     instrument_name = (
-        _db.exec(select(MurfeySession).where(MurfeySession.id == message["session_id"]))
+        _db.exec(select(MurfeySession).where(MurfeySession.id == session_id))
         .one()
         .instrument_name
     )
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
-    pj_id = _pj_id(message["program_id"], _db)
+    program_id = int(message["program_id"])
+    pj_id = _pj_id(program_id, _db)
     ctf_params = CtfParameters(
         pj_id=pj_id,
         micrographs_file=params_to_forward["micrographs_file"],
@@ -241,19 +257,21 @@ def _register_picked_particles_use_boxsize(message: dict, _db: Session):
             "downscale": relion_params.downscale,
             "kv": relion_params.voltage,
             "node_creator_queue": machine_config.node_creator_queue,
-            "session_id": message["session_id"],
+            "session_id": session_id,
             "autoproc_program_id": _app_id(
-                _pj_id(message["program_id"], _db, recipe="em-spa-extract"), _db
+                _pj_id(program_id, _db, recipe="em-spa-extract"), _db
             ),
             "batch_size": default_spa_parameters.batch_size_2d,
         },
         "recipes": ["em-spa-extract"],
     }
-    if _transport_object:
+    if murfey.server._transport_object:
         zocalo_message["parameters"]["feedback_queue"] = (
-            _transport_object.feedback_queue
+            murfey.server._transport_object.feedback_queue
         )
-        _transport_object.send("processing_recipe", zocalo_message, new_connection=True)
+        murfey.server._transport_object.send(
+            "processing_recipe", zocalo_message, new_connection=True
+        )
     _db.close()
 
 
@@ -266,8 +284,8 @@ def _request_email(
     config = get_machine_config(instrument_name=session.instrument_name)[
         session.instrument_name
     ]
-    if _transport_object:
-        _transport_object.send(
+    if murfey.server._transport_object:
+        murfey.server._transport_object.send(
             config.notifications_queue,
             {
                 "groupId": dcg_id,
@@ -284,11 +302,13 @@ def _request_email(
 
 
 def _check_notifications(message: dict, murfey_db: Session) -> None:
+    session_id = int(message["session_id"])
+    program_id = int(message["program_id"])
     data_collection_hierarchy = murfey_db.exec(
         select(DataCollection, ProcessingJob, AutoProcProgram)
         .where(ProcessingJob.dc_id == DataCollection.id)
         .where(AutoProcProgram.pj_id == ProcessingJob.id)
-        .where(AutoProcProgram.id == message["program_id"])
+        .where(AutoProcProgram.id == program_id)
     ).all()
     dcgid = data_collection_hierarchy[0][0].dcg_id
     notification_parameters = murfey_db.exec(
@@ -369,11 +389,19 @@ def _check_notifications(message: dict, murfey_db: Session) -> None:
             "Requested email notification for the following abnormal parameters: \n"
             f"{', '.join([f'{p}' for p in failures])}"
         )
-        _request_email(failures, dcgid, message["session_id"], murfey_db)
+        _request_email(failures, dcgid, session_id, murfey_db)
     return None
 
 
 def particles_picked(message: dict, murfey_db: Session) -> dict[str, bool]:
+    # Update the last_active' column for the session
+    session_id = int(message["session_id"])
+    session = murfey_db.exec(
+        select(MurfeySession).where(MurfeySession.id == session_id)
+    ).one()
+    session.last_active = datetime.now()
+    murfey_db.add(session)
+
     movie = murfey_db.exec(
         select(Movie).where(Movie.murfey_id == message["motion_correction_id"])
     ).one()
@@ -382,15 +410,14 @@ def particles_picked(message: dict, murfey_db: Session) -> dict[str, bool]:
     murfey_db.commit()
     if SMARTEM_ACTIVE and movie.smartem_uuid:
         try:
-            session = murfey_db.exec(
-                select(MurfeySession).where(MurfeySession.id == message["session_id"])
-            ).one()
             machine_config = get_machine_config(
                 instrument_name=session.instrument_name
             )[session.instrument_name]
             if machine_config.smartem_api_url:
                 smartem_client = SmartEMAPIClient(
-                    base_url=machine_config.smartem_api_url, logger=logger
+                    base_url=machine_config.smartem_api_url,
+                    logger=logger,
+                    keycloak_client=keycloak_client,
                 )
                 update = MicrographUpdateRequest(
                     status=MicrographStatus.PARTICLE_PICKING_COMPLETED
@@ -401,23 +428,60 @@ def particles_picked(message: dict, murfey_db: Session) -> dict[str, bool]:
                     update,
                     MicrographResponse,
                 )
+
+                async def _publish_particle_picking_completed(
+                    micrograph_uuid: str, number_of_particles_picked: int
+                ) -> None:
+                    publisher = AioPikaPublisher(
+                        url=get_rabbitmq_url(),
+                        exchange_name="smartem",
+                        routing_key="smartem",
+                        exchange_type="fanout",
+                    )
+                    await publisher.connect()
+                    try:
+                        await publisher.publish_event(
+                            MessageQueueEventType.PARTICLE_PICKING_COMPLETE,
+                            ParticlePickingCompleteBody(
+                                event_type=MessageQueueEventType.PARTICLE_PICKING_COMPLETE,
+                                micrograph_uuid=micrograph_uuid,
+                                number_of_particles_picked=number_of_particles_picked,
+                            ),
+                        )
+                    except Exception:
+                        logger.warning(
+                            f"smartem failed to publish picking completion {micrograph_uuid}",
+                            exc_info=True,
+                        )
+                    finally:
+                        await publisher.close()
+
+                number_of_particles_picked = message.get("particle_count")
+                if number_of_particles_picked is None:
+                    number_of_particles_picked = len(
+                        message.get("particle_diameters") or []
+                    )
+                asyncio.run(
+                    _publish_particle_picking_completed(
+                        movie.smartem_uuid, number_of_particles_picked
+                    )
+                )
+
         except Exception:
             logger.warning(
                 "Failed to emit particle picking complete event to smartem",
                 exc_info=True,
             )
+    program_id = int(message["program_id"])
     feedback_params = murfey_db.exec(
         select(ClassificationFeedbackParameters).where(
-            ClassificationFeedbackParameters.pj_id
-            == _pj_id(message["program_id"], murfey_db)
+            ClassificationFeedbackParameters.pj_id == _pj_id(program_id, murfey_db)
         )
     ).one()
     if feedback_params.estimate_particle_diameter:
         _register_picked_particles_use_diameter(message, murfey_db)
     else:
         _register_picked_particles_use_boxsize(message, murfey_db)
-    prom.preprocessed_movies.labels(
-        processing_job=_pj_id(message["program_id"], murfey_db)
-    ).inc()
+    prom.preprocessed_movies.labels(processing_job=_pj_id(program_id, murfey_db)).inc()
     _check_notifications(message, murfey_db)
     return {"success": True}

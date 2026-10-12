@@ -4,51 +4,164 @@ from unittest.mock import MagicMock
 import pytest
 from pytest_mock import MockerFixture
 
-from murfey.server.api.workflow_fib import FIBAtlasInfo, register_fib_atlas
+from murfey.server.api.workflow_fib import (
+    File,
+    make_gif,
+    register_fib_atlas,
+    register_lamella_evaluation_image,
+)
+from murfey.util.models import FIBGIFParameters
 
 
+@pytest.mark.parametrize(
+    "has_transport_object",
+    (
+        True,
+        False,
+    ),
+)
 def test_register_fib_atlas(
     mocker: MockerFixture,
     tmp_path: Path,
+    has_transport_object: bool,
 ):
-    # Mock the databse instance
-    mock_db = MagicMock()
-
-    # Patch out the entry point being called
-    mock_register_fib_atlas = mocker.patch("murfey.workflows.fib.register_atlas.run")
-
+    # Set up the variables
     session_id = 1
-    fib_atlas_info = FIBAtlasInfo(**{"file": str(tmp_path / "dummy")})
+    fib_atlas = File(**{"file": str(tmp_path / "dummy")})
+
+    # Mock the logger
+    mock_logger = mocker.patch("murfey.server.api.workflow_fib.logger")
+
+    # Mock the transport object
+    if has_transport_object:
+        mock_transport_object = MagicMock()
+        mock_transport_object.feedback_queue = "dummy"
+        mocker.patch("murfey.server._transport_object", mock_transport_object)
+    else:
+        mocker.patch("murfey.server._transport_object", None)
 
     # Run the function and check that the expected calls were made
     register_fib_atlas(
         session_id=session_id,
-        fib_atlas_info=fib_atlas_info,
-        db=mock_db,
-    )
-    mock_register_fib_atlas.assert_called_once_with(
-        session_id=session_id,
-        file=fib_atlas_info.file,
-        murfey_db=mock_db,
+        fib_atlas=fib_atlas,
     )
 
+    # Check that the expected calls were made
+    if has_transport_object:
+        mock_transport_object.send.assert_called_with(
+            "dummy",
+            {
+                "register": "fib.register_atlas",
+                "session_id": session_id,
+                "atlas_file": str(fib_atlas.file),
+            },
+        )
+    else:
+        mock_logger.error.assert_called_with("No TransportManager object was set up")
 
-def test_register_fib_atlas_no_entry_point(
+
+@pytest.mark.parametrize(
+    "has_transport_object",
+    (
+        True,
+        False,
+    ),
+)
+def test_register_lamella_evaluation_image(
     mocker: MockerFixture,
     tmp_path: Path,
+    has_transport_object: bool,
 ):
-    # Mock out entry_points to return an empty list
-    mocker.patch("murfey.server.api.workflow_fib.entry_points", return_value=[])
+    # Set up the variables
+    session_id = 1
+    lamella_image = File(**{"file": str(tmp_path / "dummy")})
 
-    # Mock the databse instance
-    mock_db = MagicMock()
+    # Mock the logger
+    mock_logger = mocker.patch("murfey.server.api.workflow_fib.logger")
 
-    fib_atlas_info = FIBAtlasInfo(**{"file": str(tmp_path / "dummy")})
-
-    # Patch out the entry point being called
-    with pytest.raises(RuntimeError):
-        register_fib_atlas(
-            session_id=1,
-            fib_atlas_info=fib_atlas_info,
-            db=mock_db,
+    # Mock the transport object
+    if has_transport_object:
+        mock_transport_object = MagicMock()
+        mock_transport_object.feedback_queue = "dummy"
+        mocker.patch(
+            "murfey.server._transport_object",
+            mock_transport_object,
         )
+    else:
+        mocker.patch(
+            "murfey.server._transport_object",
+            None,
+        )
+
+    # Run the function and check that the expected calls were made
+    register_lamella_evaluation_image(
+        session_id=session_id,
+        lamella_image=lamella_image,
+    )
+
+    # Check that the expected calls were made
+    if has_transport_object:
+        mock_transport_object.send.assert_called_with(
+            "dummy",
+            {
+                "register": "fib.register_lamella_evaluation_image",
+                "session_id": session_id,
+                "lamella_image_file": str(lamella_image.file),
+            },
+        )
+    else:
+        mock_logger.error.assert_called_with("No TransportManager object was set up")
+
+
+@pytest.mark.parametrize(
+    "has_transport_object",
+    (
+        True,
+        False,
+    ),
+)
+@pytest.mark.asyncio
+async def test_make_gif(
+    mocker: MockerFixture,
+    tmp_path: Path,
+    has_transport_object: bool,
+):
+    # Set up the variables
+    session_id = 1
+    gif_params_dict = {
+        "lamella_number": 1,
+        "images": [
+            str(tmp_path / "some_file.png"),
+        ],
+        "output_file": str(tmp_path / "target_file.gif"),
+    }
+    gif_params = FIBGIFParameters(**gif_params_dict)
+
+    # Mock the logger
+    mock_logger = mocker.patch("murfey.server.api.workflow_fib.logger")
+
+    # Mock the transport object
+    if has_transport_object:
+        mock_transport_object = MagicMock()
+        mock_transport_object.feedback_queue = "dummy"
+        mocker.patch("murfey.server._transport_object", mock_transport_object)
+    else:
+        mocker.patch("murfey.server._transport_object", None)
+
+    # Run the function and check that the expected calls were made
+    await make_gif(
+        session_id=session_id,
+        gif_params=gif_params,
+    )
+
+    if has_transport_object:
+        mock_transport_object.send.assert_called_with(
+            "dummy",
+            {
+                "register": "fib.make_milling_gif",
+                "session_id": session_id,
+                "gif_params": gif_params_dict,
+            },
+        )
+    else:
+        mock_logger.error.assert_called_with("No TransportManager object was set up")

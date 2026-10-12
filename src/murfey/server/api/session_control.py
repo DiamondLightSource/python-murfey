@@ -12,14 +12,20 @@ from sqlmodel import select
 
 try:
     from smartem_backend.api_client import SmartEMAPIClient
-    from smartem_common.schemas import AtlasData
+    from smartem_backend.model.http_request import GridSquareUpdateRequest
 
-    SMARTEM_ACTIVE = True
+    from murfey.util.config import get_smartem_keycloak_client
+
+    if keycloak_client := get_smartem_keycloak_client():
+        SMARTEM_ACTIVE = True
+    else:
+        SMARTEM_ACTIVE = False
 except ImportError:
+    keycloak_client = None
     SMARTEM_ACTIVE = False
 
+import murfey.server
 import murfey.server.prometheus as prom
-from murfey.server import _transport_object
 from murfey.server.api.auth import (
     MurfeySessionIDInstrument as MurfeySessionID,
     validate_instrument_token,
@@ -53,6 +59,7 @@ from murfey.util.db import (
     Session,
 )
 from murfey.util.models import (
+    AtlasRegistration,
     BatchPositionParameters,
     ClientInfo,
     FoilHoleParameters,
@@ -65,7 +72,6 @@ from murfey.util.models import (
 from murfey.workflows.spa.atlas import atlas_jpg_from_mrc
 from murfey.workflows.spa.flush_spa_preprocess import (
     register_foil_hole as _register_foil_hole,
-    register_grid_square as _register_grid_square,
 )
 from murfey.workflows.tomo.tomo_metadata import (
     register_batch_position_in_database,
@@ -193,14 +199,14 @@ def register_processing_success_in_ispyb(
         .where(AutoProcProgram.pj_id == ProcessingJob.id)
     ).all()
     appids = [c[3].id for c in collected_ids]
-    if _transport_object:
+    if murfey.server._transport_object:
         if db is not None:
             apps = db.query(ISPyBAutoProcProgram).filter(
                 ISPyBAutoProcProgram.autoProcProgramId.in_(appids)
             )
             for updated in apps:
                 updated.processingStatus = True
-                _transport_object.do_update_processing_status(updated)
+                murfey.server._transport_object.do_update_processing_status(updated)
 
 
 @router.get("/num_movies")
@@ -227,8 +233,10 @@ def failed_client_post(instrument_name: str, post_info: PostInfo):
         "data": post_info.data,
         "kwargs": post_info.kwargs,
     }
-    if _transport_object:
-        _transport_object.send(_transport_object.feedback_queue, zocalo_message)
+    if murfey.server._transport_object:
+        murfey.server._transport_object.send(
+            murfey.server._transport_object.feedback_queue, zocalo_message
+        )
 
 
 @router.post("/sessions/{session_id}/rsyncer")
@@ -357,94 +365,73 @@ def get_foil_hole(
     return _get_foil_hole(session_id, fh_name, db)
 
 
-class AtlasRegistration(BaseModel):
-    name: str
-    acquisition_uuid: str | None
-    storage_folder: str = ""
-    register_grid: bool = False
-    tag: str = ""
-
-
 @spa_router.post("/sessions/{session_id}/register_atlas")
 def register_atlas(
     session_id: MurfeySessionID,
     atlas_registration_data: AtlasRegistration,
     db=murfey_db,
 ):
-    if SMARTEM_ACTIVE and atlas_registration_data.acquisition_uuid is not None:
-        session = db.exec(select(Session).where(Session.id == session_id)).one()
-        machine_config = get_machine_config(session.instrument_name)[
-            session.instrument_name
-        ]
-        if machine_config.smartem_api_url:
-            smartem_client = SmartEMAPIClient(
-                base_url=machine_config.smartem_api_url, logger=logger
-            )
-            grid_uuid = None
-            if atlas_registration_data.tag:
-                dcg = db.exec(
-                    select(DataCollectionGroup)
-                    .where(DataCollectionGroup.session_id == session_id)
-                    .where(DataCollectionGroup.tag == atlas_registration_data.tag)
-                ).one_or_none()
-                grid_uuid = dcg.smartem_grid_uuid
-            else:
-                possible_grids = smartem_client.get_acquisition_grids(
-                    atlas_registration_data.acquisition_uuid
-                )
-                for grid in possible_grids:
-                    if grid.name == atlas_registration_data.name.replace("_atlas", ""):
-                        grid_uuid = grid.uuid
-                        break
-            if grid_uuid is not None:
-                atlas_data = AtlasData(
-                    id=atlas_registration_data.name,
-                    acquisition_date=datetime.now(),
-                    storage_folder=atlas_registration_data.storage_folder,
-                    name=atlas_registration_data.name,
-                    tiles=[],
-                    gridsquare_positions=None,
-                    grid_uuid=grid_uuid,
-                )
-                smartem_client.create_grid_atlas(atlas_data)
-                if atlas_registration_data.register_grid:
-                    smartem_client.grid_registered(grid_uuid)
-    else:
-        logger.info(
-            f"smartem deactivated so did not register atlas for {sanitise(str(atlas_registration_data.acquisition_uuid))}"
+    if murfey.server._transport_object:
+        murfey.server._transport_object.send(
+            murfey.server._transport_object.feedback_queue,
+            {
+                "register": "spa.smartem_atlas",
+                "session_id": session_id,
+                "atlas_registration_data": atlas_registration_data.model_dump(),
+            },
         )
 
 
 class SquareRegistration(BaseModel):
     tag: str
+    image_path: str | None = None
     count: int | None = None
+    serialem: bool = False
 
 
 @spa_router.post("/sessions/{session_id}/register_square/{gsid}")
 def register_square(
     session_id: MurfeySessionID,
-    gsid: int,
+    gsid: int | str,
     square_registration_data: SquareRegistration,
     db=murfey_db,
 ):
     if SMARTEM_ACTIVE:
-        gs = db.exec(
-            select(GridSquare)
-            .where(GridSquare.name == gsid)
-            .where(GridSquare.tag == square_registration_data.tag)
-            .where(GridSquare.session_id == session_id)
-        ).one_or_none()
-        if gs and gs.smartem_uuid:
+        logger.info(f"smartem active for square {sanitise(str(gsid))}")
+        if square_registration_data.serialem:
+            smartem_uuid: int | str | None = gsid
+        else:
+            gs = db.exec(
+                select(GridSquare)
+                .where(GridSquare.name == gsid)
+                .where(GridSquare.tag == square_registration_data.tag)
+                .where(GridSquare.session_id == session_id)
+            ).one_or_none()
+            smartem_uuid = gs.smartem_uuid if gs else None
+        if smartem_uuid is not None:
             session = db.exec(select(Session).where(Session.id == session_id)).one()
             machine_config = get_machine_config(session.instrument_name)[
                 session.instrument_name
             ]
             if machine_config.smartem_api_url:
                 smartem_client = SmartEMAPIClient(
-                    base_url=machine_config.smartem_api_url, logger=logger
+                    base_url=machine_config.smartem_api_url,
+                    logger=logger,
+                    keycloak_client=keycloak_client,
                 )
-                smartem_client.gridsquare_registered(
-                    gs.smartem_uuid, count=square_registration_data.count
+                if not square_registration_data.serialem:
+                    smartem_client.gridsquare_registered(
+                        smartem_uuid, count=square_registration_data.count
+                    )
+                logger.info(
+                    f"updating gridsquare with image path {square_registration_data.image_path}"
+                )
+                smartem_client._request(
+                    "put",
+                    f"gridsquares/{smartem_uuid}",
+                    GridSquareUpdateRequest(
+                        image_path=square_registration_data.image_path
+                    ),
                 )
     else:
         logger.info("smartem deactivated so did not register square")
@@ -470,7 +457,16 @@ def register_grid_square(
     grid_square_params: GridSquareParameters,
     db=murfey_db,
 ):
-    return _register_grid_square(session_id, gsid, grid_square_params, db)
+    if murfey.server._transport_object:
+        murfey.server._transport_object.send(
+            murfey.server._transport_object.feedback_queue,
+            {
+                "register": "spa.register_grid_square",
+                "session_id": session_id,
+                "gsid": gsid,
+                "grid_square_params": grid_square_params.model_dump(),
+            },
+        )
 
 
 @spa_router.post("/sessions/{session_id}/grid_square/{gs_name}/foil_hole")
@@ -538,6 +534,7 @@ async def gather_upstream_files(
         session_id=session_id,
         upstream_instrument=upstream_file_request.upstream_instrument,
         upstream_visit_path=upstream_file_request.upstream_visit_path,
+        search_strings=upstream_file_request.search_strings,
         db=db,
     )
 

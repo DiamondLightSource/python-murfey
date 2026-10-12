@@ -8,7 +8,7 @@ from murfey.workflows.tomo import tomo_metadata
 from tests.conftest import ExampleVisit
 
 
-@mock.patch("murfey.workflows.tomo.tomo_metadata._transport_object")
+@mock.patch("murfey.server._transport_object")
 def test_register_search_map_update_with_dimensions(
     mock_transport, murfey_db_session: Session
 ):
@@ -60,7 +60,7 @@ def test_register_search_map_update_with_dimensions(
     assert sm_final_parameters.x_location is None
 
 
-@mock.patch("murfey.workflows.tomo.tomo_metadata._transport_object")
+@mock.patch("murfey.server._transport_object")
 def test_register_search_map_update_with_all_parameters(
     mock_transport, murfey_db_session: Session
 ):
@@ -147,7 +147,7 @@ def test_register_search_map_update_with_all_parameters(
     assert update_args[1][0][1].width_on_atlas == 155
 
 
-@mock.patch("murfey.workflows.tomo.tomo_metadata._transport_object")
+@mock.patch("murfey.server._transport_object")
 def test_register_search_map_insert_with_ispyb(
     mock_transport, murfey_db_session: Session, tmp_path
 ):

@@ -20,6 +20,8 @@ from ispyb.sqlalchemy import (
     DataCollectionGroup,
     FoilHole,
     GridSquare,
+    MillingStep,
+    MillingStepName,
     ProcessingJob,
     ProcessingJobParameter,
     Proposal,
@@ -41,18 +43,22 @@ from murfey.util.models import (
 log = logging.getLogger("murfey.server.ispyb")
 security_config = get_security_config()
 
-try:
-    ISPyBSession = sessionmaker(
-        bind=create_engine(
-            url(credentials=security_config.ispyb_credentials),
-            connect_args={"use_pure": True},
-            pool_recycle=250,
+if security_config.ispyb_credentials:
+    try:
+        ISPyBSession = sessionmaker(
+            bind=create_engine(
+                url(credentials=security_config.ispyb_credentials),
+                connect_args={"use_pure": True},
+                pool_recycle=250,
+            )
         )
-    )
-    log.info("Loaded ISPyB database session")
-# Catch all errors associated with loading ISPyB database
-except Exception:
-    log.error("Error loading ISPyB session", exc_info=True)
+        log.info("Loaded ISPyB database session")
+    # Catch all errors associated with loading ISPyB database
+    except Exception:
+        log.error("Error loading ISPyB session", exc_info=True)
+        ISPyBSession = lambda: None
+else:
+    log.info("No ISPyB credentials set, using local database")
     ISPyBSession = lambda: None
 
 
@@ -222,14 +228,15 @@ class TransportManager:
     ):
         color_flags = color_flags or {}
         # most of this is for mypy
+        pixel_size = grid_square_parameters.pixel_size
         if (
-            grid_square_parameters.pixel_size is not None
+            pixel_size is not None
             and grid_square_parameters.thumbnail_size_x is not None
             and grid_square_parameters.readout_area_x is not None
         ):
             # currently hard coding the scale factor because of difficulties with
             # guaranteeing we have the atlas jpg and mrc sizes
-            grid_square_parameters.pixel_size *= (
+            pixel_size *= (
                 grid_square_parameters.readout_area_x
                 / grid_square_parameters.thumbnail_size_x
             )
@@ -244,7 +251,7 @@ class TransportManager:
             angle=grid_square_parameters.angle,
             stageLocationX=grid_square_parameters.x_stage_position,
             stageLocationY=grid_square_parameters.y_stage_position,
-            pixelSize=grid_square_parameters.pixel_size,
+            pixelSize=pixel_size,
             mode=grid_square_parameters.collection_mode,
         )
         # Optionally insert colour flags
@@ -279,12 +286,13 @@ class TransportManager:
                     .filter(GridSquare.gridSquareId == grid_square_id)
                     .one()
                 )
+                pixel_size = grid_square_parameters.pixel_size
                 if (
-                    grid_square_parameters.pixel_size is not None
+                    pixel_size is not None
                     and grid_square_parameters.readout_area_x is not None
                     and grid_square_parameters.thumbnail_size_x is not None
                 ):
-                    grid_square_parameters.pixel_size *= (
+                    pixel_size *= (
                         grid_square_parameters.readout_area_x
                         / grid_square_parameters.thumbnail_size_x
                     )
@@ -308,8 +316,8 @@ class TransportManager:
                     grid_square.stageLocationX = grid_square_parameters.x_stage_position
                 if grid_square_parameters.y_stage_position:
                     grid_square.stageLocationY = grid_square_parameters.y_stage_position
-                if grid_square_parameters.pixel_size:
-                    grid_square.pixelSize = grid_square_parameters.pixel_size
+                if pixel_size:
+                    grid_square.pixelSize = pixel_size
                 if grid_square_parameters.collection_mode:
                     grid_square.mode = grid_square_parameters.collection_mode
                 # Optionally insert colour flags
@@ -333,27 +341,31 @@ class TransportManager:
         scale_factor: Optional[float],
         foil_hole_parameters: FoilHoleParameters,
     ):
+        pixel_size = foil_hole_parameters.pixel_size
+        diameter = foil_hole_parameters.diameter
+        x_location = foil_hole_parameters.x_location
+        y_location = foil_hole_parameters.y_location
         if (
             foil_hole_parameters.thumbnail_size_x is not None
             and foil_hole_parameters.readout_area_x is not None
-            and foil_hole_parameters.pixel_size is not None
+            and pixel_size is not None
         ):
-            foil_hole_parameters.pixel_size *= (
+            pixel_size *= (
                 foil_hole_parameters.readout_area_x
                 / foil_hole_parameters.thumbnail_size_x
             )
         if scale_factor:
-            foil_hole_parameters.diameter = (
+            diameter = (
                 int(foil_hole_parameters.diameter * scale_factor)
                 if foil_hole_parameters.diameter
                 else None
             )
-            foil_hole_parameters.x_location = (
+            x_location = (
                 int(foil_hole_parameters.x_location * scale_factor)
                 if foil_hole_parameters.x_location
                 else None
             )
-            foil_hole_parameters.y_location = (
+            y_location = (
                 int(foil_hole_parameters.y_location * scale_factor)
                 if foil_hole_parameters.y_location
                 else None
@@ -362,12 +374,12 @@ class TransportManager:
             gridSquareId=grid_square_id,
             foilHoleLabel=foil_hole_parameters.name,
             foilHoleImage=foil_hole_parameters.image,
-            pixelLocationX=foil_hole_parameters.x_location,
-            pixelLocationY=foil_hole_parameters.y_location,
-            diameter=foil_hole_parameters.diameter,
+            pixelLocationX=x_location,
+            pixelLocationY=y_location,
+            diameter=diameter,
             stageLocationX=foil_hole_parameters.x_stage_position,
             stageLocationY=foil_hole_parameters.y_stage_position,
-            pixelSize=foil_hole_parameters.pixel_size,
+            pixelSize=pixel_size,
         )
         try:
             with ISPyBSession() as db:
@@ -435,45 +447,34 @@ class TransportManager:
         atlas_id: int,
         search_map_parameters: SearchMapParameters,
     ):
+        pixel_size = search_map_parameters.pixel_size
         if (
-            search_map_parameters.pixel_size
+            pixel_size
             and search_map_parameters.height
             and search_map_parameters.height_on_atlas
         ):
-            search_map_parameters.pixel_size *= (
+            pixel_size *= (
                 search_map_parameters.height / search_map_parameters.height_on_atlas
             )
-        search_map_parameters.height = (
-            int(search_map_parameters.height / 7.8)
-            if search_map_parameters.height
-            else None
-        )
-        search_map_parameters.width = (
-            int(search_map_parameters.width / 7.8)
-            if search_map_parameters.width
-            else None
-        )
-        search_map_parameters.x_location = (
-            int(search_map_parameters.x_location / 7.8)
-            if search_map_parameters.x_location
-            else None
-        )
-        search_map_parameters.y_location = (
-            int(search_map_parameters.y_location / 7.8)
-            if search_map_parameters.y_location
-            else None
-        )
         record = GridSquare(
             atlasId=atlas_id,
             gridSquareImage=search_map_parameters.image,
-            pixelLocationX=search_map_parameters.x_location,
-            pixelLocationY=search_map_parameters.y_location,
-            height=search_map_parameters.height_on_atlas,
-            width=search_map_parameters.width_on_atlas,
+            pixelLocationX=int(search_map_parameters.x_location / 7.8)
+            if search_map_parameters.x_location
+            else None,
+            pixelLocationY=int(search_map_parameters.y_location / 7.8)
+            if search_map_parameters.y_location
+            else None,
+            height=int(search_map_parameters.height / 7.8)
+            if search_map_parameters.height
+            else None,
+            width=int(search_map_parameters.width / 7.8)
+            if search_map_parameters.width
+            else None,
             angle=0,
             stageLocationX=search_map_parameters.x_stage_position,
             stageLocationY=search_map_parameters.y_stage_position,
-            pixelSize=search_map_parameters.pixel_size,
+            pixelSize=pixel_size,
         )
         try:
             with ISPyBSession() as db:
@@ -499,12 +500,13 @@ class TransportManager:
                     .filter(GridSquare.gridSquareId == search_map_id)
                     .one()
                 )
+                pixel_size = search_map_parameters.pixel_size
                 if (
-                    search_map_parameters.pixel_size
+                    pixel_size
                     and search_map_parameters.height
                     and search_map_parameters.height_on_atlas
                 ):
-                    search_map_parameters.pixel_size *= (
+                    pixel_size *= (
                         search_map_parameters.height
                         / search_map_parameters.height_on_atlas
                     )
@@ -528,14 +530,94 @@ class TransportManager:
                     grid_square.stageLocationX = search_map_parameters.x_stage_position
                 if search_map_parameters.y_stage_position:
                     grid_square.stageLocationY = search_map_parameters.y_stage_position
-                if search_map_parameters.pixel_size:
-                    grid_square.pixelSize = search_map_parameters.pixel_size
+                if pixel_size:
+                    grid_square.pixelSize = pixel_size
                 db.add(grid_square)
                 db.commit()
                 return {"success": True, "return_value": grid_square.gridSquareId}
         except ispyb.ISPyBException as e:
             log.error(
                 "Updating SearchMap (GridSquare) entry caused exception '%s'.",
+                e,
+                exc_info=True,
+            )
+        return {"success": False, "return_value": None}
+
+    def do_insert_sxt_roi(
+        self,
+        atlas_id: int,
+        roi_parameters: SearchMapParameters,
+    ):
+        pixel_size = roi_parameters.pixel_size
+        if pixel_size and roi_parameters.height and roi_parameters.height_on_atlas:
+            pixel_size *= roi_parameters.height / roi_parameters.height_on_atlas
+        record = GridSquare(
+            atlasId=atlas_id,
+            gridSquareImage=roi_parameters.image,
+            pixelLocationX=int(roi_parameters.x_location)
+            if roi_parameters.x_location
+            else None,
+            pixelLocationY=int(roi_parameters.y_location)
+            if roi_parameters.y_location
+            else None,
+            height=roi_parameters.height_on_atlas,
+            width=roi_parameters.width_on_atlas,
+            angle=0,
+            stageLocationX=roi_parameters.x_stage_position,
+            stageLocationY=roi_parameters.y_stage_position,
+            pixelSize=pixel_size,
+        )
+        try:
+            with ISPyBSession() as db:
+                db.add(record)
+                db.commit()
+                log.info(f"Created SXT ROI (GridSquare) {record.gridSquareId}")
+                return {"success": True, "return_value": record.gridSquareId}
+        except ispyb.ISPyBException as e:
+            log.error(
+                "Inserting SXT ROI (GridSquare) entry caused exception '%s'.",
+                e,
+                exc_info=True,
+            )
+        return {"success": False, "return_value": None}
+
+    def do_update_sxt_roi(self, roi_id, roi_parameters: SearchMapParameters):
+        try:
+            with ISPyBSession() as db:
+                grid_square = (
+                    db.query(GridSquare).filter(GridSquare.gridSquareId == roi_id).one()
+                )
+                pixel_size = roi_parameters.pixel_size
+                if (
+                    pixel_size
+                    and roi_parameters.height
+                    and roi_parameters.height_on_atlas
+                ):
+                    pixel_size *= roi_parameters.height / roi_parameters.height_on_atlas
+                grid_square.gridSquareImage = (
+                    roi_parameters.image or grid_square.gridSquareImage
+                )
+                if roi_parameters.x_location:
+                    grid_square.pixelLocationX = int(roi_parameters.x_location)
+                if roi_parameters.y_location:
+                    grid_square.pixelLocationY = int(roi_parameters.y_location)
+                if roi_parameters.height_on_atlas:
+                    grid_square.height = int(roi_parameters.height_on_atlas)
+                if roi_parameters.width_on_atlas:
+                    grid_square.width = int(roi_parameters.width_on_atlas)
+                grid_square.stageLocationX = (
+                    roi_parameters.x_stage_position or grid_square.stageLocationX
+                )
+                grid_square.stageLocationY = (
+                    roi_parameters.y_stage_position or grid_square.stageLocationY
+                )
+                grid_square.pixelSize = pixel_size or grid_square.pixelSize
+                db.add(grid_square)
+                db.commit()
+                return {"success": True, "return_value": grid_square.gridSquareId}
+        except ispyb.ISPyBException as e:
+            log.error(
+                "Updating SXT ROI (GridSquare) entry caused exception '%s'.",
                 e,
                 exc_info=True,
             )
@@ -709,6 +791,164 @@ class TransportManager:
                 exc_info=True,
             )
             return {"success": False, "return_value": None}
+
+    def do_insert_milling_step(
+        self,
+        # MillingStepName identifiers
+        recipe_name: str,
+        activity_name: str,
+        grid_square_id: int,
+        # Values
+        is_enabled: bool | None = None,
+        status: str | None = None,
+        execution_time: float | None = None,
+        stage_x: float | None = None,
+        stage_y: float | None = None,
+        stage_z: float | None = None,
+        rotation: float | None = None,
+        tilt_alpha: float | None = None,
+        beam_type: str | None = None,
+        beam_voltage: float | None = None,
+        beam_current: float | None = None,
+        milling_angle: float | None = None,
+        depth_correction: float | None = None,
+        lamella_offset: float | None = None,
+        trench_height_front: float | None = None,
+        trench_height_rear: float | None = None,
+        width_overlap_front_left: float | None = None,
+        width_overlap_front_right: float | None = None,
+        width_overlap_rear_left: float | None = None,
+        width_overlap_rear_right: float | None = None,
+    ):
+        try:
+            with ISPyBSession() as db:
+                # Find the ID of this MillingStep
+                milling_step_name = (
+                    db.query(MillingStepName)
+                    .filter(
+                        MillingStepName.recipe == recipe_name,
+                        MillingStepName.step == activity_name,
+                    )
+                    .one()
+                )
+                record = MillingStep(
+                    # IDs
+                    millingStepNameId=milling_step_name.millingStepNameId,
+                    gridSquareId=grid_square_id,
+                    # Values
+                    isEnabled=is_enabled,
+                    status=status,
+                    executionTime=execution_time,
+                    stageX=stage_x,
+                    stageY=stage_y,
+                    stageZ=stage_z,
+                    rotation=rotation,
+                    alphaTilt=tilt_alpha,
+                    beamType=beam_type,
+                    beamVoltage=beam_voltage,
+                    beamCurrent=beam_current,
+                    millingAngle=milling_angle,
+                    depthCorrection=depth_correction,
+                    lamellaOffset=lamella_offset,
+                    trenchHeightFront=trench_height_front,
+                    trenchHeightRear=trench_height_rear,
+                    widthOverlapFrontLeft=width_overlap_front_left,
+                    widthOverlapFrontRight=width_overlap_front_right,
+                    widthOverlapRearLeft=width_overlap_rear_left,
+                    widthOverlapRearRight=width_overlap_rear_right,
+                )
+                db.add(record)
+                db.commit()
+                log.info(f"Created MillingStep {record.millingStepId}")
+                return {"success": True, "return_value": record.millingStepId}
+        except ispyb.ISPyBException as e:
+            log.error(
+                "Insert MillingStep entry caused exception '%s'.",
+                e,
+                exc_info=True,
+            )
+        return {"success": False, "return_value": None}
+
+    def do_update_milling_step(
+        self,
+        milling_step_id: int,
+        is_enabled: bool | None = None,
+        status: str | None = None,
+        execution_time: float | None = None,
+        stage_x: float | None = None,
+        stage_y: float | None = None,
+        stage_z: float | None = None,
+        rotation: float | None = None,
+        tilt_alpha: float | None = None,
+        beam_type: str | None = None,
+        beam_voltage: float | None = None,
+        beam_current: float | None = None,
+        milling_angle: float | None = None,
+        depth_correction: float | None = None,
+        lamella_offset: float | None = None,
+        trench_height_front: float | None = None,
+        trench_height_rear: float | None = None,
+        width_overlap_front_left: float | None = None,
+        width_overlap_front_right: float | None = None,
+        width_overlap_rear_left: float | None = None,
+        width_overlap_rear_right: float | None = None,
+    ):
+        try:
+            with ISPyBSession() as db:
+                milling_step = (
+                    db.query(MillingStep)
+                    .filter(MillingStep.millingStepId == milling_step_id)
+                    .one()
+                )
+                milling_step.isEnabled = is_enabled or milling_step.isEnabled
+                milling_step.status = status or milling_step.status
+                milling_step.executionTime = (
+                    execution_time or milling_step.executionTime
+                )
+                milling_step.stageX = stage_x or milling_step.stageX
+                milling_step.stageY = stage_y or milling_step.stageY
+                milling_step.stageZ = stage_z or milling_step.stageZ
+                milling_step.rotation = rotation or milling_step.rotation
+                milling_step.alphaTilt = tilt_alpha or milling_step.alphaTilt
+                milling_step.beamType = beam_type or milling_step.beamType
+                milling_step.beamVoltage = beam_voltage or milling_step.beamVoltage
+                milling_step.beamCurrent = beam_current or milling_step.beamCurrent
+                milling_step.millingAngle = milling_angle or milling_step.millingAngle
+                milling_step.depthCorrection = (
+                    depth_correction or milling_step.depthCorrection
+                )
+                milling_step.lamellaOffset = (
+                    lamella_offset or milling_step.lamellaOffset
+                )
+                milling_step.trenchHeightFront = (
+                    trench_height_front or milling_step.trenchHeightFront
+                )
+                milling_step.trenchHeightRear = (
+                    trench_height_rear or milling_step.trenchHeightRear
+                )
+                milling_step.widthOverlapFrontLeft = (
+                    width_overlap_front_left or milling_step.widthOverlapFrontLeft
+                )
+                milling_step.widthOverlapFrontRight = (
+                    width_overlap_front_right or milling_step.widthOverlapFrontRight
+                )
+                milling_step.widthOverlapRearLeft = (
+                    width_overlap_rear_left or milling_step.widthOverlapRearLeft
+                )
+                milling_step.widthOverlapRearRight = (
+                    width_overlap_rear_right or milling_step.widthOverlapRearRight
+                )
+
+                db.add(milling_step)
+                db.commit()
+                return {"success": True, "return_value": milling_step.millingStepId}
+        except ispyb.ISPyBException as e:
+            log.error(
+                "Updating MillingStep entry caused exception '%s'.",
+                e,
+                exc_info=True,
+            )
+        return {"success": False, "return_value": None}
 
     def do_buffer_lookup(self, app_id: int, uuid: int) -> Optional[int]:
         with ISPyBSession() as db:

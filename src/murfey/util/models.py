@@ -2,14 +2,16 @@ from __future__ import annotations
 
 import math
 from datetime import datetime
+from functools import cached_property
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, computed_field, field_validator, model_validator
 
 """
+=======================================================================================
 General Models
-==============
+=======================================================================================
 Models used in multiple workflows.
 """
 
@@ -88,13 +90,246 @@ class UpstreamFileRequestInfo(BaseModel):
     # Used in backend server for cross-instrument file download requests
     upstream_instrument: str
     upstream_visit_path: Path
+    search_strings: list[str] | None = None
 
 
 """
+=======================================================================================
+FIB
+=======================================================================================
+Models related to the FIB workflow.
+"""
+
+
+class StagePositionValues(BaseModel):
+    # Coordinates are in metres
+    x: float | None = None
+    y: float | None = None
+    z: float | None = None
+    # Angles are in degrees
+    rotation: float | None = None
+    tilt_alpha: float | None = None
+
+
+class StagePositionInfo(BaseModel):
+    """
+    Stage position values associated with the different stages of the milling
+    process. The XML paths they're associated with (with "Site" as the parent
+    node) are indicated in the comments.
+
+    The image acquisition steps have a "SiteLocationType" field that appear to
+    be associated with either "ChunkSiteLocation" or "ThinningSiteLocation".
+    "ThinningStagePosition" appears to be a duplicate of "ThinningSiteLocation"
+    so far, and it is unclear for now what stages "PreparationSiteLocation" and
+    "ChunkCoincidenceStagePosition" currently correspond to.
+    """
+
+    # Top-level values
+    preparation_site: StagePositionValues | None = (
+        None  # PreparationSiteLocation/StagePosition/StagePosition
+    )
+    chunk_site: StagePositionValues | None = (
+        None  # ChunkSiteLocation/StagePosition/StagePosition
+    )
+    thinning_site: StagePositionValues | None = (
+        None  # ThinningSiteLocation/StagePosition/StagePosition
+    )
+    # Stored under Parameters
+    chunk_coincidence_params: StagePositionValues | None = (
+        None  # Parameters/ChunkCoincidenceStagePosition/StagePosition
+    )
+    thinning_params: StagePositionValues | None = (
+        None  # Parameters/ThinningStagePosition/StagePosition
+    )
+
+
+class MillingStepInfo(BaseModel):
+    """
+    These are the parameters configured per milling step that we are interested
+    in tracking. Some attributes are present only for certain steps.
+    """
+
+    # Step setup
+    step_name: str | None = None
+    recipe_name: str | None = None
+    is_enabled: bool | None = None
+    status: str | None = None
+    execution_time: float | None = None
+
+    # Associated stage position information
+    site_location_type: str | None = None
+
+    # Beam info
+    beam_type: str | None = None
+    voltage: float | None = None
+    current: float | None = None
+
+    # Milling info
+    milling_angle: float | None = None
+    depth_correction: float | None = None
+    lamella_offset: float | None = None
+    trench_height_front: float | None = None
+    trench_height_rear: float | None = None
+    width_overlap_front_left: float | None = None
+    width_overlap_front_right: float | None = None
+    width_overlap_rear_left: float | None = None
+    width_overlap_rear_right: float | None = None
+
+    @field_validator("status", mode="before")
+    @classmethod
+    def handle_stringified_none(cls, v: Any) -> None:
+        if isinstance(v, str) and v.lower() == "none":
+            return None
+        return v
+
+
+class MillingSteps(BaseModel):
+    # Processing steps supported by AutoTEM
+    # Preparation stage
+    eucentric_tilt: MillingStepInfo | None = None
+    artificial_features: MillingStepInfo | None = None
+    milling_angle: MillingStepInfo | None = None
+    image_acquisition: MillingStepInfo | None = None
+    lamella_placement: MillingStepInfo | None = None
+    # Milling stage
+    delay_1: MillingStepInfo | None = None
+    reference_definition: MillingStepInfo | None = None
+    reference_definition_electron: MillingStepInfo | None = None
+    stress_relief_cuts: MillingStepInfo | None = None
+    reference_redefinition_1: MillingStepInfo | None = None
+    rough_milling: MillingStepInfo | None = None
+    rough_milling_electron: MillingStepInfo | None = None
+    reference_redefinition_2: MillingStepInfo | None = None
+    medium_milling: MillingStepInfo | None = None
+    medium_milling_electron: MillingStepInfo | None = None
+    fine_milling: MillingStepInfo | None = None
+    fine_milling_electron: MillingStepInfo | None = None
+    finer_milling: MillingStepInfo | None = None
+    finer_milling_electron: MillingStepInfo | None = None
+    # Thinning stage
+    delay_2: MillingStepInfo | None = None
+    polishing_1: MillingStepInfo | None = None
+    polishing_1_electron: MillingStepInfo | None = None
+    polishing_2: MillingStepInfo | None = None
+    polishing_2_ion: MillingStepInfo | None = None
+    polishing_2_electron: MillingStepInfo | None = None
+
+
+class LamellaSiteInfo(BaseModel):
+    """
+    Pydantic model that stores all the metadata of interest for a single lamella
+    site.
+    """
+
+    # Values not associated with a single step
+    project_name: str | None = None
+    site_name: str | None = None
+    site_number: int | None = None
+    stage_info: StagePositionInfo | None = None
+    steps: MillingSteps | None = None
+
+
+class FIBGIFParameters(BaseModel):
+    lamella_number: int
+    images: list[Path]
+    output_file: Path
+
+
+class FIBImageMetadata(BaseModel):
+    """
+    Pydantic model to parse and house all the relevant metadata values extracted from
+    the FIB images generated by the AutoTEM and Maps software packages.
+
+    Files that this model has been shown to work on so far include:
+    1. Electron snapshot TIFFs (Maps)
+    2. Lamella evaluation images (AutoTEM)
+    """
+
+    visit_name: str
+    file: Path
+    thumbnail_path: Path | None = None
+    lamella_number: int | None = None
+    # Acceleration voltage (V)
+    voltage: float
+    # Beam shifts (m)
+    shift_x: float
+    shift_y: float
+    # Actual field of view (m)
+    len_x: float
+    len_y: float
+    # Stage position (m and rad)
+    pos_x: float
+    pos_y: float
+    pos_z: float
+    rotation: float
+    tilt_alpha: float
+    tilt_beta: float
+    slot_number: int
+    # Image dimensions (pixels)
+    pixels_x: int
+    pixels_y: int
+    # Pixel size (m)
+    pixel_size_x: float
+    pixel_size_y: float
+
+    @model_validator(mode="after")
+    def check_pixel_size_tolerance(self):
+        """
+        The pixel size values for x and y should be nigh-identical
+        """
+        if abs(self.pixel_size_x - self.pixel_size_y) > 1e-18:
+            raise ValueError
+        return self
+
+    # mypy doesn't support decorators on @property
+    @computed_field  # type: ignore
+    @cached_property
+    def pixel_size(self) -> float:
+        """
+        Return an average of pixel sizes along the x- and y-axes
+        """
+        return 0.5 * (self.pixel_size_x + self.pixel_size_y)
+
+    # mypy doesn't support decorators on @property
+    @computed_field  # type: ignore
+    @cached_property
+    def project_name(self) -> str:
+        """
+        Extract the project name from the file path. This assumes a specific
+        folder structure of '{visit_name}/maps/{project_name}'.
+        """
+        path_parts = self.file.parts
+        visit_idx = path_parts.index(self.visit_name)
+        return path_parts[visit_idx + 2]  # {visit}/maps/{project_name}
+
+    # mypy doesn't support decorators on @property
+    @computed_field  # type: ignore
+    @cached_property
+    def site_name(self) -> str:
+        """
+        Create a site name for the current image based on the project name
+        and its slot number.
+        """
+        site_name = f"{self.project_name}/grid_{self.slot_number}"
+        if self.lamella_number is not None:
+            site_name += f"/lamella_{self.lamella_number}"
+        return site_name
+
+
+"""
+=======================================================================================
 Single Particle Analysis
-========================
+=======================================================================================
 Models related to the single-particle analysis workflow.
 """
+
+
+class AtlasRegistration(BaseModel):
+    name: str
+    acquisition_uuid: str | None
+    storage_folder: str = ""
+    register_grid: bool = False
+    tag: str = ""
 
 
 class ProcessingParametersSPA(BaseModel):
@@ -128,6 +363,7 @@ class ProcessingParametersSPA(BaseModel):
 class GridSquareParameters(BaseModel):
     tag: str
     image: str = ""
+    sample: int | None = None
 
     # Actual coordinates for image centre in real space
     x_location: Optional[float] = None
@@ -180,20 +416,21 @@ class FoilHoleParameters(BaseModel):
 
 class SearchMapParameters(BaseModel):
     tag: str
-    x_location: Optional[float] = None
-    y_location: Optional[float] = None
-    x_stage_position: Optional[float] = None
-    y_stage_position: Optional[float] = None
-    pixel_size: Optional[float] = None
-    image: Optional[str] = None
-    binning: Optional[float] = None
+    x_location: float | None = None
+    y_location: float | None = None
+    x_stage_position: float | None = None
+    y_stage_position: float | None = None
+    pixel_size: float | None = None
+    image: str | None = None
+    binning: float | None = None
     reference_matrix: Dict[str, float] = {}
     stage_correction: Dict[str, float] = {}
     image_shift_correction: Dict[str, float] = {}
-    height: Optional[int] = None
-    width: Optional[int] = None
-    height_on_atlas: Optional[int] = None
-    width_on_atlas: Optional[int] = None
+    height: int | None = None
+    width: int | None = None
+    height_on_atlas: int | None = None
+    width_on_atlas: int | None = None
+    lamella: bool | None = None
 
 
 class BatchPositionParameters(BaseModel):
@@ -218,8 +455,9 @@ class Token(BaseModel):
 
 
 """
+=======================================================================================
 Tomography
-==========
+=======================================================================================
 Models related to the tomographic reconstruction workflow.
 """
 

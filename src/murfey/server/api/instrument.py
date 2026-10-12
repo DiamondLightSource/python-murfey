@@ -14,11 +14,17 @@ from sqlmodel import select
 from werkzeug.utils import secure_filename
 
 try:
-    from smartem_backend.api_client import EntityConverter
+    from smartem_backend.api_client import SmartEMAPIClient
     from smartem_common.schemas import AcquisitionData, MicroscopeData
 
-    SMARTEM_ACTIVE = True
+    from murfey.util.config import get_smartem_keycloak_client
+
+    if keycloak_client := get_smartem_keycloak_client():
+        SMARTEM_ACTIVE = True
+    else:
+        SMARTEM_ACTIVE = False
 except ImportError:
+    keycloak_client = None
     SMARTEM_ACTIVE = False
 
 import murfey.server.prometheus as prom
@@ -31,7 +37,7 @@ from murfey.server.api.auth import (
     validate_token,
 )
 from murfey.server.murfey_db import murfey_db
-from murfey.util import sanitise, secure_path
+from murfey.util import safe_chmod, sanitise, secure_path
 from murfey.util.api import url_path_for
 from murfey.util.config import get_machine_config
 from murfey.util.db import RsyncInstance, Session, SessionProcessingParameters
@@ -156,32 +162,54 @@ async def setup_multigrid_watcher(
         session = db.exec(select(Session).where(Session.id == session_id)).one()
         visit = session.visit
         async with aiohttp.ClientSession() as clientsession:
-            acquisition_uuid = None
-            if SMARTEM_ACTIVE and machine_config.smartem_api_url:
+            acquisition_uuid = session.smartem_acquisition_uuid
+            if (
+                SMARTEM_ACTIVE
+                and machine_config.smartem_api_url
+                and acquisition_uuid is None
+            ):
                 log.info("registering an acquisition with smartem")
                 try:
                     microscope_data = MicroscopeData(instrument_id=instrument_name)
-                    acquisition_data = EntityConverter.acquisition_to_request(
-                        AcquisitionData(
-                            name=visit,
-                            id=visit,
-                            instrument=microscope_data,
-                            storage_path=str(secure_path(watcher_spec.source / visit)),
-                            start_time=datetime.datetime.now(),
-                        )
+                    smartem_client = SmartEMAPIClient(
+                        base_url=machine_config.smartem_api_url,
+                        logger=log,
+                        keycloak_client=keycloak_client,
                     )
-                    async with clientsession.post(
-                        f"{machine_config.smartem_api_url}/acquisitions",
-                        json=acquisition_data.model_dump(mode="json"),
-                    ) as response:
-                        acquisition_response_data = await response.json()
-                    acquisition_uuid = acquisition_response_data["uuid"]
+                    acquisition_data = AcquisitionData(
+                        name=visit,
+                        id=visit,
+                        instrument=microscope_data,
+                        storage_path=str(
+                            secure_path(
+                                machine_config.rsync_basepath
+                                / str(datetime.datetime.now().year)
+                                / visit
+                            )
+                        )
+                        if machine_config.rsync_basepath
+                        else "",
+                        atlas_path=str(
+                            secure_path(watcher_spec.source / visit / "atlas")
+                        ),
+                        start_time=datetime.datetime.now(),
+                    )
+                    acquisition_response_data = smartem_client.create_acquisition(
+                        acquisition_data
+                    )
+                    acquisition_uuid = acquisition_response_data.uuid
                 except Exception:
                     log.warning(
                         "failed to register acquisition with smartem", exc_info=True
                     )
-            else:
+            elif acquisition_uuid is None:
                 log.info("smartem not configured")
+            if acquisition_uuid is not None:
+                session = db.exec(select(Session).where(Session.id == session_id)).one()
+                session.smartem_acquisition_uuid = acquisition_uuid
+                db.add(session)
+                db.commit()
+
             async with clientsession.post(
                 f"{machine_config.instrument_server_url}{url_path_for('api.router', 'setup_multigrid_watcher', session_id=session_id)}",
                 json={
@@ -245,6 +273,10 @@ async def update_visit_end_time(
     session_entry.visit_end_time = end_time
     db.add(session_entry)
     db.commit()
+
+    # Update the alert endtime on prometheus
+    if end_time:
+        prom.alert_end_time.labels(visit=session_entry.visit).set(end_time.timestamp())
 
     # Update the multigrid controller
     data = {}
@@ -345,6 +377,113 @@ async def check_instrument_server(instrument_name: MurfeyInstrumentName):
     return data
 
 
+@router.get("/instruments/{instrument_name}/sessions/{session_id}/possible_otf_dirs")
+async def get_possible_otf_dirs(
+    instrument_name: MurfeyInstrumentName,
+    session_id: MurfeySessionID,
+) -> list[File]:
+    """
+    Submits a GET request to the client-side instrument server to get all top-level
+    directories found under the configured OTF files directory.
+    """
+    data: list[File] = []
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
+    if machine_config.instrument_server_url:
+        async with lock:
+            token = instrument_server_tokens[session_id]["access_token"]
+        async with aiohttp.ClientSession() as clientsession:
+            url_path = url_path_for(
+                "api.router",
+                "get_possible_otf_dirs",
+                instrument_name=sanitise(instrument_name),
+                session_id=session_id,
+            )
+            async with clientsession.get(
+                f"{machine_config.instrument_server_url}{url_path}",
+                headers={"Authorization": f"Bearer {token}"},
+            ) as resp:
+                data = await resp.json()
+    return data
+
+
+class OTFDirectoryUploadRequest(BaseModel):
+    dir_path: Path
+
+
+@router.post("/sessions/{session_id}/upload_otf_dir")
+async def request_otf_dir_upload(
+    session_id: MurfeySessionID,
+    otf_dir_request: OTFDirectoryUploadRequest,
+    db=murfey_db,
+):
+    # Load session information from database
+    murfey_session = db.exec(select(Session).where(Session.id == session_id)).one()
+    visit_name = murfey_session.visit
+    instrument_name = murfey_session.instrument_name
+
+    # Load machine config
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
+
+    # Default data to return
+    data: dict[str, Any] = {"success": False}
+
+    # Load the rsync basepath
+    rsync_basepath = machine_config.rsync_basepath
+    if rsync_basepath is None:
+        log.error(f"No rsync basepath was configured for instrument {instrument_name}")
+        return data
+
+    # Construct the partial and full paths to the server-side visit directory
+    visit_path = f"{datetime.datetime.now().year}/{visit_name}"
+    visit_dir = rsync_basepath / visit_path
+    if not visit_dir.exists():  # Check previous year in case of rollover
+        visit_dir_prev = visit_dir
+        visit_path = f"{datetime.datetime.now().year - 1}/{visit_name}"
+        visit_dir = rsync_basepath / visit_path
+        if not visit_dir.exists():
+            log.error(
+                "Unable to find visit directory under "
+                f"{str(visit_dir_prev)} or {str(visit_dir)}"
+            )
+            return data
+
+    # Ensure that the OTF destination directory exists
+    otf_dir = visit_dir / machine_config.gain_directory_name
+    otf_dir.mkdir(exist_ok=True)
+    safe_chmod(otf_dir, mode=machine_config.mkdir_chmod)  # Set permissions
+
+    if machine_config.instrument_server_url:
+        async with aiohttp.ClientSession() as clientsession:
+            url_path = url_path_for(
+                "api.router",
+                "upload_otf_dir",
+                instrument_name=instrument_name,
+                session_id=session_id,
+            )
+            payload = {
+                "dir_path": str(otf_dir_request.dir_path),
+                "visit_path": visit_path,
+                "destination_dir": machine_config.gain_directory_name,
+            }
+            async with clientsession.post(
+                f"{machine_config.instrument_server_url}{url_path}",
+                json=payload,
+                headers={
+                    "Authorization": f"Bearer {instrument_server_tokens[session_id]['access_token']}"
+                },
+            ) as resp:
+                data = await resp.json()
+    else:
+        log.error(
+            f"No instrument server URL was configured for instrument {instrument_name}"
+        )
+    return data
+
+
 @router.get(
     "/instruments/{instrument_name}/sessions/{session_id}/possible_gain_references"
 )
@@ -433,7 +572,7 @@ async def request_upstream_tiff_data_download(
 
 
 @router.post("/visits/{visit_name}/sessions/{session_id}/upstream_file_data_request")
-async def request_upstream_file_data_download(
+async def request_upstream_file_download(
     visit_name: str,
     session_id: MurfeySessionID,
     upstream_file_request: UpstreamFileRequestInfo,
@@ -471,7 +610,7 @@ async def request_upstream_file_data_download(
     async with aiohttp.ClientSession() as clientsession:
         url_path = url_path_for(
             "api.router",
-            "gather_upstream_files",
+            "run_upstream_file_download_request",
             visit_name=secure_filename(visit_name),
             session_id=session_id,
         )
@@ -484,6 +623,7 @@ async def request_upstream_file_data_download(
                 "download_dir": download_dir,
                 "upstream_instrument": upstream_file_request.upstream_instrument,
                 "upstream_visit_path": str(upstream_file_request.upstream_visit_path),
+                "search_strings": upstream_file_request.search_strings,
             },
         ) as resp:
             data = await resp.json()

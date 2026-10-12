@@ -31,9 +31,7 @@ def test_run(
 
     # Create mocks
     # Transport object functions
-    mock_transport_object = mocker.patch(
-        "murfey.workflows.register_processing_job._transport_object"
-    )
+    mock_transport_object = mocker.patch("murfey.server._transport_object")
     mock_transport_object.do_create_ispyb_job.return_value = {
         "return_value": insert_job
     }

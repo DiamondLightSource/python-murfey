@@ -8,7 +8,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Dict, Tuple
 
-from murfey.util import secure_path
+from murfey.util import safe_chmod, secure_path
 
 logger = logging.getLogger("murfey.server.gain")
 
@@ -35,6 +35,7 @@ async def prepare_gain(
     env: Dict[str, str],
     rescale: bool = True,
     tag: str = "",
+    chmod: int = 0o750,
 ) -> Tuple[Path | None, Path | None]:
     if not all(executables.get(s) for s in ("dm2mrc", "clip", "newstack")):
         logger.error("No executables were provided to prepare the gain reference with")
@@ -57,10 +58,10 @@ async def prepare_gain(
             return gain_out, gain_out_superres if rescale else gain_out
         for k, v in env.items():
             os.environ[k] = v
-        if tag:
-            secure_path(gain_path.parent / f"gain_{tag}").mkdir(exist_ok=True)
-        else:
-            secure_path(gain_path.parent / "gain").mkdir(exist_ok=True)
+        gain_tag = f"gain_{tag}" if tag else "gain"
+        gain_dir = secure_path(gain_path.parent / gain_tag)
+        gain_dir.mkdir(exist_ok=True)
+        safe_chmod(gain_dir, chmod)
         gain_path = _sanitise(gain_path, tag)
         flip = "flipx" if camera == Camera.K3_FLIPX else "flipy"
         gain_path_mrc = gain_path.with_suffix(".mrc")
@@ -109,7 +110,10 @@ async def prepare_gain(
 
 
 async def prepare_eer_gain(
-    gain_path: Path, executables: Dict[str, str], env: Dict[str, str], tag: str = ""
+    gain_path: Path,
+    executables: Dict[str, str],
+    env: Dict[str, str],
+    tag: str = "",
 ) -> Tuple[Path | None, Path | None]:
     if not executables.get("tif2mrc"):
         logger.error(

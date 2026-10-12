@@ -8,12 +8,20 @@ from murfey.workflows.spa import flush_spa_preprocess
 from tests.conftest import ExampleVisit
 
 
-@mock.patch("murfey.workflows.spa.flush_spa_preprocess._transport_object")
+@mock.patch("murfey.server._transport_object")
 def test_register_grid_square_update_add_locations(
     mock_transport, murfey_db_session: Session
 ):
     """Test the updating of an existing grid square"""
     # Create a grid square to update
+    dcg = DataCollectionGroup(
+        id=1,
+        session_id=ExampleVisit.murfey_session_id,
+        tag="session_tag",
+        atlas_id=90,
+        sample=2,
+    )
+    murfey_db_session.add(dcg)
     grid_square = GridSquare(
         id=1,
         name=101,
@@ -52,12 +60,20 @@ def test_register_grid_square_update_add_locations(
     )
 
 
-@mock.patch("murfey.workflows.spa.flush_spa_preprocess._transport_object")
+@mock.patch("murfey.server._transport_object")
 def test_register_grid_square_update_add_nothing(
     mock_transport, murfey_db_session: Session
 ):
     """Test the updating of an existing grid square, but with nothing to update with"""
     # Create a grid square to update
+    dcg = DataCollectionGroup(
+        id=1,
+        session_id=ExampleVisit.murfey_session_id,
+        tag="session_tag",
+        atlas_id=90,
+        sample=2,
+    )
+    murfey_db_session.add(dcg)
     grid_square = GridSquare(
         id=1,
         name=101,
@@ -71,8 +87,8 @@ def test_register_grid_square_update_add_nothing(
     murfey_db_session.add(grid_square)
     murfey_db_session.commit()
 
-    # Parameters to update with
-    new_parameters = GridSquareParameters(tag="session_tag")
+    # Parameters to update with - use a new tag but same sample
+    new_parameters = GridSquareParameters(tag="atlas_tag", sample=2)
 
     # Run the registration
     flush_spa_preprocess.register_grid_square(
@@ -90,18 +106,19 @@ def test_register_grid_square_update_add_nothing(
     assert grid_square_final_parameters.y_stage_position == 0.4
 
 
-@mock.patch("murfey.workflows.spa.flush_spa_preprocess._transport_object")
+@mock.patch("murfey.server._transport_object")
 def test_register_grid_square_insert_with_ispyb(
     mock_transport, murfey_db_session: Session, tmp_path
 ):
     # Create a data collection group for lookups
-    grid_square = DataCollectionGroup(
+    dcg = DataCollectionGroup(
         id=1,
         session_id=ExampleVisit.murfey_session_id,
         tag="session_tag",
         atlas_id=90,
+        sample=2,
     )
-    murfey_db_session.add(grid_square)
+    murfey_db_session.add(dcg)
     murfey_db_session.commit()
 
     # Set the ispyb return

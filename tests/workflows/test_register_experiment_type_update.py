@@ -14,9 +14,7 @@ def test_run(
     insert_dcg: int | None,
 ):
     # Mock the transport object functions
-    mock_transport_object = mocker.patch(
-        "murfey.workflows.register_experiment_type_update._transport_object"
-    )
+    mock_transport_object = mocker.patch("murfey.server._transport_object")
     mock_transport_object.do_update_data_collection_group.return_value = {
         "return_value": insert_dcg,
     }

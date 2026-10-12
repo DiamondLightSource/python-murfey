@@ -130,6 +130,24 @@ murfey.instrument_server.api.router:
         type: int
     methods:
       - POST
+  - path: /instruments/{instrument_name}/sessions/{session_id}/possible_otf_dirs
+    function: get_possible_otf_dirs
+    path_params:
+      - name: instrument_name
+        type: str
+      - name: session_id
+        type: int
+    methods:
+      - GET
+  - path: /instruments/{instrument_name}/sessions/{session_id}/upload_otf_dir
+    function: upload_otf_dir
+    path_params:
+      - name: instrument_name
+        type: str
+      - name: session_id
+        type: int
+    methods:
+      - POST
   - path: /instruments/{instrument_name}/sessions/{session_id}/possible_gain_references
     function: get_possible_gain_references
     path_params:
@@ -149,7 +167,7 @@ murfey.instrument_server.api.router:
     methods:
       - POST
   - path: /visits/{visit_name}/sessions/{session_id}/upstream_file_data_request
-    function: gather_upstream_files
+    function: run_upstream_file_download_request
     path_params:
       - name: visit_name
         type: str
@@ -259,6 +277,13 @@ murfey.server.api.bootstrap.msys2:
     methods:
       - GET
 murfey.server.api.bootstrap.plugins:
+  - path: /plugins/instruments/{instrument_name}/
+    function: show_plugin_wheels
+    path_params:
+      - name: instrument_name
+        type: str
+    methods:
+      - GET
   - path: /plugins/instruments/{instrument_name}/{package}
     function: get_plugin_wheel
     path_params:
@@ -382,28 +407,6 @@ murfey.server.api.bootstrap.version:
     path_params: []
     methods:
       - GET
-murfey.server.api.clem.router:
-  - path: /workflow/clem/sessions/{session_id}/process_raw_lifs
-    function: process_raw_lifs
-    path_params:
-      - name: session_id
-        type: int
-    methods:
-      - POST
-  - path: /workflow/clem/sessions/{session_id}/process_raw_tiffs
-    function: process_raw_tiffs
-    path_params:
-      - name: session_id
-        type: int
-    methods:
-      - POST
-  - path: /workflow/clem/sessions/{session_id}/align_and_merge_stacks
-    function: align_and_merge_stacks
-    path_params:
-      - name: session_id
-        type: int
-    methods:
-      - POST
 murfey.server.api.display.router:
   - path: /display/instruments/{instrument_name}/instrument_name
     function: get_instrument_display_name
@@ -504,6 +507,15 @@ murfey.server.api.hub.router:
         type: str
     methods:
       - GET
+  - path: /instrument/{instrument_name}/mag/{mag}/shifts
+    function: get_instrument_mag_image_shift
+    path_params:
+      - name: instrument_name
+        type: str
+      - name: mag
+        type: int
+    methods:
+      - GET
 murfey.server.api.instrument.router:
   - path: /instrument_server/instruments/{instrument_name}/sessions/{session_id}/activate_instrument_server
     function: activate_instrument_server_for_session
@@ -565,6 +577,22 @@ murfey.server.api.instrument.router:
         type: str
     methods:
       - GET
+  - path: /instrument_server/instruments/{instrument_name}/sessions/{session_id}/possible_otf_dirs
+    function: get_possible_otf_dirs
+    path_params:
+      - name: instrument_name
+        type: str
+      - name: session_id
+        type: int
+    methods:
+      - GET
+  - path: /instrument_server/sessions/{session_id}/upload_otf_dir
+    function: request_otf_dir_upload
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
   - path: /instrument_server/instruments/{instrument_name}/sessions/{session_id}/possible_gain_references
     function: get_possible_gain_references
     path_params:
@@ -591,7 +619,7 @@ murfey.server.api.instrument.router:
     methods:
       - POST
   - path: /instrument_server/visits/{visit_name}/sessions/{session_id}/upstream_file_data_request
-    function: request_upstream_file_data_download
+    function: request_upstream_file_download
     path_params:
       - name: visit_name
         type: str
@@ -723,15 +751,6 @@ murfey.server.api.prometheus.router:
     path_params:
       - name: visit_name
         type: str
-    methods:
-      - POST
-  - path: /prometheus/visits/{visit_name}/monitoring/{on}
-    function: change_monitoring_status
-    path_params:
-      - name: visit_name
-        type: str
-      - name: "on"
-        type: int
     methods:
       - POST
   - path: /prometheus/metrics/{metric_name}
@@ -951,7 +970,7 @@ murfey.server.api.session_control.spa_router:
     function: register_square
     path_params:
       - name: gsid
-        type: int
+        type: int | str
       - name: session_id
         type: int
     methods:
@@ -1106,13 +1125,9 @@ murfey.server.api.session_info.router:
     path_params: []
     methods:
       - GET
-  - path: /session_info/instruments/{instrument_name}/visits/{visit}/sessions/{name}
+  - path: /session_info/instruments/{instrument_name}/sessions/new
     function: create_session
     path_params:
-      - name: visit
-        type: str
-      - name: name
-        type: str
       - name: instrument_name
         type: str
     methods:
@@ -1175,6 +1190,27 @@ murfey.server.api.session_info.router:
         type: int
     methods:
       - PUT
+  - path: /session_info/silences/{instrument_name}
+    function: get_silences
+    path_params:
+      - name: instrument_name
+        type: str
+    methods:
+      - GET
+  - path: /session_info/silences/{instrument_name}
+    function: create_silence
+    path_params:
+      - name: instrument_name
+        type: str
+    methods:
+      - POST
+  - path: /session_info/silences/{instrument_name}
+    function: delete_silences
+    path_params:
+      - name: instrument_name
+        type: str
+    methods:
+      - DELETE
 murfey.server.api.session_info.spa_router:
   - path: /session_info/spa/sessions/{session_id}/spa_processing_parameters
     function: get_spa_proc_param_details
@@ -1292,17 +1328,6 @@ murfey.server.api.workflow.correlative_router:
         type: str
     methods:
       - POST
-  - path: /workflow/correlative/year/{year}/visits/{visit_name}/sessions/{session_id}/make_milling_gif
-    function: make_gif
-    path_params:
-      - name: year
-        type: int
-      - name: visit_name
-        type: str
-      - name: session_id
-        type: int
-    methods:
-      - POST
 murfey.server.api.workflow.router:
   - path: /workflow/visits/{visit_name}/sessions/{session_id}/register_data_collection_group
     function: register_dc_group
@@ -1350,16 +1375,6 @@ murfey.server.api.workflow.spa_router:
       - POST
   - path: /workflow/spa/visits/{visit_name}/sessions/{session_id}/spa_preprocess
     function: request_spa_preprocessing
-    path_params:
-      - name: visit_name
-        type: str
-      - name: session_id
-        type: int
-    methods:
-      - POST
-murfey.server.api.workflow.sxt_router:
-  - path: /workflow/sxt/visits/{visit_name}/sessions/{session_id}/sxt_tilt_series
-    function: process_sxt_tilt_series
     path_params:
       - name: visit_name
         type: str
@@ -1432,10 +1447,78 @@ murfey.server.api.workflow.tomo_router:
         type: int
     methods:
       - POST
+murfey.server.api.workflow_clem.router:
+  - path: /workflow/clem/sessions/{session_id}/process_raw_lifs
+    function: process_raw_lifs
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
+  - path: /workflow/clem/sessions/{session_id}/process_raw_tiffs
+    function: process_raw_tiffs
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
 murfey.server.api.workflow_fib.router:
   - path: /workflow/fib/sessions/{session_id}/register_atlas
     function: register_fib_atlas
     path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
+  - path: /workflow/fib/sessions/{session_id}/register_lamella_evaluation_image
+    function: register_lamella_evaluation_image
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
+  - path: /workflow/fib/sessions/{session_id}/register_milling_progress
+    function: register_fib_milling_progress
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
+  - path: /workflow/fib/sessions/{session_id}/make_gif
+    function: make_gif
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
+murfey.server.api.workflow_sim.router:
+  - path: /workflow/sim/sessions/{session_id}/sim_recon
+    function: request_sim_reconstruction
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
+murfey.server.api.workflow_sxt.router:
+  - path: /workflow/sxt/visits/{visit_name}/sessions/{session_id}/sxt_tilt_series
+    function: process_sxt_tilt_series
+    path_params:
+      - name: visit_name
+        type: str
+      - name: session_id
+        type: int
+    methods:
+      - POST
+  - path: /workflow/sxt/convert_xrm_to_tiff
+    function: convert_xrm_to_tiff
+    path_params: []
+    methods:
+      - POST
+  - path: /workflow/sxt/sessions/{session_id}/sxt_roi/{roi_name}
+    function: register_sxt_roi
+    path_params:
+      - name: roi_name
+        type: str
       - name: session_id
         type: int
     methods:

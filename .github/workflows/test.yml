@@ -1,12 +1,14 @@
 name: Build and test
 
-on: [push, pull_request]
+on: [push]
 
 env:
-  ISPYB_DATABASE_SCHEMA: 4.11.0
+  ISPYB_DATABASE_SCHEMA: 5.2.0
   # Installs from GitHub
   # Versions: https://github.com/DiamondLightSource/ispyb-database/tags
   # Previous version(s):
+  # 5.1.0
+  # 4.11.0
   # 4.8.0
   # 4.2.1 # released 2024-08-19
   # 4.1.0 # released 2024-03-26
@@ -20,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Set up Python 3.10
+      - name: Set up Python 3.14
         uses: actions/setup-python@v6
         with:
           python-version: "3.14"
@@ -37,7 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Set up Python 3.10
+      - name: Set up Python 3.14
         uses: actions/setup-python@v6
         with:
           python-version: "3.14"

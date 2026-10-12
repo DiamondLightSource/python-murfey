@@ -129,73 +129,77 @@ def test_find_upstream_visits_permission_error(
     assert result == upstream_visits
 
 
-gather_upstream_files_test_matrix: tuple[
-    tuple[tuple[str, list[str], list[str]], ...], ...
-] = (
-    # CLEM
+# File search strings configured, and the files they will be associated with
+clem_upstream_file_dict = {
+    "processed/**/composite*.tiff": [
+        f"processed/grid1/TileScan1/Position_{n}/composite_BF_FL.tiff" for n in range(5)
+    ],
+    "processed/**/gray.tiff": [
+        f"processed/grid1/TileScan1/Position_{n}/gray.tiff" for n in range(5)
+    ],
+    "processed/**/red.tiff": [
+        f"processed/grid1/TileScan1/Position_{n}/red.tiff" for n in range(5)
+    ],
+    "processed/**/green.tiff": [
+        f"processed/grid1/TileScan1/Position_{n}/green.tiff" for n in range(5)
+    ],
+    "processed/**/blue.tiff": [
+        f"processed/grid1/TileScan1/Position_{n}/blue.tiff" for n in range(5)
+    ],
+    "processed/**/cyan.tiff": [
+        f"processed/grid1/TileScan1/Position_{n}/cyan.tiff" for n in range(5)
+    ],
+    "processed/**/magenta.tiff": [
+        f"processed/grid1/TileScan1/Position_{n}/magenta.tiff" for n in range(5)
+    ],
+    "processed/**/yellow.tiff": [
+        f"processed/grid1/TileScan1/Position_{n}/yellow.tiff" for n in range(5)
+    ],
+    "screenshots/**/*": [
+        *[f"screenshots/overview_{n}.png" for n in range(10)],
+        *[f"screenshots/annotated_{n}.png" for n in range(10)],
+    ],
+}
+fib_upstream_file_dict = {
+    "maps/**/*": [
+        *[f"maps/data_{n}.txt" for n in range(5)],
+        *[f"maps/map/image_{n}.tiff" for n in range(5)],
+    ],
+}
+
+
+@pytest.mark.parametrize(
+    "test_params",
     (
-        # Search strings, files to match, and files to avoid
+        # Workflow to test | Search strings to use
+        (clem_upstream_file_dict, ["processed/**/composite*.tiff"]),
+        (clem_upstream_file_dict, ["processed/**/gray.tiff"]),
+        (clem_upstream_file_dict, ["processed/**/red.tiff"]),
+        (clem_upstream_file_dict, ["processed/**/green.tiff"]),
+        (clem_upstream_file_dict, ["processed/**/blue.tiff"]),
+        (clem_upstream_file_dict, ["processed/**/cyan.tiff"]),
+        (clem_upstream_file_dict, ["processed/**/magenta.tiff"]),
+        (clem_upstream_file_dict, ["processed/**/yellow.tiff"]),
+        (clem_upstream_file_dict, ["screenshots/**/*"]),
         (
-            "processed/**/composite*.tiff",
+            clem_upstream_file_dict,
             [
-                file
-                for sublist in [
-                    [
-                        f"processed/grid1/TileScan1/Position_{n}/composite_BF_FL.tiff"
-                        for n in range(5)
-                    ],
-                ]
-                for file in sublist
-            ],
-            [
-                file
-                for sublist in [
-                    [
-                        f"processed/grid1/TileScan1/Position_{n}/{color}.tiff"
-                        for n in range(5)
-                        for color in ("gray", "green", "red")
-                    ],
-                ]
-                for file in sublist
+                "processed/**/composite*.tiff",
+                "processed/**/gray.tiff",
+                "screenshots/**/*",
             ],
         ),
-        (
-            "screenshots/**/*",
-            [
-                file
-                for sublist in [
-                    [f"screenshots/overview_{n}.png" for n in range(10)],
-                    [f"screenshots/annotated_{n}.png" for n in range(10)],
-                ]
-                for file in sublist
-            ],
-            [],
-        ),
-    ),
-    # FIB
-    (
-        # Search strings, files to match, and files to avoid
-        (
-            "maps/**/*",
-            [
-                file
-                for sublist in [
-                    [f"maps/data_{n}.txt" for n in range(5)],
-                    [f"maps/map/image_{n}.tiff" for n in range(5)],
-                ]
-                for file in sublist
-            ],
-            [],
-        ),
+        (clem_upstream_file_dict, []),
+        (clem_upstream_file_dict, None),
+        (fib_upstream_file_dict, ["maps/**/*"]),
+        (fib_upstream_file_dict, []),
+        (fib_upstream_file_dict, None),
     ),
 )
-
-
-@pytest.mark.parametrize("test_params", gather_upstream_files_test_matrix)
 def test_gather_upstream_files(
     mocker: MockerFixture,
     tmp_path: Path,
-    test_params: tuple[tuple[str, list[str], list[str]], ...],
+    test_params: tuple[dict[str, list[str]], list[str] | None],
 ):
     # Get the visit, instrument name, and session ID
     visit_name_root = f"{ExampleVisit.proposal_code}{ExampleVisit.proposal_number}"
@@ -203,30 +207,42 @@ def test_gather_upstream_files(
     instrument_name = ExampleVisit.instrument_name
     session_id = ExampleVisit.murfey_session_id
 
-    # Unpack the test params
-    search_strings = [item[0] for item in test_params]
-    upstream_relative_paths = [file for item in test_params for file in item[1]]
-    other_relative_paths = [file for item in test_params for file in item[2]]
-
     # Set the upstream instrument and upstream visit to access
     upstream_instrument = f"{instrument_name}01"
     upstream_visit = f"{visit_name_root}-5"
     upstream_visit_path = tmp_path / f"{upstream_instrument}/data/2020/{upstream_visit}"
 
-    # Construct the files and directories
-    upstream_files = [
-        upstream_visit_path / relative_path for relative_path in upstream_relative_paths
-    ]
-    other_files = [
-        upstream_visit_path / relative_path for relative_path in other_relative_paths
-    ]
+    # Unpack the test params
+    upstream_file_dict, search_strings = test_params
 
-    for file in upstream_files:
+    # Sort files into expected ones and skipped ones
+    if search_strings is None:
+        expected_files = [
+            upstream_visit_path / file
+            for file_list in upstream_file_dict.values()
+            for file in file_list
+        ]
+        skipped_files = []
+    else:
+        expected_files = [
+            upstream_visit_path / file
+            for search_string in search_strings
+            for file in upstream_file_dict[search_string]
+        ]
+        skipped_files = [
+            upstream_visit_path / file
+            for search_string, file_list in upstream_file_dict.items()
+            for file in file_list
+            if search_string not in search_strings
+        ]
+
+    # Make files
+    for file in expected_files:
         if not file.parent.exists():
             file.parent.mkdir(parents=True)
         file.touch(exist_ok=True)
         assert file.is_file()
-    for file in other_files:
+    for file in skipped_files:
         if not file.parent.exists():
             file.parent.mkdir(parents=True)
         file.touch(exist_ok=True)
@@ -242,7 +258,7 @@ def test_gather_upstream_files(
     # Mock the MachineConfig for this instrument
     mock_machine_config = MagicMock(spec=MachineConfig)
     mock_machine_config.upstream_data_search_strings = {
-        upstream_instrument: search_strings
+        upstream_instrument: list(upstream_file_dict.keys()),
     }
     mock_get_machine_config = mocker.patch(
         "murfey.server.api.session_shared.get_machine_config",
@@ -254,6 +270,7 @@ def test_gather_upstream_files(
             session_id=session_id,
             upstream_instrument=upstream_instrument,
             upstream_visit_path=upstream_visit_path,
+            search_strings=search_strings,
             db=mock_murfey_db,
         )
-    ) == sorted(upstream_files)
+    ) == sorted(expected_files)

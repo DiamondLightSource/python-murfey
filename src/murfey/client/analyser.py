@@ -63,7 +63,9 @@ class Analyser(Observer):
         self._acquisition_software = ""
         self._context: Context | None = None
         self.queue: queue.Queue = queue.Queue()
-        self.thread = threading.Thread(name="Analyser", target=self._analyse_in_thread)
+        self.thread = threading.Thread(
+            name=f"Analyser {basepath_local}", target=self._analyse_in_thread
+        )
         self._stopping = False
         self._halt_thread = False
         self._murfey_config = (
@@ -214,6 +216,25 @@ class Analyser(Observer):
             return True
 
         # -----------------------------------------------------------------------------
+        # SIM workflow checks
+        # -----------------------------------------------------------------------------
+        if (
+            # CryoSIM raw data files have no extension
+            # Bright field files end with "_BF"
+            # Processing will be triggered on fluorescent files ending with "_FL"
+            not file_path.suffix and file_path.stem.endswith(("_BF", "_FL"))
+        ):
+            if (context := _get_context("SIMContext")) is None:
+                return False
+            self._context = context.load()(
+                "sim",
+                self._basepath,
+                self._murfey_config,
+                self._token,
+            )
+            return True
+
+        # -----------------------------------------------------------------------------
         # SXT workflow checks
         # -----------------------------------------------------------------------------
         if file_path.suffix in (".txrm", ".xrm"):
@@ -241,11 +262,15 @@ class Analyser(Observer):
             )
             return True
 
-        if "Metadata" in file_path.parts or file_path.name == "EpuSession.dm":
+        if (
+            "Metadata" in file_path.parts
+            or "gridsquares" in file_path.parts
+            or file_path.name == "EpuSession.dm"
+        ):
             if (context := _get_context("SPAMetadataContext")) is None:
                 return False
             self._context = context.load()(
-                "epu",
+                "serialem" if self._serialem else "epu",
                 self._basepath,
                 self._murfey_config,
                 self._token,
@@ -355,12 +380,13 @@ class Analyser(Observer):
         if self._limited:
             if (
                 "Metadata" in transferred_file.parts
+                or "gridsquares" in transferred_file.parts
                 or transferred_file.name == "EpuSession.dm"
             ) and not self._context:
                 if not (context := _get_context("SPAMetadataContext")):
                     return None
                 self._context = context.load()(
-                    "epu",
+                    "serialem" if self._serialem else "epu",
                     self._basepath,
                     self._murfey_config,
                     self._token,
@@ -399,6 +425,7 @@ class Analyser(Observer):
                     "AtlasContext"
                     | "CLEMContext"
                     | "FIBContext"
+                    | "SIMContext"
                     | "SPAMetadataContext"
                     | "SXTContext"
                     | "TomographyMetadataContext"

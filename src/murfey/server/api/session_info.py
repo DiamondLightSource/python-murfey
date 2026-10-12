@@ -1,15 +1,18 @@
+import re
 from datetime import datetime
 from logging import getLogger
 from pathlib import Path
-from typing import Dict, List, Optional
 
+import requests
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
-from sqlmodel import select
+from sqlmodel import Session as SQLModelSession, select
 
+import murfey.server
 import murfey.server.api.websocket as ws
-from murfey.server import _transport_object
+import murfey.server.prometheus as prom
+import murfey.util.db as MurfeyDB
 from murfey.server.api import templates
 from murfey.server.api.auth import (
     MurfeyInstrumentNameFrontend as MurfeyInstrumentName,
@@ -32,22 +35,6 @@ from murfey.server.ispyb import DB as ispyb_db, get_all_ongoing_visits
 from murfey.server.murfey_db import murfey_db
 from murfey.util import sanitise
 from murfey.util.config import get_machine_config
-from murfey.util.db import (
-    ClassificationFeedbackParameters,
-    ClientEnvironment,
-    DataCollection,
-    DataCollectionGroup,
-    FoilHole,
-    GridSquare,
-    Movie,
-    ProcessingJob,
-    RsyncInstance,
-    Session,
-    SessionProcessingParameters,
-    SPARelionParameters,
-    Tilt,
-    TiltSeries,
-)
 from murfey.util.models import UpstreamFileRequestInfo, Visit
 
 logger = getLogger("murfey.server.api.session_info")
@@ -65,7 +52,7 @@ def health_check(db=ispyb_db):
     conn.close()
     return {
         "ispyb_connection": True,
-        "rabbitmq_connection": _transport_object.transport.is_connected(),
+        "rabbitmq_connection": murfey.server._transport_object.transport.is_connected(),
     }
 
 
@@ -87,7 +74,7 @@ def check_smartem_availability(instrument_name: str):
     return {"available": bool(machine_config.smartem_api_url)}
 
 
-@router.get("/instruments/{instrument_name}/visits_raw", response_model=List[Visit])
+@router.get("/instruments/{instrument_name}/visits_raw", response_model=list[Visit])
 def get_current_visits(instrument_name: MurfeyInstrumentName, db=ispyb_db):
     logger.debug(
         f"Received request to look up ongoing visits for {sanitise(instrument_name)}"
@@ -128,32 +115,44 @@ def all_visit_info(
         )
 
 
-@router.get("/sessions/{session_id}/rsyncers", response_model=List[RsyncInstance])
-def get_rsyncers_for_client(session_id: MurfeySessionID, db=murfey_db):
+@router.get(
+    "/sessions/{session_id}/rsyncers", response_model=list[MurfeyDB.RsyncInstance]
+)
+def get_rsyncers_for_client(
+    session_id: MurfeySessionID, db: SQLModelSession = murfey_db
+):
     rsync_instances = db.exec(
-        select(RsyncInstance).where(RsyncInstance.session_id == session_id)
+        select(MurfeyDB.RsyncInstance).where(
+            MurfeyDB.RsyncInstance.session_id == session_id
+        )
     )
     return rsync_instances.all()
 
 
 class SessionClients(BaseModel):
-    session: Session
-    clients: List[ClientEnvironment]
+    session: MurfeyDB.Session
+    clients: list[MurfeyDB.ClientEnvironment]
 
 
 @router.get("/sessions/{session_id}")
-async def get_session(session_id: MurfeySessionID, db=murfey_db) -> SessionClients:
-    session = db.exec(select(Session).where(Session.id == session_id)).one()
+async def get_session(
+    session_id: MurfeySessionID, db: SQLModelSession = murfey_db
+) -> SessionClients:
+    session = db.exec(
+        select(MurfeyDB.Session).where(MurfeyDB.Session.id == session_id)
+    ).one()
     clients = db.exec(
-        select(ClientEnvironment).where(ClientEnvironment.session_id == session_id)
+        select(MurfeyDB.ClientEnvironment).where(
+            MurfeyDB.ClientEnvironment.session_id == session_id
+        )
     ).all()
     return SessionClients(session=session, clients=clients)
 
 
 @router.get("/sessions")
-async def get_sessions(db=murfey_db):
-    sessions = db.exec(select(Session)).all()
-    clients = db.exec(select(ClientEnvironment)).all()
+async def get_sessions(db: SQLModelSession = murfey_db):
+    sessions = db.exec(select(MurfeyDB.Session)).all()
+    clients = db.exec(select(MurfeyDB.ClientEnvironment)).all()
     res = []
     for sess in sessions:
         r = {"session": sess, "clients": []}
@@ -164,91 +163,132 @@ async def get_sessions(db=murfey_db):
     return res
 
 
-class VisitEndTime(BaseModel):
-    end_time: Optional[datetime] = None
+class NewSessionInfo(BaseModel):
+    visit: str  # Alphanumeric hyphenated code
+    name: str  # Human-readable description
+    end_time: datetime | None = None
 
 
-@router.post("/instruments/{instrument_name}/visits/{visit}/sessions/{name}")
+@router.post("/instruments/{instrument_name}/sessions/new")
 def create_session(
     instrument_name: MurfeyInstrumentName,
-    visit: str,
-    name: str,
-    visit_end_time: VisitEndTime,
-    db=murfey_db,
+    session_info: NewSessionInfo,
+    db: SQLModelSession = murfey_db,
 ) -> int:
-    s = Session(
-        name=name,
-        visit=visit,
-        instrument_name=instrument_name,
-        visit_end_time=visit_end_time.end_time,
+    # For 'visit', keep only alphanumerics, hyphens, and underscores
+    visit_cleaned = re.sub(r"[^A-Za-z0-9_-]", "", sanitise(session_info.visit))
+
+    # For 'name' (human-readable description), keep:
+    # - alphanumerics
+    # - spaces
+    # - hyphens
+    # - underscores
+    # - forward slashes
+    # - round and square brackets
+    # - periods
+    # - commas
+    # - ampersands
+    # - pluses
+    # - single/double quotes
+    name_cleaned = re.sub(
+        r'[^\w\s\-/()\[\].,&+\'"]',
+        "",
+        sanitise(session_info.name),
     )
-    db.add(s)
+
+    # Add to database
+    session = MurfeyDB.Session(
+        name=name_cleaned,
+        visit=visit_cleaned,
+        instrument_name=instrument_name,
+        visit_end_time=session_info.end_time,
+    )
+    db.add(session)
     db.commit()
-    sid = s.id
-    return sid
+    session_id = session.id
+
+    # Add a Prometheus label for the session if an end time is set
+    if session_info.end_time:
+        prom.alert_end_time.labels(visit=session_info.visit).set(
+            session_info.end_time.timestamp()
+        )
+
+    return session_id
 
 
 @router.post("/sessions/{session_id}")
 def update_session(
-    session_id: MurfeySessionID, process: bool = True, db=murfey_db
+    session_id: MurfeySessionID,
+    process: bool = True,
+    smartem_acquisition_uuid: str | None = None,
+    db: SQLModelSession = murfey_db,
 ) -> None:
-    session = db.exec(select(Session).where(Session.id == session_id)).one()
+    session = db.exec(
+        select(MurfeyDB.Session).where(MurfeyDB.Session.id == session_id)
+    ).one()
     session.process = process
+    session.smartem_acquisition_uuid = smartem_acquisition_uuid
     db.add(session)
     db.commit()
     return None
 
 
 @router.delete("/sessions/{session_id}")
-def remove_session(session_id: MurfeySessionID, db=murfey_db):
+def remove_session(session_id: MurfeySessionID, db: SQLModelSession = murfey_db):
     remove_session_by_id(session_id, db)
 
 
 @router.get("/instruments/{instrument_name}/visits/{visit_name}/sessions")
 def get_sessions_with_visit(
-    instrument_name: MurfeyInstrumentName, visit_name: str, db=murfey_db
-) -> List[Session]:
+    instrument_name: MurfeyInstrumentName,
+    visit_name: str,
+    db: SQLModelSession = murfey_db,
+) -> list[MurfeyDB.Session]:
     sessions = db.exec(
-        select(Session)
-        .where(Session.instrument_name == instrument_name)
-        .where(Session.visit == visit_name)
+        select(MurfeyDB.Session)
+        .where(MurfeyDB.Session.instrument_name == instrument_name)
+        .where(MurfeyDB.Session.visit == visit_name)
     ).all()
     return sessions
 
 
 @router.get("/instruments/{instrument_name}/sessions")
 async def get_sessions_by_instrument_name(
-    instrument_name: MurfeyInstrumentName, db=murfey_db
-) -> List[Session]:
+    instrument_name: MurfeyInstrumentName, db: SQLModelSession = murfey_db
+) -> list[MurfeyDB.Session]:
     sessions = db.exec(
-        select(Session).where(Session.instrument_name == instrument_name)
+        select(MurfeyDB.Session).where(
+            MurfeyDB.Session.instrument_name == instrument_name
+        )
     ).all()
     return sessions
 
 
 @router.get("/sessions/{session_id}/data_collection_groups")
 def get_dc_groups(
-    session_id: MurfeySessionID, db=murfey_db
-) -> Dict[str, DataCollectionGroup]:
+    session_id: MurfeySessionID, db: SQLModelSession = murfey_db
+) -> dict[str, MurfeyDB.DataCollectionGroup]:
     data_collection_groups = db.exec(
-        select(DataCollectionGroup).where(DataCollectionGroup.session_id == session_id)
+        select(MurfeyDB.DataCollectionGroup).where(
+            MurfeyDB.DataCollectionGroup.session_id == session_id
+        )
     ).all()
     return {dcg.tag: dcg for dcg in data_collection_groups}
 
 
 @router.get("/sessions/{session_id}/data_collection_groups/{dcgid}/data_collections")
 def get_data_collections(
-    session_id: MurfeySessionID, dcgid: int, db=murfey_db
-) -> List[DataCollection]:
+    session_id: MurfeySessionID, dcgid: int, db: SQLModelSession = murfey_db
+) -> list[MurfeyDB.DataCollection]:
     data_collections = db.exec(
-        select(DataCollection).where(DataCollection.dcg_id == dcgid)
+        select(MurfeyDB.DataCollection).where(MurfeyDB.DataCollection.dcg_id == dcgid)
     ).all()
     return data_collections
 
 
 @router.get("/clients")
-async def get_clients(db=murfey_db):
-    clients = db.exec(select(ClientEnvironment)).all()
+async def get_clients(db: SQLModelSession = murfey_db):
+    clients = db.exec(select(MurfeyDB.ClientEnvironment)).all()
     return clients
 
 
@@ -258,15 +298,19 @@ class CurrentGainRef(BaseModel):
 
 @router.put("/sessions/{session_id}/current_gain_ref")
 def update_current_gain_ref(
-    session_id: MurfeySessionID, new_gain_ref: CurrentGainRef, db=murfey_db
+    session_id: MurfeySessionID,
+    new_gain_ref: CurrentGainRef,
+    db: SQLModelSession = murfey_db,
 ):
-    session = db.exec(select(Session).where(Session.id == session_id)).one()
+    session = db.exec(
+        select(MurfeyDB.Session).where(MurfeyDB.Session.id == session_id)
+    ).one()
     session.current_gain_ref = new_gain_ref.path
     db.add(session)
 
     session_processing_parameters = db.exec(
-        select(SessionProcessingParameters).where(
-            SessionProcessingParameters.session_id == session_id
+        select(MurfeyDB.SessionProcessingParameters).where(
+            MurfeyDB.SessionProcessingParameters.session_id == session_id
         )
     ).all()
     if session_processing_parameters:
@@ -274,6 +318,94 @@ def update_current_gain_ref(
         db.add(session_processing_parameters[0])
 
     db.commit()
+
+
+# Endpoints for turning alerts on and off
+
+
+@router.get("/silences/{instrument_name}")
+def get_silences(instrument_name: MurfeyInstrumentName):
+    all_configs = get_machine_config()
+    valid_instrument_names = list(all_configs.keys())
+    if instrument_name in valid_instrument_names:
+        index = valid_instrument_names.index(instrument_name)
+        query_params = f"filter=microscope={sanitise(valid_instrument_names[index])}"
+    else:
+        logger.warning(
+            f"invalid query parameters for get alerts on {sanitise(instrument_name)}"
+        )
+        return []
+    machine_config = all_configs[instrument_name]
+    alertmanager_url = machine_config.alertmanager_url
+    if not alertmanager_url:
+        logger.warning(f"alertmanager_url not set for {sanitise(instrument_name)}")
+        return []
+    response = requests.get(f"{alertmanager_url}/api/v2/silences?{query_params}")
+    if response.status_code != 200:
+        logger.warning(
+            f"Get silences for {sanitise(instrument_name)} received status {response.status_code} from alertmanager API"
+        )
+    active_silences = []
+    for silence in response.json():
+        if silence["status"]["state"] == "active":
+            active_silences.append(silence)
+    return active_silences
+
+
+@router.post("/silences/{instrument_name}")
+def create_silence(
+    instrument_name: MurfeyInstrumentName, end_time: datetime
+) -> JSONResponse:
+    machine_config = machine_info_by_instrument(instrument_name)
+    alertmanager_url = machine_config.alertmanager_url
+    if not alertmanager_url:
+        logger.warning(f"alertmanager_url not set for {sanitise(instrument_name)}")
+        return JSONResponse(
+            status_code=500, content="URL not set. Could not turn off alerts"
+        )
+    start_time = datetime.now().astimezone().isoformat()
+    end_time_str = end_time.astimezone().isoformat()
+    silence_json = {
+        "matchers": [
+            {"name": "microscope", "value": instrument_name, "isRegex": False}
+        ],
+        "createdBy": "murfey",
+        "annotations": {"description": f"Silence for alerts on {instrument_name}"},
+        "comment": "silence created from murfey",
+        "status": {"state": "active"},
+        "startsAt": str(start_time),
+        "endsAt": str(end_time_str),
+    }
+    response = requests.post(f"{alertmanager_url}/api/v2/silences", json=silence_json)
+    if response.status_code != 200:
+        logger.warning(
+            f"Create silence for {sanitise(instrument_name)} received status {response.status_code} from alertmanager API"
+        )
+    return JSONResponse(
+        status_code=response.status_code, content=response.json()
+    )  # return a response with same data and code as from alertmanager
+
+
+@router.delete(
+    "/silences/{instrument_name}"
+)  # delete all silences for given microscope
+def delete_silences(instrument_name: MurfeyInstrumentName):
+    machine_config = machine_info_by_instrument(instrument_name)
+    alertmanager_url = machine_config.alertmanager_url
+    if not alertmanager_url:
+        logger.warning(f"alertmanager_url not set for {sanitise(instrument_name)}")
+        return JSONResponse(status_code=500, content="URL not set")
+    silences = get_silences(instrument_name)
+    if not silences:
+        return {"success": False}
+    for silence in silences:
+        id = silence["id"]
+        response = requests.delete(f"{alertmanager_url}/api/v2/silence/{id}")
+        if response.status_code != 200:
+            logger.warning(
+                f"Delete silence {id} for {sanitise(instrument_name)} received status {response.status_code} from alertmanager API"
+            )
+    return response  # returns final response in loop
 
 
 spa_router = APIRouter(
@@ -284,30 +416,32 @@ spa_router = APIRouter(
 
 
 class ProcessingDetails(BaseModel):
-    data_collection_group: DataCollectionGroup
-    data_collections: List[DataCollection]
-    processing_jobs: List[ProcessingJob]
-    relion_params: SPARelionParameters
-    feedback_params: ClassificationFeedbackParameters
+    data_collection_group: MurfeyDB.DataCollectionGroup
+    data_collections: list[MurfeyDB.DataCollection]
+    processing_jobs: list[MurfeyDB.ProcessingJob]
+    relion_params: MurfeyDB.SPARelionParameters
+    feedback_params: MurfeyDB.ClassificationFeedbackParameters
 
 
 @spa_router.get("/sessions/{session_id}/spa_processing_parameters")
 def get_spa_proc_param_details(
-    session_id: MurfeySessionID, db=murfey_db
-) -> Optional[List[ProcessingDetails]]:
+    session_id: MurfeySessionID, db: SQLModelSession = murfey_db
+) -> list[ProcessingDetails] | None:
     params = db.exec(
         select(
-            DataCollectionGroup,
-            DataCollection,
-            ProcessingJob,
-            SPARelionParameters,
-            ClassificationFeedbackParameters,
+            MurfeyDB.DataCollectionGroup,
+            MurfeyDB.DataCollection,
+            MurfeyDB.ProcessingJob,
+            MurfeyDB.SPARelionParameters,
+            MurfeyDB.ClassificationFeedbackParameters,
         )
-        .where(DataCollectionGroup.session_id == session_id)
-        .where(DataCollectionGroup.id == DataCollection.dcg_id)
-        .where(DataCollection.id == ProcessingJob.dc_id)
-        .where(SPARelionParameters.pj_id == ProcessingJob.id)
-        .where(ClassificationFeedbackParameters.pj_id == ProcessingJob.id)
+        .where(MurfeyDB.DataCollectionGroup.session_id == session_id)
+        .where(MurfeyDB.DataCollectionGroup.id == MurfeyDB.DataCollection.dcg_id)
+        .where(MurfeyDB.DataCollection.id == MurfeyDB.ProcessingJob.dc_id)
+        .where(MurfeyDB.SPARelionParameters.pj_id == MurfeyDB.ProcessingJob.id)
+        .where(
+            MurfeyDB.ClassificationFeedbackParameters.pj_id == MurfeyDB.ProcessingJob.id
+        )
     ).all()
     if not params:
         return None
@@ -342,30 +476,35 @@ def get_spa_proc_param_details(
     "/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares/{gsid}/foil_holes/{fhid}/num_movies"
 )
 def get_number_of_movies_from_foil_hole(
-    session_id: int, dcgid: int, gsid: int, fhid: int, db=murfey_db
+    session_id: int, dcgid: int, gsid: int, fhid: int, db: SQLModelSession = murfey_db
 ) -> int:
     movies = db.exec(
-        select(Movie, FoilHole, GridSquare, DataCollectionGroup)
-        .where(Movie.foil_hole_id == FoilHole.id)
-        .where(FoilHole.name == fhid)
-        .where(FoilHole.grid_square_id == GridSquare.id)
-        .where(GridSquare.name == gsid)
-        .where(GridSquare.session_id == session_id)
-        .where(GridSquare.tag == DataCollectionGroup.tag)
-        .where(DataCollectionGroup.id == dcgid)
+        select(
+            MurfeyDB.Movie,
+            MurfeyDB.FoilHole,
+            MurfeyDB.GridSquare,
+            MurfeyDB.DataCollectionGroup,
+        )
+        .where(MurfeyDB.Movie.foil_hole_id == MurfeyDB.FoilHole.id)
+        .where(MurfeyDB.FoilHole.name == fhid)
+        .where(MurfeyDB.FoilHole.grid_square_id == MurfeyDB.GridSquare.id)
+        .where(MurfeyDB.GridSquare.name == gsid)
+        .where(MurfeyDB.GridSquare.session_id == session_id)
+        .where(MurfeyDB.GridSquare.tag == MurfeyDB.DataCollectionGroup.tag)
+        .where(MurfeyDB.DataCollectionGroup.id == dcgid)
     ).all()
     return len(movies)
 
 
 @spa_router.get("/sessions/{session_id}/grid_squares")
-def get_grid_squares(session_id: MurfeySessionID, db=murfey_db):
+def get_grid_squares(session_id: MurfeySessionID, db: SQLModelSession = murfey_db):
     return _get_grid_squares(session_id, db)
 
 
 @spa_router.get("/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares")
 def get_grid_squares_from_dcg(
-    session_id: MurfeySessionID, dcgid: int, db=murfey_db
-) -> List[GridSquare]:
+    session_id: MurfeySessionID, dcgid: int, db: SQLModelSession = murfey_db
+) -> list[MurfeyDB.GridSquare]:
     return _get_grid_squares_from_dcg(session_id, dcgid, db)
 
 
@@ -373,15 +512,15 @@ def get_grid_squares_from_dcg(
     "/sessions/{session_id}/data_collection_groups/{dcgid}/grid_squares/{gsid}/foil_holes"
 )
 def get_foil_holes_from_grid_square(
-    session_id: MurfeySessionID, dcgid: int, gsid: int, db=murfey_db
-) -> List[FoilHole]:
+    session_id: MurfeySessionID, dcgid: int, gsid: int, db: SQLModelSession = murfey_db
+) -> list[MurfeyDB.FoilHole]:
     return _get_foil_holes_from_grid_square(session_id, dcgid, gsid, db)
 
 
 @spa_router.get("/sessions/{session_id}/foil_hole/{fh_name}")
 def get_foil_hole(
-    session_id: MurfeySessionID, fh_name: int, db=murfey_db
-) -> Dict[str, int]:
+    session_id: MurfeySessionID, fh_name: int, db: SQLModelSession = murfey_db
+) -> dict[str, int]:
     return _get_foil_hole(session_id, fh_name, db)
 
 
@@ -394,15 +533,15 @@ tomo_router = APIRouter(
 
 @tomo_router.get("/sessions/{session_id}/tilt_series/{tilt_series_tag}/tilts")
 def get_tilts(
-    session_id: MurfeySessionID, tilt_series_tag: str, db=murfey_db
-) -> Dict[str, List[str]]:
+    session_id: MurfeySessionID, tilt_series_tag: str, db: SQLModelSession = murfey_db
+) -> dict[str, list[str]]:
     res = db.exec(
-        select(TiltSeries, Tilt)
-        .where(TiltSeries.tag == tilt_series_tag)
-        .where(TiltSeries.session_id == session_id)
-        .where(Tilt.tilt_series_id == TiltSeries.id)
+        select(MurfeyDB.TiltSeries, MurfeyDB.Tilt)
+        .where(MurfeyDB.TiltSeries.tag == tilt_series_tag)
+        .where(MurfeyDB.TiltSeries.session_id == session_id)
+        .where(MurfeyDB.Tilt.tilt_series_id == MurfeyDB.TiltSeries.id)
     ).all()
-    tilts: Dict[str, List[str]] = {}
+    tilts: dict[str, list[str]] = {}
     for el in res:
         if tilts.get(el[1].rsync_source):
             tilts[el[1].rsync_source].append(el[2].movie_path)
@@ -419,7 +558,9 @@ correlative_router = APIRouter(
 
 
 @correlative_router.get("/sessions/{session_id}/upstream_visits")
-async def find_upstream_visits(session_id: MurfeySessionID, db=murfey_db):
+async def find_upstream_visits(
+    session_id: MurfeySessionID, db: SQLModelSession = murfey_db
+):
     return _find_upstream_visits(session_id=session_id, db=db)
 
 
@@ -430,12 +571,13 @@ async def gather_upstream_files(
     visit_name: str,
     session_id: MurfeySessionID,
     upstream_file_request: UpstreamFileRequestInfo,
-    db=murfey_db,
+    db: SQLModelSession = murfey_db,
 ):
     return _gather_upstream_files(
         session_id=session_id,
         upstream_instrument=upstream_file_request.upstream_instrument,
         upstream_visit_path=upstream_file_request.upstream_visit_path,
+        search_strings=upstream_file_request.search_strings,
         db=db,
     )
 
@@ -447,7 +589,7 @@ async def get_upstream_file(
     visit_name: str,
     session_id: MurfeySessionID,
     upstream_file_path: Path,
-    db=murfey_db,
+    db: SQLModelSession = murfey_db,
 ):
     upstream_file = _get_upstream_file(upstream_file_path)
     return (
@@ -458,14 +600,18 @@ async def get_upstream_file(
 @correlative_router.get(
     "/visits/{visit_name}/sessions/{session_id}/upstream_tiff_paths"
 )
-async def gather_upstream_tiffs(visit_name: str, session_id: int, db=murfey_db):
+async def gather_upstream_tiffs(
+    visit_name: str, session_id: int, db: SQLModelSession = murfey_db
+):
     return _gather_upstream_tiffs(visit_name=visit_name, session_id=session_id, db=db)
 
 
 @correlative_router.get(
     "/visits/{visit_name}/sessions/{session_id}/upstream_tiff/{tiff_path:path}"
 )
-async def get_tiff_file(visit_name: str, session_id: int, tiff_path: str, db=murfey_db):
+async def get_tiff_file(
+    visit_name: str, session_id: int, tiff_path: str, db: SQLModelSession = murfey_db
+):
     tiff_file = _get_tiff_file(
         visit_name=visit_name, session_id=session_id, tiff_path=tiff_path, db=db
     )

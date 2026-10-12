@@ -38,8 +38,5 @@ preprocessed_movies = Counter(
 
 exposure_time = Gauge("exposure_time", "Exposure time for a single movie")
 
-monitoring_switch = Gauge(
-    "monitoring_on",
-    "Whether the corresponding visit should be monitored or not",
-    ["visit"],
-)
+
+alert_end_time = Gauge("alert_end_time", "End time for alerts", ["visit"])

@@ -108,7 +108,7 @@ def test_ids_tomo_classification(murfey_db_session: Session):
     assert returned_ids[1] == first_pj_id
 
 
-@mock.patch("murfey.workflows.tomo.picking._transport_object")
+@mock.patch("murfey.server._transport_object")
 @mock.patch("murfey.workflows.tomo.picking._ids_tomo_classification")
 def test_picked_tomogram_not_run_class2d(
     mock_ids, mock_transport, murfey_db_session: Session, tmp_path
@@ -120,6 +120,7 @@ def test_picked_tomogram_not_run_class2d(
     set_up_picking_db(murfey_db_session)
 
     message = {
+        "session_id": 1,
         "program_id": 0,
         "cbox_3d": f"{tmp_path}/AutoPick/job007/CBOX_3d/sample.cbox",
         "particle_count": 2,
@@ -150,7 +151,7 @@ def test_picked_tomogram_not_run_class2d(
     mock_transport.send.assert_not_called()
 
 
-@mock.patch("murfey.workflows.tomo.picking._transport_object")
+@mock.patch("murfey.server._transport_object")
 @mock.patch("murfey.workflows.tomo.picking._ids_tomo_classification")
 def test_picked_tomogram_run_class2d_with_diameter(
     mock_ids, mock_transport, murfey_db_session: Session, tmp_path
@@ -233,7 +234,7 @@ def test_picked_tomogram_run_class2d_with_diameter(
     )
 
 
-@mock.patch("murfey.workflows.tomo.picking._transport_object")
+@mock.patch("murfey.server._transport_object")
 @mock.patch("murfey.workflows.tomo.picking._ids_tomo_classification")
 def test_picked_tomogram_run_class2d_estimate_diameter(
     mock_ids, mock_transport, murfey_db_session: Session, tmp_path

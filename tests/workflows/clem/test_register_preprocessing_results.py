@@ -37,6 +37,7 @@ def generate_preprocessing_messages(
     rsync_basepath: Path,
     session_id: int,
     colors: list[str],
+    denoising_suffix: str,
 ):
     # Make directory to where data for current grid is stored
     visit_dir = rsync_basepath / "2020" / visit_name
@@ -69,10 +70,24 @@ def generate_preprocessing_messages(
             for n in range(3)
         ]
     )
+    # Add a second atlas dataset
     datasets.extend(
         [
             (
-                grid_dir / "TileScan 1" / f"Position {n + 1}_Lng_LVCC",
+                grid_dir / "Overview 2" / "Image 1",
+                False,
+                True,
+                (2400, 2400),
+                1e-6,
+                [0.002, 0.0044, 0.002, 0.0044],
+            )
+        ]
+    )
+    # Add on metadata for denoised datasets
+    datasets.extend(
+        [
+            (
+                grid_dir / "TileScan 1" / f"Position {n + 1}{denoising_suffix}",
                 True,
                 False,
                 (2048, 2048),
@@ -86,11 +101,7 @@ def generate_preprocessing_messages(
     messages: list[dict[str, Any]] = []
     for series_path, is_stack, is_montage, shape, pixel_size, extent in datasets:
         # Unpack items from list of dataset parameters
-        series_name = (
-            str(series_path.relative_to(processed_dir))
-            .replace("/", "--")
-            .replace(" ", "_")
-        )
+        series_name = str(series_path.relative_to(processed_dir)).replace(" ", "_")
         metadata = series_path / "metadata" / f"{series_path.stem}.xml"
         metadata.parent.mkdir(parents=True, exist_ok=True)
         metadata.touch(exist_ok=True)
@@ -230,31 +241,62 @@ def test_register_grid_square():
 
 @pytest.mark.parametrize(
     "test_params",
-    (  # Colors
-        (["gray"],),
-        (["gray", "green"],),
-        (["red", "green", "blue"],),
-        (["cyan", "magenta", "blue"],),
+    (  # Has transport | Colors
+        # Success cases
+        (
+            True,
+            ["gray"],
+        ),
+        (
+            True,
+            ["gray", "green"],
+        ),
+        (
+            True,
+            ["red", "green", "blue"],
+        ),
+        (
+            True,
+            ["cyan", "magenta", "blue"],
+        ),
+        # Fail cases
+        (
+            False,
+            ["gray"],
+        ),
+        (
+            True,
+            [],
+        ),
     ),
 )
 def test_run(
     mocker: MockerFixture,
     rsync_basepath: Path,
-    test_params: tuple[list[str]],
+    test_params: tuple[bool, list[str]],
 ):
     # Unpack test params
-    (colors,) = test_params
+    has_transport, colors = test_params
+
+    # Mock the transport object
+    mock_transport = MagicMock()
+    mocker.patch(
+        "murfey.server._transport_object",
+        mock_transport if has_transport else None,
+    )
 
     # Mock the MurfeyDB connection
     mock_murfey_session_entry = MagicMock()
     mock_murfey_session_entry.instrument_name = ExampleVisit.instrument_name
     mock_murfey_session_entry.visit = visit_name
     mock_murfey_db = MagicMock()
-    mock_murfey_db.exec().return_value.one.return_value = mock_murfey_session_entry
+    mock_murfey_db.exec.return_value.one.return_value = mock_murfey_session_entry
 
     # Mock the registration helper functions
-    mock_register_clem_series = mocker.patch(
-        "murfey.workflows.clem.register_preprocessing_results._register_clem_imaging_site"
+    mock_clem_img_site = MagicMock()
+    mock_register_clem_imaging_site = mocker.patch(
+        "murfey.workflows.clem.register_preprocessing_results._register_clem_imaging_site",
+        return_value=mock_clem_img_site,
     )
     mock_register_dcg_and_atlas = mocker.patch(
         "murfey.workflows.clem.register_preprocessing_results._register_dcg_and_atlas"
@@ -263,41 +305,41 @@ def test_run(
         "murfey.workflows.clem.register_preprocessing_results._register_grid_square"
     )
 
-    # Mock the align and merge workflow call
-    mock_align_and_merge_call = mocker.patch(
-        "murfey.workflows.clem.register_preprocessing_results.run_align_and_merge"
-    )
-
     preprocessing_messages = generate_preprocessing_messages(
         rsync_basepath=rsync_basepath,
         session_id=ExampleVisit.murfey_session_id,
         colors=colors,
+        denoising_suffix="_Lng_LVCC",
     )
     for message in preprocessing_messages:
-        result = run(
+        run(
             message=message,
             murfey_db=mock_murfey_db,
         )
-        assert result == {"success": True}
-    assert mock_register_clem_series.call_count == len(preprocessing_messages)
-    assert mock_register_dcg_and_atlas.call_count == len(preprocessing_messages)
-    assert mock_register_grid_square.call_count == len(preprocessing_messages)
-    if ("gray" not in colors) or ("gray" in colors and len(colors) == 1):
-        assert mock_align_and_merge_call.call_count == len(preprocessing_messages)
+    if not has_transport or not colors:
+        mock_register_clem_imaging_site.assert_not_called()
+        mock_register_dcg_and_atlas.assert_not_called()
+        mock_register_grid_square.assert_not_called()
     else:
-        assert mock_align_and_merge_call.call_count == len(preprocessing_messages) * 3
+        assert mock_register_clem_imaging_site.call_count == len(preprocessing_messages)
+        assert mock_register_dcg_and_atlas.call_count == len(preprocessing_messages)
+        assert mock_register_grid_square.call_count == len(preprocessing_messages)
+        if ("gray" not in colors) or ("gray" in colors and len(colors) == 1):
+            assert mock_transport.send.call_count == len(preprocessing_messages)
+        else:
+            assert mock_transport.send.call_count == len(preprocessing_messages) * 3
 
 
 @pytest.mark.parametrize(
     "test_params",
     (
-        # Reverse list order? | Colors
-        (False, ["gray"]),
-        (True, ["gray"]),
-        (False, ["red", "green", "blue"]),
-        (True, ["cyan", "magenta", "yellow"]),
-        (False, ["gray", "red", "green", "blue"]),
-        (True, ["gray", "cyan", "magenta", "yellow"]),
+        # Reverse list order? | Colors | Denoising suffix
+        (False, ["gray"], "_Lng_LVCC"),
+        (True, ["gray"], "_Lng_SVCC"),
+        (False, ["red", "green", "blue"], "_ICC"),
+        (True, ["cyan", "magenta", "yellow"], "_Lng_LVCC"),
+        (False, ["gray", "red", "green", "blue"], "_Lng_SVCC"),
+        (True, ["gray", "cyan", "magenta", "yellow"], "_ICC"),
     ),
 )
 def test_run_with_db(
@@ -306,10 +348,10 @@ def test_run_with_db(
     mock_ispyb_credentials,
     murfey_db_session: SQLModelSession,
     ispyb_db_session: SQLAlchemySession,
-    test_params: tuple[bool, list[str]],
+    test_params: tuple[bool, list[str], str],
 ):
     # Unpack test params
-    (shuffle_message, colors) = test_params
+    (shuffle_message, colors, denoising_suffix) = test_params
 
     # Create a session to insert for this test
     murfey_session: MurfeyDB.Session = get_or_create_db_entry(
@@ -341,25 +383,14 @@ def test_run_with_db(
         return_value=ispyb_db_session,
     )
 
-    # Mock the align and merge workflow call
-    mock_align_and_merge_call = mocker.patch(
-        "murfey.workflows.clem.register_preprocessing_results.run_align_and_merge"
-    )
-
     # Patch the TransportManager object in the workflows called
     from murfey.server.ispyb import TransportManager
 
+    mock_send = mocker.patch.object(TransportManager, "send")
+    transport_object = TransportManager("PikaTransport")
+    transport_object.feedback_queue = "murfey_feedback"
     mocker.patch(
-        "murfey.workflows.clem.register_preprocessing_results._transport_object",
-        new=TransportManager("PikaTransport"),
-    )
-    mocker.patch(
-        "murfey.workflows.register_data_collection_group._transport_object",
-        new=TransportManager("PikaTransport"),
-    )
-    mocker.patch(
-        "murfey.workflows.register_atlas_update._transport_object",
-        new=TransportManager("PikaTransport"),
+        "murfey.server._transport_object", new=TransportManager("PikaTransport")
     )
 
     # Run the function
@@ -367,6 +398,7 @@ def test_run_with_db(
         rsync_basepath=rsync_basepath,
         session_id=murfey_session.id,
         colors=colors,
+        denoising_suffix=denoising_suffix,
     )
     if shuffle_message:
         preprocessing_messages.reverse()
@@ -380,9 +412,9 @@ def test_run_with_db(
     # Each message should call the align-and-merge workflow thrice
     # if gray and colour channels are both present
     if ("gray" not in colors) or ("gray" in colors and len(colors) == 1):
-        assert mock_align_and_merge_call.call_count == len(preprocessing_messages)
+        assert mock_send.call_count == len(preprocessing_messages)
     else:
-        assert mock_align_and_merge_call.call_count == len(preprocessing_messages) * 3
+        assert mock_send.call_count == len(preprocessing_messages) * 3
 
     # Murfey's DataCollectionGroup should have an entry
     murfey_dcg_search = murfey_db_session.exec(
@@ -398,7 +430,7 @@ def test_run_with_db(
             MurfeyDB.GridSquare.session_id == murfey_session.id
         )
     ).all()
-    assert len(murfey_gs_search) == (len(preprocessing_messages) - 1) // 2
+    assert len(murfey_gs_search) == (len(preprocessing_messages) - 2) // 2
 
     # ISPyB's DataCollectionGroup should have an entry
     murfey_dcg = murfey_dcg_search[0]
@@ -439,7 +471,7 @@ def test_run_with_db(
         assert getattr(ispyb_atlas, flag) == value
     assert ispyb_atlas.mode == collection_mode
 
-    # ISPyB's GrridSquare should have half the number of initial entries
+    # ISPyB's GridSquare should have half the number of initial entries
     ispyb_gs_search = (
         ispyb_db_session.execute(
             sa_select(ISPyBDB.GridSquare).where(
@@ -449,10 +481,10 @@ def test_run_with_db(
         .scalars()
         .all()
     )
-    assert len(ispyb_gs_search) == (len(preprocessing_messages) - 1) // 2
+    assert len(ispyb_gs_search) == (len(preprocessing_messages) - 2) // 2
     for gs in ispyb_gs_search:
-        # Check that all entries point to the denoised images ("_Lng_LVCC")
-        assert gs.gridSquareImage is not None and "_Lng_LVCC" in gs.gridSquareImage
+        # Check that all entries point to the denoised images
+        assert gs.gridSquareImage is not None and denoising_suffix in gs.gridSquareImage
 
         # Check that the GridSquare color flags and collection mode are set correctly
         for flag, value in color_flags.items():

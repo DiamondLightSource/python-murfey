@@ -1,13 +1,12 @@
 import logging
-from importlib.metadata import entry_points
 from pathlib import Path
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from sqlmodel import Session
 
+import murfey.server
 from murfey.server.api.auth import validate_instrument_token
-from murfey.server.murfey_db import murfey_db
+from murfey.util.models import FIBGIFParameters, LamellaSiteInfo
 
 logger = logging.getLogger("murfey.server.api.workflow_fib")
 
@@ -18,28 +17,77 @@ router = APIRouter(
 )
 
 
-class FIBAtlasInfo(BaseModel):
-    file: Path | None = None
+class File(BaseModel):
+    file: Path
 
 
 @router.post("/sessions/{session_id}/register_atlas")
 def register_fib_atlas(
     session_id: int,
-    fib_atlas_info: FIBAtlasInfo,
-    db: Session = murfey_db,
+    fib_atlas: File,
 ):
-    # See if the relevant workflow is available
-    if not (
-        workflow_search := list(
-            entry_points(group="murfey.workflows", name="fib.register_atlas")
-        )
-    ):
-        raise RuntimeError("Unable to find Murfey workflow to register FIB atlas")
-    workflow = workflow_search[0]
+    if murfey.server._transport_object is None:
+        logger.error("No TransportManager object was set up")
+        return None
+    murfey.server._transport_object.send(
+        murfey.server._transport_object.feedback_queue,
+        {
+            "register": "fib.register_atlas",
+            "session_id": session_id,
+            "atlas_file": str(fib_atlas.file),
+        },
+    )
 
-    # Run the workflow
-    workflow.load()(
-        session_id=session_id,
-        file=fib_atlas_info.file,
-        murfey_db=db,
+
+@router.post("/sessions/{session_id}/register_lamella_evaluation_image")
+def register_lamella_evaluation_image(
+    session_id: int,
+    lamella_image: File,
+):
+    if murfey.server._transport_object is None:
+        logger.error("No TransportManager object was set up")
+        return None
+    murfey.server._transport_object.send(
+        murfey.server._transport_object.feedback_queue,
+        {
+            "register": "fib.register_lamella_evaluation_image",
+            "session_id": session_id,
+            "lamella_image_file": str(lamella_image.file),
+        },
+    )
+
+
+@router.post("/sessions/{session_id}/register_milling_progress")
+def register_fib_milling_progress(
+    session_id: int,
+    site_info: LamellaSiteInfo,
+):
+    if murfey.server._transport_object is None:
+        logger.error("No TransportManager object was set up")
+        return None
+    murfey.server._transport_object.send(
+        murfey.server._transport_object.feedback_queue,
+        {
+            "register": "fib.register_milling_progress",
+            "session_id": session_id,
+            "site_info": site_info.model_dump(exclude_none=True),
+        },
+    )
+
+
+@router.post("/sessions/{session_id}/make_gif")
+async def make_gif(
+    session_id: int,
+    gif_params: FIBGIFParameters,
+):
+    if murfey.server._transport_object is None:
+        logger.error("No TransportManager object was set up")
+        return None
+    murfey.server._transport_object.send(
+        murfey.server._transport_object.feedback_queue,
+        {
+            "register": "fib.make_milling_gif",
+            "session_id": session_id,
+            "gif_params": gif_params.model_dump(mode="json"),
+        },
     )
