@@ -3,7 +3,7 @@ Validate the job numbering in a CCP-EM Pipeliner project.
 
 SPA live processing allocates Pipeliner job numbers from several processes at
 once (Murfey reserving them at schedule time, the node creator registering them
-once compute finishes). When that allocation goes wrong the it shows up in
+once compute finishes). When that allocation goes wrong then it shows up in
 default_pipeline.star as two job types sharing a number, or as a block of
 numbers unused, or jobs falling out of order.
 """
@@ -50,7 +50,7 @@ def check_project(project_dir: Path) -> List[str]:
     if process_block is None:
         return [f"{pipeline_file} has no {PROCESS_BLOCK} block"]
 
-    # Process name and type are the first two columns of the process table.
+    # Process name and type are the first and third columns of the process table.
     by_number: Dict[int, List[str]] = defaultdict(list)
     unnumbered: List[str] = []
     for row in process_block.find(PROCESS_PREFIX, PROCESS_SUFFIXES):
