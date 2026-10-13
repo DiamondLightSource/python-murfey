@@ -1592,6 +1592,19 @@ def _flush_tomography_preprocessing(message: dict, _db):
         ).one()
         detached_ids = [c.id for c in collected_ids]
 
+        lamella_angle = None
+        tilt_series = _db.exec(
+            select(db.TiltSeries)
+            .where(db.TiltSeries.tag == f.tag)
+            .where(db.TiltSeries.session_id == session_id)
+            .where(db.TiltSeries.rsync_source == message["data_collection_group_tag"])
+        ).one_or_none()
+        if tilt_series and tilt_series.search_map_id:
+            relevant_search_map = _db.exec(
+                select(db.SearchMap).where(db.SearchMap.id == tilt_series.search_map_id)
+            ).one()
+            lamella_angle = relevant_search_map.angle
+
         murfey_ids = _murfey_id(detached_ids[3], _db, number=1, close=False)
         movie = db.Movie(
             murfey_id=murfey_ids[0],
@@ -1626,6 +1639,7 @@ def _flush_tomography_preprocessing(message: dict, _db):
                     else proc_params.gain_ref
                 ),
                 "fm_int_file": proc_params.eer_fractionation_file or "",
+                "lamella_angle": lamella_angle,
             },
         }
         logger.info(
