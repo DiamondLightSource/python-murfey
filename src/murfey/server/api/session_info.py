@@ -7,6 +7,7 @@ import requests
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlmodel import Session as SQLModelSession, select
 
 import murfey.server
@@ -284,6 +285,44 @@ def get_data_collections(
         select(MurfeyDB.DataCollection).where(MurfeyDB.DataCollection.dcg_id == dcgid)
     ).all()
     return data_collections
+
+
+@router.get("/sessions/{session_id}/movies/preprocessed")
+async def get_preprocessed_movie_count(
+    session_id: MurfeySessionID,
+    db: SQLModelSession = murfey_db,
+):
+    """
+    Helper function that counts the number of movies for the current session that have
+    been preprocessed or not, and returns the result as a dictionary.
+    """
+    grouped_movies = db.exec(
+        select(MurfeyDB.Movie.preprocessed, func.count().label("number"))
+        .join(
+            MurfeyDB.DataCollection,
+            MurfeyDB.Movie.data_collection_id == MurfeyDB.DataCollection.id,
+        )
+        .join(
+            MurfeyDB.DataCollectionGroup,
+            MurfeyDB.DataCollection.dcg_id == MurfeyDB.DataCollectionGroup.id,
+        )
+        .join(
+            MurfeyDB.Session,
+            MurfeyDB.DataCollectionGroup.session_id == MurfeyDB.Session.id,
+        )
+        .where(MurfeyDB.Session.id == session_id)
+        .group_by(MurfeyDB.Movie.preprocessed)
+    ).all()
+    preprocessed_movies = {
+        "complete": 0,
+        "incomplete": 0,
+    }
+    for preprocessed, number in grouped_movies:
+        if preprocessed:
+            preprocessed_movies["complete"] = number
+        else:
+            preprocessed_movies["incomplete"] = number
+    return preprocessed_movies
 
 
 @router.get("/clients")

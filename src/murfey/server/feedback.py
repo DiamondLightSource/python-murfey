@@ -2051,6 +2051,7 @@ def feedback_callback(
                     .where(db.ProcessingJob.recipe == "em-tomo-align")
                 ).one()
 
+                # Update the tilt series and its corresponding tilts
                 relevant_tilt_and_series = _db.exec(
                     select(db.Tilt, db.TiltSeries)
                     .where(db.Tilt.movie_path == message.get("movie"))
@@ -2061,7 +2062,17 @@ def feedback_callback(
                 relevant_tilt_series = relevant_tilt_and_series[1]
                 relevant_tilt.motion_corrected = True
                 _db.add(relevant_tilt)
+
+                # Update all related Movie rows and mark as preprocessed
+                relevant_movies = _db.exec(
+                    select(db.Movie).where(db.Movie.path == message["movie"])
+                ).all()
+                for movie in relevant_movies:
+                    movie.preprocessed = True
+                    _db.add(movie)
+
                 _db.commit()
+
                 if (
                     check_tilt_series_mc(relevant_tilt_series.id, _db)
                     and not relevant_tilt_series.processing_requested
