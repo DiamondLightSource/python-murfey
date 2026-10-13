@@ -1,6 +1,5 @@
 import json
 import logging
-import math
 import re
 from datetime import datetime
 from pathlib import Path
@@ -13,9 +12,10 @@ from sqlmodel import Session as SQLModelSession, select
 import murfey.server
 import murfey.util.db as MurfeyDB
 from murfey.util.config import get_machine_config
-from murfey.util.models import FIBImageMetadata, GridSquareParameters
+from murfey.util.models import FIBImageMetadata
 from murfey.workflows.fib.shared import (
     parse_image_metadata,
+    populate_fib_grid_square_entry,
     populate_fib_imaging_site_entry,
 )
 from murfey.workflows.register_data_collection_group import register_dcg
@@ -185,7 +185,7 @@ def _register_dcg(
 def _register_grid_square(
     session_id: int,
     imaging_site: MurfeyDB.ImagingSite,
-    site_number: int,
+    lamella_number: int,
     murfey_db: SQLModelSession,
 ):
     """
@@ -216,143 +216,16 @@ def _register_grid_square(
         return imaging_site
     atlas = atlas_search[-1]
 
-    # Check if the atlas has the required values for the GridSquare registration
-    if not (
-        atlas.pos_x is not None
-        and atlas.pos_y is not None
-        and atlas.pos_z is not None
-        and atlas.rotation is not None
-        and atlas.tilt_alpha is not None
-        and atlas.len_x is not None
-        and atlas.len_y is not None
-        and atlas.thumbnail_pixels_x is not None
-        and atlas.thumbnail_pixels_y is not None
-    ):
-        logger.warning(f"Atlas {atlas.image_path} not populated with required values")
-        return imaging_site
-    atlas_x1 = atlas.pos_x + (atlas.len_x / 2)
-    atlas_y0 = atlas.pos_y - (atlas.len_y / 2)
-
-    # Check that imaging site has the required values for registration
-    if not (
-        imaging_site.pos_x is not None
-        and imaging_site.pos_y is not None
-        and imaging_site.pos_z is not None
-        and imaging_site.rotation is not None
-        and imaging_site.tilt_alpha is not None
-        and imaging_site.len_x is not None
-        and imaging_site.len_y is not None
-    ):
-        logger.warning(
-            f"ImagingSite for {imaging_site.image_path} not populated with required values"
-        )
-        return imaging_site
-
-    # Transform the imaging site coordinates into the atlas' frame of reference
-    # NOTE: This will require further investigation and tweaking, given the
-    # many axes and centres of rotation present in the FIB stage system.
-    # We start with a simple 2D rotation for now, and will adjust it as we observe
-    # the alignment accuracy
-    theta = math.radians(imaging_site.rotation - atlas.rotation)
-    sin = math.sin(theta)
-    cos = math.cos(theta)
-    x_transformed = (imaging_site.pos_x * cos) - (imaging_site.pos_y * sin)
-    y_transformed = (imaging_site.pos_x * sin) + (imaging_site.pos_y * cos)
-
-    # Find the pixel coordinates of the image on the atlas
-    # NOTE: On the atlas image, positive directions are LEFT (x) and DOWN (y)
-    x_mid_px = int(
-        round((atlas_x1 - x_transformed) / atlas.len_x * atlas.thumbnail_pixels_x) or 1
+    # Create/update the GridSquare entry in ISPyB
+    grid_square_entry = populate_fib_grid_square_entry(
+        session_id=session_id,
+        dcg_name=dcg_name,
+        atlas=atlas,
+        lamella=imaging_site,
+        lamella_number=lamella_number,
+        transport_object=murfey.server._transport_object,
+        murfey_db=murfey_db,
     )
-    y_mid_px = int(
-        round((y_transformed - atlas_y0) / atlas.len_y * atlas.thumbnail_pixels_y) or 1
-    )
-
-    # Find the pixel width and height of the lamella image on the atlas
-    width_scaled = int(
-        round((imaging_site.len_x / atlas.len_x) * atlas.thumbnail_pixels_x) or 1
-    )
-    height_scaled = int(
-        round((imaging_site.len_y / atlas.len_y) * atlas.thumbnail_pixels_y) or 1
-    )
-
-    # Populate GridSquareParameters model
-    grid_square_params = GridSquareParameters(
-        tag=dcg_name,
-        x_location=x_transformed,
-        x_location_scaled=x_mid_px,
-        y_location=y_transformed,
-        y_location_scaled=y_mid_px,
-        readout_area_x=imaging_site.image_pixels_x,
-        readout_area_y=imaging_site.image_pixels_y,
-        thumbnail_size_x=imaging_site.thumbnail_pixels_x,
-        thumbnail_size_y=imaging_site.thumbnail_pixels_y,
-        width=imaging_site.image_pixels_x,
-        width_scaled=width_scaled,
-        height=imaging_site.image_pixels_y,
-        height_scaled=height_scaled,
-        x_stage_position=x_transformed,
-        y_stage_position=y_transformed,
-        pixel_size=imaging_site.image_pixel_size,
-        image=imaging_site.thumbnail_path,
-    )
-
-    # Register or update the grid square entry as required
-    if grid_square_entry := murfey_db.exec(
-        select(MurfeyDB.GridSquare)
-        .where(MurfeyDB.GridSquare.name == site_number)
-        .where(MurfeyDB.GridSquare.session_id == session_id)
-        .where(MurfeyDB.GridSquare.tag == grid_square_params.tag)
-    ).one_or_none():
-        # Update existing grid square entry on Murfey
-        grid_square_entry.x_location = grid_square_params.x_location
-        grid_square_entry.y_location = grid_square_params.y_location
-        grid_square_entry.x_stage_position = grid_square_params.x_stage_position
-        grid_square_entry.y_stage_position = grid_square_params.y_stage_position
-        grid_square_entry.readout_area_x = grid_square_params.readout_area_x
-        grid_square_entry.readout_area_y = grid_square_params.readout_area_y
-        grid_square_entry.thumbnail_size_x = grid_square_params.thumbnail_size_x
-        grid_square_entry.thumbnail_size_y = grid_square_params.thumbnail_size_y
-        grid_square_entry.pixel_size = grid_square_params.pixel_size
-        grid_square_entry.image = grid_square_params.image
-
-        # Update existing entry on ISPyB
-        murfey.server._transport_object.do_update_grid_square(
-            grid_square_id=grid_square_entry.id,
-            grid_square_parameters=grid_square_params,
-        )
-    else:
-        # Look up data collection group for current series
-        dcg_entry = murfey_db.exec(
-            select(MurfeyDB.DataCollectionGroup)
-            .where(MurfeyDB.DataCollectionGroup.session_id == session_id)
-            .where(MurfeyDB.DataCollectionGroup.tag == grid_square_params.tag)
-        ).one()
-        # Register to ISPyB
-        grid_square_ispyb_result = (
-            murfey.server._transport_object.do_insert_grid_square(
-                atlas_id=dcg_entry.atlas_id,
-                grid_square_id=site_number,
-                grid_square_parameters=grid_square_params,
-            )
-        )
-        # Create matching record in Murfey
-        grid_square_entry = MurfeyDB.GridSquare(
-            id=grid_square_ispyb_result.get("return_value", None),
-            name=site_number,
-            session_id=session_id,
-            tag=grid_square_params.tag,
-            x_location=grid_square_params.x_location,
-            y_location=grid_square_params.y_location,
-            x_stage_position=grid_square_params.x_stage_position,
-            y_stage_position=grid_square_params.y_stage_position,
-            readout_area_x=grid_square_params.readout_area_x,
-            readout_area_y=grid_square_params.readout_area_y,
-            thumbnail_size_x=grid_square_params.thumbnail_size_x,
-            thumbnail_size_y=grid_square_params.thumbnail_size_y,
-            pixel_size=grid_square_params.pixel_size,
-            image=grid_square_params.image,
-        )
     murfey_db.add(grid_square_entry)
 
     # Add grid square ID to existing CLEM image series entry
@@ -434,7 +307,7 @@ def run(
     fib_img_site = _register_grid_square(
         session_id=fib_info.session_id,
         imaging_site=fib_img_site,
-        site_number=metadata.lamella_number,
+        lamella_number=metadata.lamella_number,
         murfey_db=murfey_db,
     )
 

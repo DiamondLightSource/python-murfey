@@ -7,12 +7,14 @@ import PIL.Image
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
+import murfey.server
 import murfey.util.db as MurfeyDB
 from murfey.util.config import get_machine_config
 from murfey.util.fib import number_from_name
 from murfey.util.models import FIBImageMetadata
 from murfey.workflows.fib.shared import (
     parse_image_metadata,
+    populate_fib_grid_square_entry,
     populate_fib_imaging_site_entry,
 )
 from murfey.workflows.register_data_collection_group import register_dcg
@@ -166,6 +168,67 @@ def _register_dcg_and_atlas(
     murfey_db.add(imaging_site)
     murfey_db.commit()
 
+    return imaging_site
+
+
+def _update_grid_squares(
+    session_id: int,
+    atlas: MurfeyDB.ImagingSite,
+    murfey_db: Session,
+):
+    """
+    Searches for any grid square-type ImagingSites associated with this atlas, and
+    uses them to recalculate the relative positions of the images on the current
+    atlas image.
+    """
+    # Early errors if variables are not set correctly
+    if murfey.server._transport_object is None:
+        raise RuntimeError("No TransportManager object was set up")
+    dcg_name = atlas.dcg_name
+    if dcg_name is None:
+        raise ValueError(
+            f"'dcg_name' field in ImagingSite entry for {atlas.image_path} is empty"
+        )
+
+    # Early exit if no lamella images have been registered
+    lamella_imaging_sites = murfey_db.exec(
+        select(MurfeyDB.ImagingSite)
+        .where(MurfeyDB.ImagingSite.session_id == session_id)
+        .where(MurfeyDB.ImagingSite.dcg_name == atlas.dcg_name)
+        .where(MurfeyDB.ImagingSite.data_type == "grid_square")
+    ).all()
+    if not lamella_imaging_sites:
+        logger.info(
+            "No lamella imaging sites associated with this atlas have been registered"
+        )
+        return atlas
+
+    # Iterate across lamella imaging sites and register/update them
+    for lamella in lamella_imaging_sites:
+        try:
+            grid_square_entry = populate_fib_grid_square_entry(
+                session_id=session_id,
+                dcg_name=dcg_name,
+                atlas=atlas,
+                lamella=lamella,
+                lamella_number=int(lamella.site_name.split("lamella_")[-1]),
+                transport_object=murfey.server._transport_object,
+                murfey_db=murfey_db,
+            )
+            murfey_db.add(grid_square_entry)
+        except Exception:
+            logger.error(
+                "Error registering/updating GridSquare entry for "
+                f"ImagingSite entry {lamella.image_path}",
+                exc_info=True,
+            )
+            continue
+
+    # Commit all changes at the end
+    murfey_db.commit()
+
+    return atlas
+
 
 class FIBAtlasRegistrationInfo(BaseModel):
     session_id: int
@@ -219,7 +282,7 @@ def run(
     )
 
     # Register data collection group and atlas in ISPyB
-    _register_dcg_and_atlas(
+    fib_imaging_site = _register_dcg_and_atlas(
         session_id=fib_info.session_id,
         instrument_name=murfey_session.instrument_name,
         visit_name=murfey_session.visit,
@@ -227,4 +290,12 @@ def run(
         metadata=metadata,
         murfey_db=murfey_db,
     )
+
+    # Update any existing lammella image (grid square) entries
+    fib_imaging_site = _update_grid_squares(
+        session_id=fib_info.session_id,
+        atlas=fib_imaging_site,
+        murfey_db=murfey_db,
+    )
+
     return {"success": True, "requeue": False}

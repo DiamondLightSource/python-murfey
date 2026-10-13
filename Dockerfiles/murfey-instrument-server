@@ -38,7 +38,7 @@ RUN \
     /venv/bin/python -m pip install --upgrade \
         pip \
         build \
-        importlib-metadata && \
+        && \
     /venv/bin/python -m pip install /tmp/python-murfey[sxt]
 
 

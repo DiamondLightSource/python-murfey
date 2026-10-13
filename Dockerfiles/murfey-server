@@ -37,8 +37,7 @@ RUN \
     /venv/bin/python -m pip install --upgrade \
         pip \
         build \
-        importlib-metadata \
-        psycopg2-binary && \
+        && \
     /venv/bin/python -m pip install /tmp/python-murfey[server] && \
     echo "Installing IMOD..." && \
     mkdir /imod && \
