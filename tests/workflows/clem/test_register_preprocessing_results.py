@@ -243,31 +243,13 @@ def test_register_grid_square():
     "test_params",
     (  # Has transport | Colors
         # Success cases
-        (
-            True,
-            ["gray"],
-        ),
-        (
-            True,
-            ["gray", "green"],
-        ),
-        (
-            True,
-            ["red", "green", "blue"],
-        ),
-        (
-            True,
-            ["cyan", "magenta", "blue"],
-        ),
+        (True, ["gray"]),
+        (True, ["gray", "green"]),
+        (True, ["red", "green", "blue"]),
+        (True, ["cyan", "magenta", "blue"]),
         # Fail cases
-        (
-            False,
-            ["gray"],
-        ),
-        (
-            True,
-            [],
-        ),
+        (False, ["gray"]),
+        (True, []),
     ),
 )
 def test_run(
@@ -311,16 +293,12 @@ def test_run(
         colors=colors,
         denoising_suffix="_Lng_LVCC",
     )
-    for message in preprocessing_messages:
-        run(
-            message=message,
-            murfey_db=mock_murfey_db,
-        )
-    if not has_transport or not colors:
-        mock_register_clem_imaging_site.assert_not_called()
-        mock_register_dcg_and_atlas.assert_not_called()
-        mock_register_grid_square.assert_not_called()
-    else:
+    if has_transport and colors:
+        for message in preprocessing_messages:
+            run(
+                message=message,
+                murfey_db=mock_murfey_db,
+            )
         assert mock_register_clem_imaging_site.call_count == len(preprocessing_messages)
         assert mock_register_dcg_and_atlas.call_count == len(preprocessing_messages)
         assert mock_register_grid_square.call_count == len(preprocessing_messages)
@@ -328,6 +306,18 @@ def test_run(
             assert mock_transport.send.call_count == len(preprocessing_messages)
         else:
             assert mock_transport.send.call_count == len(preprocessing_messages) * 3
+    else:
+        errors: list[type[Exception]] = []
+        if not has_transport:
+            errors.append(RuntimeError)
+        elif not colors:
+            errors.append(ValueError)
+        with pytest.raises(tuple(errors)):
+            for message in preprocessing_messages:
+                run(
+                    message=message,
+                    murfey_db=mock_murfey_db,
+                )
 
 
 @pytest.mark.parametrize(
