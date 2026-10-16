@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import time
 from threading import Thread
 from typing import Literal
 
@@ -191,6 +192,9 @@ def run():
             daemon=True,
         )
         rabbit_thread.start()
+        # Don't end function if RabbitMQ consumer is run by itself
+        while args.no_server:
+            time.sleep(86400)
 
     # Start Murfey Uvicorn server if '--no-server' is not passed
     if not args.no_server:
