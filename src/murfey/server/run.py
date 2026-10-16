@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import time
 from threading import Thread
 from typing import Literal
 
@@ -78,9 +79,15 @@ def _set_up_logging(quiet: bool, verbosity: int):
         logging.getLogger(logger_name).setLevel(log_level)
 
 
-def _set_up_transport(transport_type: Literal["PikaTransport"]):
+def _set_up_transport(
+    transport_type: Literal["PikaTransport"],
+    feedback_queue: str,
+    temporary: bool = False,
+):
     # Update the existing TransportManager object in 'murfey.server'
     murfey.server._transport_object = TransportManager(transport_type)
+    if not temporary:
+        murfey.server._transport_object.feedback_queue = feedback_queue
 
 
 def run():
@@ -102,22 +109,32 @@ def run():
         default=8000,
     )
     parser.add_argument(
-        "--workers", help="Number of workers for Uvicorn server", type=int, default=2
+        "--root-path",
+        type=str,
+        default="",
+        help="Uvicorn root path for use in conjunction with a proxy",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=2,
+        help="Number of workers for Uvicorn server",
     )
     parser.add_argument(
         "--feedback",
         action="store_true",
+        help="Allow server to consume from the configured RabbitMQ message queue",
+    )
+    parser.add_argument(
+        "--no-server",
+        action="store_true",
+        help="Disables FastAPI server startup. Use with '--feedback' to run only the RabbitMQ message consumer",
     )
     parser.add_argument(
         "--temporary",
         action="store_true",
     )
-    parser.add_argument(
-        "--root-path",
-        default="",
-        type=str,
-        help="Uvicorn root path for use in conjunction with a proxy",
-    )
+
     verbosity = parser.add_mutually_exclusive_group()
     verbosity.add_argument(
         "-q",
@@ -149,10 +166,17 @@ def run():
     # Install a log filter to all existing handlers.
     LogFilter.install()
 
+    # Set up logging now that the desired verbosity is known
+    _set_up_logging(quiet=args.quiet, verbosity=args.verbose)
+
     # Load RabbitMQ configuration and set up the connection
     try:
         PikaTransport().load_configuration_file(security_config.rabbitmq_credentials)
-        _set_up_transport("PikaTransport")
+        _set_up_transport(
+            "PikaTransport",
+            feedback_queue=security_config.feedback_queue,
+            temporary=args.temporary,
+        )
         logger.info("Set up message transport manager")
     except WorkflowsError:
         logger.error(
@@ -160,36 +184,36 @@ def run():
             exc_info=True,
         )
 
-    # Set up logging now that the desired verbosity is known
-    _set_up_logging(quiet=args.quiet, verbosity=args.verbose)
-
-    if not args.temporary and murfey.server._transport_object:
-        murfey.server._transport_object.feedback_queue = security_config.feedback_queue
-    rabbit_thread = Thread(
-        target=feedback_listen,
-        daemon=True,
-    )
-    logger.info("Starting Murfey RabbitMQ thread")
+    # Start the RabbitMQ message consumer thread
     if args.feedback:
+        logger.info("Starting Murfey RabbitMQ thread")
+        rabbit_thread = Thread(
+            target=feedback_listen,
+            daemon=True,
+        )
         rabbit_thread.start()
+        # Don't end function if RabbitMQ consumer is run by itself
+        while args.no_server:
+            time.sleep(86400)
 
-    logger.info(
-        f"Starting Murfey server version {murfey.__version__} for beamline {get_microscope()}, listening on {args.host}:{args.port}"
-    )
-    config = uvicorn.Config(
-        "murfey.server.main:app",
-        host=args.host,
-        port=args.port,
-        log_config=None,
-        ws_ping_interval=300,
-        ws_ping_timeout=300,
-        workers=args.workers,
-        root_path=args.root_path,
-    )
-
-    murfey.server._running_server = uvicorn.Server(config=config)
-    murfey.server._running_server.run()
-    logger.info("Server shutting down")
+    # Start Murfey Uvicorn server if '--no-server' is not passed
+    if not args.no_server:
+        logger.info(
+            f"Starting Murfey server version {murfey.__version__} for beamline {get_microscope()}, listening on {args.host}:{args.port}"
+        )
+        config = uvicorn.Config(
+            "murfey.server.main:app",
+            host=args.host,
+            port=args.port,
+            log_config=None,
+            ws_ping_interval=300,
+            ws_ping_timeout=300,
+            workers=args.workers,
+            root_path=args.root_path,
+        )
+        murfey.server._running_server = uvicorn.Server(config=config)
+        murfey.server._running_server.run()
+        logger.info("Server shutting down")
 
 
 def shutdown():

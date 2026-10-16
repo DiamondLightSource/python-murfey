@@ -199,12 +199,7 @@ def run():
 
     from murfey.server.run import _set_up_transport
 
-    _set_up_transport("PikaTransport")
-
-    # Now import transport object which was set up in the above step
-    from murfey.server import _transport_object
-
-    _transport_object.feedback_queue = security_config.feedback_queue
+    _set_up_transport("PikaTransport", feedback_queue=security_config.feedback_queue)
 
     # Purge the queue and repost/reinject any messages found
     dlq_dump_path = Path(args.dir)
