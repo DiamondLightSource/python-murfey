@@ -183,32 +183,33 @@ def run():
             exc_info=True,
         )
 
-    rabbit_thread = Thread(
-        target=feedback_listen,
-        daemon=True,
-    )
-    logger.info("Starting Murfey RabbitMQ thread")
+    # Start the RabbitMQ message consumer thread
     if args.feedback:
+        logger.info("Starting Murfey RabbitMQ thread")
+        rabbit_thread = Thread(
+            target=feedback_listen,
+            daemon=True,
+        )
         rabbit_thread.start()
 
-    logger.info(
-        f"Starting Murfey server version {murfey.__version__} for beamline {get_microscope()}, listening on {args.host}:{args.port}"
-    )
-    config = uvicorn.Config(
-        "murfey.server.main:app",
-        host=args.host,
-        port=args.port,
-        log_config=None,
-        ws_ping_interval=300,
-        ws_ping_timeout=300,
-        workers=args.workers,
-        root_path=args.root_path,
-    )
-
+    # Start Murfey Uvicorn server if '--no-server' is not passed
     if not args.no_server:
+        logger.info(
+            f"Starting Murfey server version {murfey.__version__} for beamline {get_microscope()}, listening on {args.host}:{args.port}"
+        )
+        config = uvicorn.Config(
+            "murfey.server.main:app",
+            host=args.host,
+            port=args.port,
+            log_config=None,
+            ws_ping_interval=300,
+            ws_ping_timeout=300,
+            workers=args.workers,
+            root_path=args.root_path,
+        )
         murfey.server._running_server = uvicorn.Server(config=config)
         murfey.server._running_server.run()
-    logger.info("Server shutting down")
+        logger.info("Server shutting down")
 
 
 def shutdown():
