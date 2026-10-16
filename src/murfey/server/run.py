@@ -165,6 +165,9 @@ def run():
     # Install a log filter to all existing handlers.
     LogFilter.install()
 
+    # Set up logging now that the desired verbosity is known
+    _set_up_logging(quiet=args.quiet, verbosity=args.verbose)
+
     # Load RabbitMQ configuration and set up the connection
     try:
         PikaTransport().load_configuration_file(security_config.rabbitmq_credentials)
@@ -179,9 +182,6 @@ def run():
             "Error encountered setting up RabbitMQ connection",
             exc_info=True,
         )
-
-    # Set up logging now that the desired verbosity is known
-    _set_up_logging(quiet=args.quiet, verbosity=args.verbose)
 
     rabbit_thread = Thread(
         target=feedback_listen,
