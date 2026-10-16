@@ -78,9 +78,15 @@ def _set_up_logging(quiet: bool, verbosity: int):
         logging.getLogger(logger_name).setLevel(log_level)
 
 
-def _set_up_transport(transport_type: Literal["PikaTransport"]):
+def _set_up_transport(
+    transport_type: Literal["PikaTransport"],
+    feedback_queue: str,
+    temporary: bool = False,
+):
     # Update the existing TransportManager object in 'murfey.server'
     murfey.server._transport_object = TransportManager(transport_type)
+    if not temporary:
+        murfey.server._transport_object.feedback_queue = feedback_queue
 
 
 def run():
@@ -162,7 +168,11 @@ def run():
     # Load RabbitMQ configuration and set up the connection
     try:
         PikaTransport().load_configuration_file(security_config.rabbitmq_credentials)
-        _set_up_transport("PikaTransport")
+        _set_up_transport(
+            "PikaTransport",
+            feedback_queue=security_config.feedback_queue,
+            temporary=args.temporary,
+        )
         logger.info("Set up message transport manager")
     except WorkflowsError:
         logger.error(
@@ -173,8 +183,6 @@ def run():
     # Set up logging now that the desired verbosity is known
     _set_up_logging(quiet=args.quiet, verbosity=args.verbose)
 
-    if not args.temporary and murfey.server._transport_object:
-        murfey.server._transport_object.feedback_queue = security_config.feedback_queue
     rabbit_thread = Thread(
         target=feedback_listen,
         daemon=True,
