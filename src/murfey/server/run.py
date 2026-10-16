@@ -102,22 +102,32 @@ def run():
         default=8000,
     )
     parser.add_argument(
-        "--workers", help="Number of workers for Uvicorn server", type=int, default=2
+        "--root-path",
+        type=str,
+        default="",
+        help="Uvicorn root path for use in conjunction with a proxy",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=2,
+        help="Number of workers for Uvicorn server",
     )
     parser.add_argument(
         "--feedback",
         action="store_true",
+        help="Allow server to consume from the configured RabbitMQ message queue",
+    )
+    parser.add_argument(
+        "--no-server",
+        action="store_true",
+        help="Disables FastAPI server startup. Use with '--feedback' to run only the RabbitMQ message consumer",
     )
     parser.add_argument(
         "--temporary",
         action="store_true",
     )
-    parser.add_argument(
-        "--root-path",
-        default="",
-        type=str,
-        help="Uvicorn root path for use in conjunction with a proxy",
-    )
+
     verbosity = parser.add_mutually_exclusive_group()
     verbosity.add_argument(
         "-q",
@@ -187,8 +197,9 @@ def run():
         root_path=args.root_path,
     )
 
-    murfey.server._running_server = uvicorn.Server(config=config)
-    murfey.server._running_server.run()
+    if not args.no_server:
+        murfey.server._running_server = uvicorn.Server(config=config)
+        murfey.server._running_server.run()
     logger.info("Server shutting down")
 
 
