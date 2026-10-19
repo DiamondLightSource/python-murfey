@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import logging
 import time
-from threading import Thread
+from threading import Event, Thread
 from typing import Literal
 
 import graypy
@@ -192,9 +192,13 @@ def run():
             daemon=True,
         )
         rabbit_thread.start()
-        # Don't end function if RabbitMQ consumer is run by itself
-        while args.no_server:
-            time.sleep(86400)
+
+        # Sleep in a while-block if RabbitMQ consumer is run by itself
+        rabbit_event = Event()
+        if args.no_server:
+            rabbit_event.set()
+        while rabbit_event.is_set():
+            time.sleep(0.5)
 
     # Start Murfey Uvicorn server if '--no-server' is not passed
     if not args.no_server:
