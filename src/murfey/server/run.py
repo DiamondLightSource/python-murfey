@@ -185,7 +185,7 @@ def run():
         )
 
     # Start the RabbitMQ message consumer thread
-    if args.feedback:
+    if args.feedback or args.no_server:
         logger.info("Starting Murfey RabbitMQ thread")
         rabbit_thread = Thread(
             target=feedback_listen,
