@@ -11,7 +11,7 @@ from murfey.server.run import run
 
 @pytest.mark.parametrize(
     "args",
-    (  # Host | Port | Root path | Workers | Feedback | No server | Temporary | Quiet | Verbose
+    (  # Host | Port | Root path | Workers | Feedback | Feedback only | Temporary | Quiet | Verbose
         ("1.1.1.1", 5432, "/api", 4, True, False, False, False, 0),
         ("1.1.1.1", 5432, "/api", 4, False, True, False, False, 0),
         ("", None, "", None, False, True, False, False, 0),
@@ -29,9 +29,17 @@ def test_run(
     args: tuple[str, int | None, str, int | None, bool, bool, bool, bool, int],
 ):
     # Unpack test params
-    host, port, root_path, workers, feedback, no_server, temporary, quiet, verbosity = (
-        args
-    )
+    (
+        host,
+        port,
+        root_path,
+        workers,
+        feedback,
+        feedback_only,
+        temporary,
+        quiet,
+        verbosity,
+    ) = args
 
     # Manually pass in argument variables
     sys.argv = [
@@ -47,8 +55,8 @@ def test_run(
         sys.argv.extend(["--workers", str(workers)])
     if feedback:
         sys.argv.append("--feedback")
-    if no_server:
-        sys.argv.append("--no-server")
+    if feedback_only:
+        sys.argv.append("--feedback-only")
     if temporary:
         sys.argv.append("--temporary")
     if quiet:
@@ -99,11 +107,11 @@ def test_run(
         rmq_creds
     )
 
-    # RabbitMQ thread should start if '--feedback' or '--no-server' are set
-    if feedback or no_server:
+    # RabbitMQ thread should start if '--feedback' or '--feedback-only' are set
+    if feedback or feedback_only:
         mock_thread_class.assert_called_once_with(target=feedback_listen, daemon=True)
         mock_thread.start.assert_called_once()
-        if no_server:
+        if feedback_only:
             mock_event.set.assert_called_once()
         else:
             mock_event.set.assert_not_called()
@@ -112,8 +120,8 @@ def test_run(
         mock_thread.start.assert_not_called()
         mock_event.set.assert_not_called()
 
-    # Uvicorn server should start if '--no-server' is not set
-    if not no_server:
+    # Uvicorn server should start if '--feedback-only' is not set
+    if not feedback_only:
         mock_config_class.assert_called_once_with(
             "murfey.server.main:app",
             host=host if host else "0.0.0.0",

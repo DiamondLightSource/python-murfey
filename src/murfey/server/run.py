@@ -97,6 +97,7 @@ def run():
 
     # Set up argument parser
     parser = argparse.ArgumentParser(description="Start the Murfey server")
+    # FastAPI args
     parser.add_argument(
         "--host",
         help="Listen for incoming connections on a specific interface (IP address or hostname; default: all)",
@@ -120,21 +121,22 @@ def run():
         default=2,
         help="Number of workers for Uvicorn server",
     )
+    # RabbitMQ args
     parser.add_argument(
         "--feedback",
         action="store_true",
         help="Allow server to consume from the configured RabbitMQ message queue",
     )
     parser.add_argument(
-        "--no-server",
+        "--feedback-only",
         action="store_true",
-        help="Disables FastAPI server startup. Use with '--feedback' to run only the RabbitMQ message consumer",
+        help="Disables FastAPI server startup and only runs the RabbitMQ message consumer",
     )
     parser.add_argument(
         "--temporary",
         action="store_true",
     )
-
+    # Logging args
     verbosity = parser.add_mutually_exclusive_group()
     verbosity.add_argument(
         "-q",
@@ -185,7 +187,7 @@ def run():
         )
 
     # Start the RabbitMQ message consumer thread
-    if args.feedback or args.no_server:
+    if args.feedback or args.feedback_only:
         logger.info("Starting Murfey RabbitMQ thread")
         rabbit_thread = Thread(
             target=feedback_listen,
@@ -195,13 +197,13 @@ def run():
 
         # Sleep in a while-block if RabbitMQ consumer is run by itself
         rabbit_event = Event()
-        if args.no_server:
+        if args.feedback_only:
             rabbit_event.set()
         while rabbit_event.is_set():
             time.sleep(0.5)
 
-    # Start Murfey Uvicorn server if '--no-server' is not passed
-    if not args.no_server:
+    # Start Murfey Uvicorn server if '--feedback-only' is not passed
+    if not args.feedback_only:
         logger.info(
             f"Starting Murfey server version {murfey.__version__} for beamline {get_microscope()}, listening on {args.host}:{args.port}"
         )
