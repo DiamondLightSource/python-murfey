@@ -11,22 +11,22 @@ from murfey.server.run import run
 
 @pytest.mark.parametrize(
     "args",
-    (  # Host | Port | Root path | Workers | Feedback | Feedback only | Temporary | Quiet | Verbose
-        ("1.1.1.1", 5432, "/api", 4, True, False, False, False, 0),
-        ("1.1.1.1", 5432, "/api", 4, False, True, False, False, 0),
-        ("", None, "", None, False, True, False, False, 0),
-        ("", None, "", None, True, False, False, False, 0),
-        ("", None, "", None, False, True, False, True, 0),
-        ("", None, "", None, True, False, False, False, 0),
-        ("", None, "", None, False, True, False, False, 1),
-        ("", None, "", None, True, False, False, False, 2),
-        ("", None, "", None, True, False, False, False, 3),
+    (  # Host | Port | Root path | Workers | Feedback | Feedback only | Quiet | Verbose
+        ("1.1.1.1", 5432, "/api", 4, True, False, False, 0),
+        ("1.1.1.1", 5432, "/api", 4, False, True, False, 0),
+        ("", None, "", None, False, True, False, 0),
+        ("", None, "", None, True, False, False, 0),
+        ("", None, "", None, False, True, True, 0),
+        ("", None, "", None, True, False, False, 0),
+        ("", None, "", None, False, True, False, 1),
+        ("", None, "", None, True, False, False, 2),
+        ("", None, "", None, True, False, False, 3),
     ),
 )
 def test_run(
     mocker: MockerFixture,
     tmp_path: Path,
-    args: tuple[str, int | None, str, int | None, bool, bool, bool, bool, int],
+    args: tuple[str, int | None, str, int | None, bool, bool, bool, int],
 ):
     # Unpack test params
     (
@@ -36,7 +36,6 @@ def test_run(
         workers,
         feedback,
         feedback_only,
-        temporary,
         quiet,
         verbosity,
     ) = args
@@ -57,8 +56,6 @@ def test_run(
         sys.argv.append("--feedback")
     if feedback_only:
         sys.argv.append("--feedback-only")
-    if temporary:
-        sys.argv.append("--temporary")
     if quiet:
         sys.argv.append("--quiet")
     if verbosity:
