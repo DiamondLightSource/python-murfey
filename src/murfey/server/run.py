@@ -82,12 +82,10 @@ def _set_up_logging(quiet: bool, verbosity: int):
 def _set_up_transport(
     transport_type: Literal["PikaTransport"],
     feedback_queue: str,
-    temporary: bool = False,
 ):
     # Update the existing TransportManager object in 'murfey.server'
     murfey.server._transport_object = TransportManager(transport_type)
-    if not temporary:
-        murfey.server._transport_object.feedback_queue = feedback_queue
+    murfey.server._transport_object.feedback_queue = feedback_queue
 
 
 def run():
@@ -132,10 +130,6 @@ def run():
         action="store_true",
         help="Disables FastAPI server startup and only runs the RabbitMQ message consumer",
     )
-    parser.add_argument(
-        "--temporary",
-        action="store_true",
-    )
     # Logging args
     verbosity = parser.add_mutually_exclusive_group()
     verbosity.add_argument(
@@ -177,7 +171,6 @@ def run():
         _set_up_transport(
             "PikaTransport",
             feedback_queue=security_config.feedback_queue,
-            temporary=args.temporary,
         )
         logger.info("Set up message transport manager")
     except WorkflowsError:
