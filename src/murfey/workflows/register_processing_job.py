@@ -23,6 +23,13 @@ def run(message: dict, murfey_db: SQLModelSession):
     logger.info(f"Registering the following processing job: \n{message}")
 
     murfey_session_id = int(message["session_id"])
+    instrument_name = (
+        murfey_db.exec(
+            select(MurfeyDB.Session).where(MurfeyDB.Session.id == murfey_session_id)
+        )
+        .one()
+        .instrument_name
+    )
     dc = murfey_db.exec(
         select(MurfeyDB.DataCollection, MurfeyDB.DataCollectionGroup)
         .where(MurfeyDB.DataCollection.dcg_id == MurfeyDB.DataCollectionGroup.id)
@@ -74,7 +81,7 @@ def run(message: dict, murfey_db: SQLModelSession):
         murfey_db.close()
 
     # Update Prometheus counter for preprocessed movies
-    prom.preprocessed_movies.labels(processing_job=pid)
+    prom.preprocessed_movies.labels(microscope=instrument_name, processing_job=pid)
 
     # Register AutoProcProgram database entry if it doesn't already exist
     if not murfey_db.exec(

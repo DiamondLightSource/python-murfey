@@ -2130,7 +2130,7 @@ def feedback_callback(
                     _db.add(relevant_tilt_series)
 
                 prom.preprocessed_movies.labels(
-                    processing_job=collected_ids[2].id
+                    microscope=instrument_name, processing_job=collected_ids[2].id
                 ).inc()
                 _db.commit()
                 _db.close()

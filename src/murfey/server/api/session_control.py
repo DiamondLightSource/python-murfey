@@ -56,7 +56,7 @@ from murfey.util.db import (
     Movie,
     ProcessingJob,
     RsyncInstance,
-    Session,
+    Session as MurfeySession,
 )
 from murfey.util.models import (
     AtlasRegistration,
@@ -126,7 +126,7 @@ def link_client_to_session(
 ):
     sid = sess.session_id
     if sid is None:
-        s = Session(name=sess.session_name, instrument_name=instrument_name)
+        s = MurfeySession(name=sess.session_name, instrument_name=instrument_name)
         db.add(s)
         db.commit()
         sid = s.id
@@ -145,7 +145,9 @@ def register_client_to_visit(visit_name: str, client_info: ClientInfo, db=murfey
     client_env = db.exec(
         select(ClientEnvironment).where(ClientEnvironment.client_id == client_info.id)
     ).one()
-    session = db.exec(select(Session).where(Session.id == client_env.session_id)).one()
+    session = db.exec(
+        select(MurfeySession).where(MurfeySession.id == client_env.session_id)
+    ).one()
     if client_env:
         client_env.visit = visit_name
         db.add(client_env)
@@ -160,7 +162,7 @@ def register_client_to_visit(visit_name: str, client_info: ClientInfo, db=murfey
 
 @router.get("/sessions")
 async def get_sessions(db=murfey_db):
-    sessions = db.exec(select(Session)).all()
+    sessions = db.exec(select(MurfeySession)).all()
     clients = db.exec(select(ClientEnvironment)).all()
     res = []
     for sess in sessions:
@@ -241,7 +243,9 @@ def failed_client_post(instrument_name: str, post_info: PostInfo):
 
 @router.post("/sessions/{session_id}/rsyncer")
 def register_rsyncer(session_id: int, rsyncer_info: RsyncerInfo, db=murfey_db):
-    visit_name = db.exec(select(Session).where(Session.id == session_id)).one().visit
+    session = db.exec(select(MurfeySession).where(MurfeySession.id == session_id)).one()
+    instrument_name = session.instrument_name
+    visit_name = session.visit
     rsync_instance = RsyncInstance(
         source=rsyncer_info.source,
         session_id=rsyncer_info.session_id,
@@ -252,23 +256,27 @@ def register_rsyncer(session_id: int, rsyncer_info: RsyncerInfo, db=murfey_db):
     db.add(rsync_instance)
     db.commit()
     db.close()
-    prom.seen_files.labels(rsync_source=rsyncer_info.source, visit=visit_name).set(0)
+    prom.seen_files.labels(
+        microscope=instrument_name, rsync_source=rsyncer_info.source, visit=visit_name
+    ).set(0)
     prom.transferred_files.labels(
-        rsync_source=rsyncer_info.source, visit=visit_name
+        microscope=instrument_name, rsync_source=rsyncer_info.source, visit=visit_name
     ).set(0)
     prom.transferred_files_bytes.labels(
-        rsync_source=rsyncer_info.source, visit=visit_name
+        microscope=instrument_name, rsync_source=rsyncer_info.source, visit=visit_name
     ).set(0)
-    prom.seen_data_files.labels(rsync_source=rsyncer_info.source, visit=visit_name).set(
-        0
-    )
+    prom.seen_data_files.labels(
+        microscope=instrument_name, rsync_source=rsyncer_info.source, visit=visit_name
+    ).set(0)
     prom.transferred_data_files.labels(
-        rsync_source=rsyncer_info.source, visit=visit_name
+        microscope=instrument_name, rsync_source=rsyncer_info.source, visit=visit_name
     ).set(0)
     prom.transferred_data_files_bytes.labels(
-        rsync_source=rsyncer_info.source, visit=visit_name
+        microscope=instrument_name, rsync_source=rsyncer_info.source, visit=visit_name
     ).set(0)
-    prom.skipped_files.labels(rsync_source=rsyncer_info.source, visit=visit_name).set(0)
+    prom.skipped_files.labels(
+        microscope=instrument_name, rsync_source=rsyncer_info.source, visit=visit_name
+    ).set(0)
     return rsyncer_info
 
 
@@ -409,7 +417,9 @@ def register_square(
             ).one_or_none()
             smartem_uuid = gs.smartem_uuid if gs else None
         if smartem_uuid is not None:
-            session = db.exec(select(Session).where(Session.id == session_id)).one()
+            session = db.exec(
+                select(MurfeySession).where(MurfeySession.id == session_id)
+            ).one()
             machine_config = get_machine_config(session.instrument_name)[
                 session.instrument_name
             ]
@@ -444,7 +454,7 @@ def make_atlas_jpg(
     logger.debug(
         f"Received request to create JPG image of atlas {sanitise(atlas_mrc.path)!r}"
     )
-    session = db.exec(select(Session).where(Session.id == session_id)).one()
+    session = db.exec(select(MurfeySession).where(MurfeySession.id == session_id)).one()
     return atlas_jpg_from_mrc(
         session.instrument_name, session.visit, Path(atlas_mrc.path)
     )

@@ -482,6 +482,8 @@ def particles_picked(message: dict, murfey_db: Session) -> dict[str, bool]:
         _register_picked_particles_use_diameter(message, murfey_db)
     else:
         _register_picked_particles_use_boxsize(message, murfey_db)
-    prom.preprocessed_movies.labels(processing_job=_pj_id(program_id, murfey_db)).inc()
+    prom.preprocessed_movies.labels(
+        microscope=session.instrument_name, processing_job=_pj_id(program_id, murfey_db)
+    ).inc()
     _check_notifications(message, murfey_db)
     return {"success": True}
