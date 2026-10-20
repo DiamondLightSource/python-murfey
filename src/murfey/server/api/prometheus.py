@@ -34,7 +34,7 @@ def increment_rsync_file_count(
             select(RsyncInstance).where(
                 RsyncInstance.source == rsyncer_info.source,
                 RsyncInstance.destination == rsyncer_info.destination,
-                RsyncInstance.session_id == rsyncer_info.session_id,
+                RsyncInstance.session_id == session_id,
             )
         ).one()
     except Exception:
@@ -65,7 +65,7 @@ def increment_rsync_transferred_files(
         select(RsyncInstance).where(
             RsyncInstance.source == rsyncer_info.source,
             RsyncInstance.destination == rsyncer_info.destination,
-            RsyncInstance.session_id == rsyncer_info.session_id,
+            RsyncInstance.session_id == session_id,
         )
     ).one()
     rsync_instance.files_transferred += rsyncer_info.increment_count

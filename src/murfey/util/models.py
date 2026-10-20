@@ -71,7 +71,6 @@ class ClientInfo(BaseModel):
 class RsyncerInfo(BaseModel):
     source: str
     destination: str
-    session_id: int
     transferring: bool = True
     increment_count: int = 1
     bytes: int = 0
@@ -82,7 +81,6 @@ class RsyncerInfo(BaseModel):
 
 class RsyncerSkippedFiles(BaseModel):
     source: str
-    session_id: int
     increment_count: int = 1
 
 
