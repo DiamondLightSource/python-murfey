@@ -196,11 +196,12 @@ def run():
         rabbit_thread.start()
 
         # Sleep in a while-block if RabbitMQ consumer is run by itself
-        rabbit_event = Event()
         if args.feedback_only:
+            rabbit_event = Event()
             rabbit_event.set()
-        while rabbit_event.is_set():
-            time.sleep(0.5)
+            # Run the while-block against the event so that the args can be tested
+            while rabbit_event.is_set():
+                time.sleep(0.5)
 
     # Start Murfey Uvicorn server if '--feedback-only' is not passed
     if not args.feedback_only:
