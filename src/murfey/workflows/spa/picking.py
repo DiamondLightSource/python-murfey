@@ -19,6 +19,7 @@ from murfey.util.db import (
     ClassificationFeedbackParameters,
     CtfParameters,
     DataCollection,
+    DataCollectionGroup,
     Movie,
     NotificationParameter,
     NotificationValue,
@@ -482,8 +483,16 @@ def particles_picked(message: dict, murfey_db: Session) -> dict[str, bool]:
         _register_picked_particles_use_diameter(message, murfey_db)
     else:
         _register_picked_particles_use_boxsize(message, murfey_db)
+
+    dcg = murfey_db.exec(
+        select(DataCollectionGroup)
+        .join(DataCollection, DataCollection.dcg_id == DataCollectionGroup.id)
+        .join(ProcessingJob, ProcessingJob.dc_id == DataCollection.id)
+        .join(AutoProcProgram, AutoProcProgram.pj_id == ProcessingJob.id)
+        .where(AutoProcProgram.id == program_id)
+    ).one()
     prom.preprocessed_movies.labels(
-        microscope=session.instrument_name, processing_job=_pj_id(program_id, murfey_db)
+        microscope=session.instrument_name, rsync_source=dcg.tag, visit=session.visit
     ).inc()
     _check_notifications(message, murfey_db)
     return {"success": True}

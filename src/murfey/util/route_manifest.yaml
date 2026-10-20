@@ -725,28 +725,28 @@ murfey.server.api.processing_parameters.router:
     methods:
       - POST
 murfey.server.api.prometheus.router:
-  - path: /prometheus/session/{session_id}/increment_rsync_file_count
+  - path: /prometheus/sessions/{session_id}/increment_rsync_file_count
     function: increment_rsync_file_count
     path_params:
       - name: session_id
         type: int
     methods:
       - POST
-  - path: /prometheus/session/{session_id}/increment_rsync_transferred_files
+  - path: /prometheus/sessions/{session_id}/increment_rsync_transferred_files
     function: increment_rsync_transferred_files
     path_params:
       - name: session_id
         type: int
     methods:
       - POST
-  - path: /prometheus/session/{session_id}/increment_rsync_transferred_files_prometheus
+  - path: /prometheus/sessions/{session_id}/increment_rsync_transferred_files_prometheus
     function: increment_rsync_transferred_files_prometheus
     path_params:
       - name: session_id
         type: int
     methods:
       - POST
-  - path: /prometheus/session/{session_id}/increment_rsync_skipped_files_prometheus
+  - path: /prometheus/sessions/{session_id}/increment_rsync_skipped_files_prometheus
     function: increment_rsync_skipped_files_prometheus
     path_params:
       - name: session_id

@@ -41,7 +41,7 @@ skipped_files = Gauge(
 preprocessed_movies = Counter(
     "preprocessed_movies",
     "Number of movies that have been preprocessed",
-    ["microscope", "processing_job"],
+    ["microscope", "rsync_source", "visit"],
 )
 
 exposure_time = Gauge(

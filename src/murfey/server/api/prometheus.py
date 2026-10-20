@@ -22,7 +22,7 @@ router = APIRouter(
 )
 
 
-@router.post("/session/{session_id}/increment_rsync_file_count")
+@router.post("/sessions/{session_id}/increment_rsync_file_count")
 def increment_rsync_file_count(
     session_id: int, rsyncer_info: RsyncerInfo, db=murfey_db
 ):
@@ -57,7 +57,7 @@ def increment_rsync_file_count(
     ).inc(rsyncer_info.increment_data_count)
 
 
-@router.post("/session/{session_id}/increment_rsync_transferred_files")
+@router.post("/sessions/{session_id}/increment_rsync_transferred_files")
 def increment_rsync_transferred_files(
     session_id: int, rsyncer_info: RsyncerInfo, db=murfey_db
 ):
@@ -74,7 +74,7 @@ def increment_rsync_transferred_files(
     db.close()
 
 
-@router.post("/session/{session_id}/increment_rsync_transferred_files_prometheus")
+@router.post("/sessions/{session_id}/increment_rsync_transferred_files_prometheus")
 def increment_rsync_transferred_files_prometheus(
     session_id: int, rsyncer_info: RsyncerInfo, db=murfey_db
 ):
@@ -95,7 +95,7 @@ def increment_rsync_transferred_files_prometheus(
     ).inc(rsyncer_info.data_bytes)
 
 
-@router.post("/session/{session_id}/increment_rsync_skipped_files_prometheus")
+@router.post("/sessions/{session_id}/increment_rsync_skipped_files_prometheus")
 def increment_rsync_skipped_files_prometheus(
     session_id: int, rsyncer_skipped_files: RsyncerSkippedFiles, db=murfey_db
 ):
@@ -119,7 +119,7 @@ def inspect_prometheus_metrics(
     """
 
     # Extract the Prometheus metric defined in the Prometheus module
-    metric: Counter | Gauge = getattr(prom, metric_name, None)
+    metric: Counter | Gauge | None = getattr(prom, metric_name, None)
     if metric is None or not isinstance(metric, (Counter, Gauge)):
         raise LookupError("No matching metric was found")
 
