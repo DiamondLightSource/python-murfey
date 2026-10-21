@@ -19,6 +19,7 @@ class SIMContext(Context):
         super().__init__("SIMContext", acquisition_software, token)
         self._basepath = basepath
         self._machine_config = machine_config
+        self._atlas_files: dict[str, dict[str, str]] = {}
 
     def post_transfer(
         self,
@@ -31,9 +32,53 @@ class SIMContext(Context):
             logger.warning("No environment passed in")
             return None
 
+        # Look for atlas files
+        if transferred_file.name in ("mosaic.mrc", "mosaic.txt", "markers.txt"):
+            source = _get_source(transferred_file, environment)
+            if source is None:
+                logger.warning(f"No source found for file {transferred_file}")
+                return None
+            destination_file = _file_transferred_to(
+                environment=environment,
+                source=source,
+                file_path=transferred_file,
+                rsync_basepath=Path(self._machine_config.get("rsync_basepath", "")),
+            )
+            # Add to dictionary
+            atlas_parent = str(destination_file.parent)
+            if not self._atlas_files.get(atlas_parent):
+                self._atlas_files[atlas_parent] = {
+                    destination_file.name.replace(".", "_"): str(destination_file)
+                }
+            else:
+                self._atlas_files[atlas_parent][
+                    destination_file.name.replace(".", "_")
+                ] = str(destination_file)
+
+            # Only trigger processing once the 'mosaic.txt' and 'mosaic.mrc' files are available
+            # Processing will be re-triggered if the optional 'markers.txt' file is detected
+            if all(
+                file in self._atlas_files[atlas_parent].keys()
+                for file in ("mosaic_mrc", "mosaic_txt")
+            ):
+                logger.info(
+                    f"Submitting processing request for atlas files found in {atlas_parent}"
+                )
+                capture_post(
+                    base_url=str(environment.url.geturl()),
+                    router_name="workflow_sim.router",
+                    function_name="request_sim_atlas_stitching",
+                    token=self._token,
+                    instrument_name=environment.instrument_name,
+                    data=self._atlas_files[atlas_parent],
+                    # Endpoint kwargs
+                    session_id=environment.murfey_session,
+                )
+            return None
+
         # Look for raw data files
         # These have no extensions, and end with "_FL"
-        if not transferred_file.suffix and transferred_file.stem.endswith("_FL"):
+        elif not transferred_file.suffix and transferred_file.stem.endswith("_FL"):
             source = _get_source(transferred_file, environment)
             if source is None:
                 logger.warning(f"No source found for file {transferred_file}")

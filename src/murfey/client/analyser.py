@@ -223,6 +223,10 @@ class Analyser(Observer):
             # Bright field files end with "_BF"
             # Processing will be triggered on fluorescent files ending with "_FL"
             not file_path.suffix and file_path.stem.endswith(("_BF", "_FL"))
+        ) or (
+            # CryoSIM atlas files consist of a "mosaic.mrc" file, a "mosaic.txt" file,
+            # and an optional "markers.txt" file
+            file_path.name in ("mosaic.mrc", "mosaic.txt", "markers.txt")
         ):
             if (context := _get_context("SIMContext")) is None:
                 return False
