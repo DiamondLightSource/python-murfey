@@ -989,16 +989,14 @@ async def request_tomography_preprocessing(
         db.close()
 
         lamella_angle = None
-        tilt_series = db.exec(
-            select(TiltSeries)
+        relevant_search_map = db.exec(
+            select(SearchMap)
+            .join(TiltSeries, TiltSeries.search_map_id == SearchMap.id)
             .where(TiltSeries.tag == proc_file.tag)
             .where(TiltSeries.session_id == session_id)
             .where(TiltSeries.rsync_source == proc_file.rsync_source)
         ).one_or_none()
-        if tilt_series and tilt_series.search_map_id:
-            relevant_search_map = db.exec(
-                select(SearchMap).where(SearchMap.id == tilt_series.search_map_id)
-            ).one()
+        if relevant_search_map:
             lamella_angle = relevant_search_map.angle
 
         zocalo_message: dict = {

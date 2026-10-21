@@ -1593,16 +1593,14 @@ def _flush_tomography_preprocessing(message: dict, _db):
         detached_ids = [c.id for c in collected_ids]
 
         lamella_angle = None
-        tilt_series = _db.exec(
-            select(db.TiltSeries)
+        relevant_search_map = _db.exec(
+            select(db.SearchMap)
+            .join(db.TiltSeries, db.TiltSeries.search_map_id == db.SearchMap.id)
             .where(db.TiltSeries.tag == f.tag)
             .where(db.TiltSeries.session_id == session_id)
             .where(db.TiltSeries.rsync_source == message["data_collection_group_tag"])
         ).one_or_none()
-        if tilt_series and tilt_series.search_map_id:
-            relevant_search_map = _db.exec(
-                select(db.SearchMap).where(db.SearchMap.id == tilt_series.search_map_id)
-            ).one()
+        if relevant_search_map:
             lamella_angle = relevant_search_map.angle
 
         murfey_ids = _murfey_id(detached_ids[3], _db, number=1, close=False)
