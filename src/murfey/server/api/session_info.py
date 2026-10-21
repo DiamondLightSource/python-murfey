@@ -210,9 +210,9 @@ def create_session(
 
     # Add a Prometheus label for the session if an end time is set
     if session_info.end_time:
-        prom.alert_end_time.labels(visit=session_info.visit).set(
-            session_info.end_time.timestamp()
-        )
+        prom.alert_end_time.labels(
+            microscope=instrument_name, visit=session_info.visit
+        ).set(session_info.end_time.timestamp())
 
     return session_id
 

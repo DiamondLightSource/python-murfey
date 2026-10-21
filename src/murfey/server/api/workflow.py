@@ -464,7 +464,9 @@ def start_dc(
             },
         )
     if dc_params.exposure_time:
-        prom.exposure_time.set(dc_params.exposure_time)
+        prom.exposure_time.labels(microscope=instrument_name, visit=visit_name).set(
+            dc_params.exposure_time
+        )
     return dc_params
 
 
