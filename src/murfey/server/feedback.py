@@ -1592,6 +1592,17 @@ def _flush_tomography_preprocessing(message: dict, _db):
         ).one()
         detached_ids = [c.id for c in collected_ids]
 
+        lamella_angle = None
+        relevant_search_map = _db.exec(
+            select(db.SearchMap)
+            .join(db.TiltSeries, db.TiltSeries.search_map_id == db.SearchMap.id)
+            .where(db.TiltSeries.tag == f.tag)
+            .where(db.TiltSeries.session_id == session_id)
+            .where(db.TiltSeries.rsync_source == message["data_collection_group_tag"])
+        ).one_or_none()
+        if relevant_search_map:
+            lamella_angle = relevant_search_map.angle
+
         murfey_ids = _murfey_id(detached_ids[3], _db, number=1, close=False)
         movie = db.Movie(
             murfey_id=murfey_ids[0],
@@ -1626,6 +1637,7 @@ def _flush_tomography_preprocessing(message: dict, _db):
                     else proc_params.gain_ref
                 ),
                 "fm_int_file": proc_params.eer_fractionation_file or "",
+                "lamella_angle": lamella_angle,
             },
         }
         logger.info(
@@ -2078,6 +2090,15 @@ def feedback_callback(
                     and not relevant_tilt_series.processing_requested
                     and relevant_tilt_series.tilt_series_length > 2
                 ):
+                    lamella_angle = None
+                    if relevant_tilt_series.search_map_id:
+                        relevant_search_map = _db.exec(
+                            select(db.SearchMap).where(
+                                db.SearchMap.id == relevant_tilt_series.search_map_id
+                            )
+                        ).one()
+                        lamella_angle = relevant_search_map.angle
+
                     instrument_name = murfey_session.instrument_name
                     machine_config = get_machine_config(
                         instrument_name=instrument_name
@@ -2113,6 +2134,7 @@ def feedback_callback(
                             "search_map_id": relevant_tilt_series.search_map_id,
                             "x_location": relevant_tilt_series.x_location,
                             "y_location": relevant_tilt_series.y_location,
+                            "lamella_angle": lamella_angle,
                         },
                     }
                     if murfey.server._transport_object:
