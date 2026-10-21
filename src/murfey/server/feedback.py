@@ -2130,7 +2130,9 @@ def feedback_callback(
                     _db.add(relevant_tilt_series)
 
                 prom.preprocessed_movies.labels(
-                    processing_job=collected_ids[2].id
+                    microscope=instrument_name,
+                    rsync_source=collected_ids[0].tag,
+                    visit=murfey_session.visit,
                 ).inc()
                 _db.commit()
                 _db.close()

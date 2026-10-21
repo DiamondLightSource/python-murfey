@@ -32,7 +32,7 @@ def remove_session_by_id(session_id: int, db):
     if len(sessions_for_visit) == 1:
         safe_run(
             prom.alert_end_time.remove,
-            args=(session.visit,),
+            args=(session.instrument_name, session.visit),
             label="alert_end_time",
         )
         rsync_instances = db.exec(
@@ -41,37 +41,37 @@ def remove_session_by_id(session_id: int, db):
         for ri in rsync_instances:
             safe_run(
                 prom.seen_files.remove,
-                args=(ri.source, session.visit),
+                args=(session.instrument_name, ri.source, session.visit),
                 label="seen_files",
             )
             safe_run(
                 prom.transferred_files.remove,
-                args=(ri.source, session.visit),
+                args=(session.instrument_name, ri.source, session.visit),
                 label="transferred_files",
             )
             safe_run(
                 prom.transferred_files_bytes.remove,
-                args=(ri.source, session.visit),
+                args=(session.instrument_name, ri.source, session.visit),
                 label="transferred_files_bytes",
             )
             safe_run(
                 prom.seen_data_files.remove,
-                args=(ri.source, session.visit),
+                args=(session.instrument_name, ri.source, session.visit),
                 label="seen_data_files",
             )
             safe_run(
                 prom.transferred_data_files.remove,
-                args=(ri.source, session.visit),
+                args=(session.instrument_name, ri.source, session.visit),
                 label="transferred_data_files",
             )
             safe_run(
                 prom.transferred_data_files_bytes.remove,
-                args=(ri.source, session.visit),
+                args=(session.instrument_name, ri.source, session.visit),
                 label="transferred_data_file_bytes",
             )
             safe_run(
                 prom.skipped_files.remove,
-                args=(ri.source, session.visit),
+                args=(session.instrument_name, ri.source, session.visit),
                 label="skipped_files",
             )
     collected_ids = db.exec(
@@ -83,7 +83,7 @@ def remove_session_by_id(session_id: int, db):
     for c in collected_ids:
         safe_run(
             prom.preprocessed_movies.remove,
-            args=(c[2].id,),
+            args=(session.instrument_name, c[2].id),
             label="preprocessed_movies",
         )
     db.delete(session)
