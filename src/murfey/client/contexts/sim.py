@@ -33,7 +33,10 @@ class SIMContext(Context):
             return None
 
         # Look for atlas files
-        if transferred_file.name in ("mosaic.mrc", "mosaic.txt", "markers.txt"):
+        if (
+            "mosaic" in transferred_file.stem
+            and transferred_file.suffix in (".mrc", ".txt")
+        ) or ("markers" in transferred_file.stem and transferred_file.suffix == ".txt"):
             source = _get_source(transferred_file, environment)
             if source is None:
                 logger.warning(f"No source found for file {transferred_file}")
@@ -46,14 +49,19 @@ class SIMContext(Context):
             )
             # Add to dictionary
             atlas_parent = str(destination_file.parent)
+            if "mosaic" in transferred_file.stem and transferred_file.suffix == ".mrc":
+                file_type = "mosaic_mrc"
+            elif (
+                "mosaic" in transferred_file.stem and transferred_file.suffix == ".txt"
+            ):
+                file_type = "mosaic_txt"
+            elif (
+                "markers" in transferred_file.stem and transferred_file.suffix == ".txt"
+            ):
+                file_type = "markers_txt"
             if not self._atlas_files.get(atlas_parent):
-                self._atlas_files[atlas_parent] = {
-                    destination_file.name.replace(".", "_"): str(destination_file)
-                }
-            else:
-                self._atlas_files[atlas_parent][
-                    destination_file.name.replace(".", "_")
-                ] = str(destination_file)
+                self._atlas_files[atlas_parent] = {}
+            self._atlas_files[atlas_parent][file_type] = str(destination_file)
 
             # Only trigger processing once the 'mosaic.txt' and 'mosaic.mrc' files are available
             # Processing will be re-triggered if the optional 'markers.txt' file is detected

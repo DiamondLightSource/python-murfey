@@ -219,14 +219,21 @@ class Analyser(Observer):
         # SIM workflow checks
         # -----------------------------------------------------------------------------
         if (
-            # CryoSIM raw data files have no extension
-            # Bright field files end with "_BF"
-            # Processing will be triggered on fluorescent files ending with "_FL"
-            not file_path.suffix and file_path.stem.endswith(("_BF", "_FL"))
-        ) or (
-            # CryoSIM atlas files consist of a "mosaic.mrc" file, a "mosaic.txt" file,
-            # and an optional "markers.txt" file
-            file_path.name in ("mosaic.mrc", "mosaic.txt", "markers.txt")
+            (
+                # CryoSIM raw data files have no extension
+                # Bright field files end with "_BF"
+                # Processing will be triggered on fluorescent files ending with "_FL"
+                not file_path.suffix and file_path.stem.endswith(("_BF", "_FL"))
+            )
+            or (
+                # CryoSIM consist of a mosaic MRC file and an accompanying text file
+                # Both should have the word "mosaic" in them
+                "mosaic" in file_path.stem and file_path.suffix in (".mrc", ".txt")
+            )
+            or (
+                # The atlas image will have an optional markers TXT file as well
+                "markers" in file_path.stem and file_path.suffix == ".txt"
+            )
         ):
             if (context := _get_context("SIMContext")) is None:
                 return False
