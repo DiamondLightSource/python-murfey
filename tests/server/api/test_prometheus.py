@@ -328,3 +328,62 @@ def test_increment_rsync_transferred_files_prometheus(
         }
     )
     assert transferred_data_files_bytes_sample.value == data_bytes * iterations
+
+
+@pytest.mark.parametrize(
+    "test_params",
+    (  # File count | Iterations
+        (1, 1),
+        (1, 3),
+    ),
+)
+def test_increment_rsync_skipped_files_prometheus(
+    test_params: tuple[int, int],
+    tmp_path: Path,
+    murfey_db_session: SQLModelSession,
+):
+    # Unpack and set up test parameters
+    src = str(tmp_path / "client" / visit_name / "raw")
+    file_count, iterations = test_params
+
+    # Set up the backend test client
+    def mock_get_db_session():
+        yield murfey_db_session
+
+    backend_client = set_up_test_backend_client(
+        router=router,
+        mock_db_session=mock_get_db_session,
+    )
+
+    # Submit posts to the endpoint
+    backend_url_path = url_path_for(
+        "api.prometheus.router",
+        "increment_rsync_skipped_files_prometheus",
+        session_id=session_id,
+    )
+    for _ in range(iterations):
+        response = backend_client.post(
+            backend_url_path,
+            json={
+                "source": src,
+                "increment_count": file_count,
+            },
+        )
+        assert response.status_code == 200
+
+    # Check that the Prometheus objects were updated correctly
+    import murfey.server.prometheus as prom
+
+    # Check 'skipped_files'
+    skipped_files_samples = prom.skipped_files.collect()[0].samples
+    skipped_files_sample = next(
+        s
+        for s in skipped_files_samples
+        if s.labels
+        == {
+            "microscope": instrument_name,
+            "rsync_source": src,
+            "visit": visit_name,
+        }
+    )
+    assert skipped_files_sample.value == file_count * iterations
