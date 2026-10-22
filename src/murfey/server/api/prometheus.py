@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from logging import getLogger
-from typing import Optional
 
 from fastapi import APIRouter, Depends
 from prometheus_client import Counter, Gauge
@@ -11,7 +10,7 @@ import murfey.server.prometheus as prom
 from murfey.server.api.auth import validate_instrument_token
 from murfey.server.murfey_db import murfey_db
 from murfey.util import sanitise
-from murfey.util.db import RsyncInstance
+from murfey.util.db import RsyncInstance, Session as MurfeySession
 from murfey.util.models import RsyncerInfo, RsyncerSkippedFiles
 
 logger = getLogger("murfey.server.api.prometheus")
@@ -23,16 +22,19 @@ router = APIRouter(
 )
 
 
-@router.post("/visits/{visit_name}/increment_rsync_file_count")
+@router.post("/sessions/{session_id}/increment_rsync_file_count")
 def increment_rsync_file_count(
-    visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db
+    session_id: int, rsyncer_info: RsyncerInfo, db=murfey_db
 ):
+    session = db.exec(select(MurfeySession).where(MurfeySession.id == session_id)).one()
+    instrument_name = session.instrument_name
+    visit_name = session.visit_name
     try:
         rsync_instance = db.exec(
             select(RsyncInstance).where(
                 RsyncInstance.source == rsyncer_info.source,
                 RsyncInstance.destination == rsyncer_info.destination,
-                RsyncInstance.session_id == rsyncer_info.session_id,
+                RsyncInstance.session_id == session_id,
             )
         ).one()
     except Exception:
@@ -47,23 +49,23 @@ def increment_rsync_file_count(
     db.add(rsync_instance)
     db.commit()
     db.close()
-    prom.seen_files.labels(rsync_source=rsyncer_info.source, visit=visit_name).inc(
-        rsyncer_info.increment_count
-    )
-    prom.seen_data_files.labels(rsync_source=rsyncer_info.source, visit=visit_name).inc(
-        rsyncer_info.increment_data_count
-    )
+    prom.seen_files.labels(
+        microscope=instrument_name, rsync_source=rsyncer_info.source, visit=visit_name
+    ).inc(rsyncer_info.increment_count)
+    prom.seen_data_files.labels(
+        microscope=instrument_name, rsync_source=rsyncer_info.source, visit=visit_name
+    ).inc(rsyncer_info.increment_data_count)
 
 
-@router.post("/visits/{visit_name}/increment_rsync_transferred_files")
+@router.post("/sessions/{session_id}/increment_rsync_transferred_files")
 def increment_rsync_transferred_files(
-    visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db
+    session_id: int, rsyncer_info: RsyncerInfo, db=murfey_db
 ):
     rsync_instance = db.exec(
         select(RsyncInstance).where(
             RsyncInstance.source == rsyncer_info.source,
             RsyncInstance.destination == rsyncer_info.destination,
-            RsyncInstance.session_id == rsyncer_info.session_id,
+            RsyncInstance.session_id == session_id,
         )
     ).one()
     rsync_instance.files_transferred += rsyncer_info.increment_count
@@ -72,30 +74,38 @@ def increment_rsync_transferred_files(
     db.close()
 
 
-@router.post("/visits/{visit_name}/increment_rsync_transferred_files_prometheus")
+@router.post("/sessions/{session_id}/increment_rsync_transferred_files_prometheus")
 def increment_rsync_transferred_files_prometheus(
-    visit_name: str, rsyncer_info: RsyncerInfo, db=murfey_db
+    session_id: int, rsyncer_info: RsyncerInfo, db=murfey_db
 ):
+    session = db.exec(select(MurfeySession).where(MurfeySession.id == session_id)).one()
+    instrument_name = session.instrument_name
+    visit_name = session.visit_name
     prom.transferred_files.labels(
-        rsync_source=rsyncer_info.source, visit=visit_name
+        microscope=instrument_name, rsync_source=rsyncer_info.source, visit=visit_name
     ).inc(rsyncer_info.increment_count)
     prom.transferred_files_bytes.labels(
-        rsync_source=rsyncer_info.source, visit=visit_name
+        microscope=instrument_name, rsync_source=rsyncer_info.source, visit=visit_name
     ).inc(rsyncer_info.bytes)
     prom.transferred_data_files.labels(
-        rsync_source=rsyncer_info.source, visit=visit_name
+        microscope=instrument_name, rsync_source=rsyncer_info.source, visit=visit_name
     ).inc(rsyncer_info.increment_data_count)
     prom.transferred_data_files_bytes.labels(
-        rsync_source=rsyncer_info.source, visit=visit_name
+        microscope=instrument_name, rsync_source=rsyncer_info.source, visit=visit_name
     ).inc(rsyncer_info.data_bytes)
 
 
-@router.post("/visits/{visit_name}/increment_rsync_skipped_files_prometheus")
+@router.post("/sessions/{session_id}/increment_rsync_skipped_files_prometheus")
 def increment_rsync_skipped_files_prometheus(
-    visit_name: str, rsyncer_skipped_files: RsyncerSkippedFiles, db=murfey_db
+    session_id: int, rsyncer_skipped_files: RsyncerSkippedFiles, db=murfey_db
 ):
+    session = db.exec(select(MurfeySession).where(MurfeySession.id == session_id)).one()
+    instrument_name = session.instrument_name
+    visit_name = session.visit_name
     prom.skipped_files.labels(
-        rsync_source=rsyncer_skipped_files.source, visit=visit_name
+        microscope=instrument_name,
+        rsync_source=rsyncer_skipped_files.source,
+        visit=visit_name,
     ).inc(rsyncer_skipped_files.increment_count)
 
 
@@ -109,7 +119,7 @@ def inspect_prometheus_metrics(
     """
 
     # Extract the Prometheus metric defined in the Prometheus module
-    metric: Optional[Counter | Gauge] = getattr(prom, metric_name, None)
+    metric: Counter | Gauge | None = getattr(prom, metric_name, None)
     if metric is None or not isinstance(metric, (Counter, Gauge)):
         raise LookupError("No matching metric was found")
 

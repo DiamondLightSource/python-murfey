@@ -276,7 +276,9 @@ async def update_visit_end_time(
 
     # Update the alert endtime on prometheus
     if end_time:
-        prom.alert_end_time.labels(visit=session_entry.visit).set(end_time.timestamp())
+        prom.alert_end_time.labels(
+            microscope=instrument_name, visit=session_entry.visit
+        ).set(end_time.timestamp())
 
     # Update the multigrid controller
     data = {}
@@ -837,7 +839,9 @@ async def flush_skipped_rsyncer(
                     return {"success": False}
                 # Reset the skipped file count for the specific Prometheus gauge to 0
                 prom.skipped_files.labels(
-                    rsync_source=rsyncer_source.source, visit=session_entry.visit
+                    microscope=instrument_name,
+                    rsync_source=rsyncer_source.source,
+                    visit=session_entry.visit,
                 ).set(0)
     return flush_result
 

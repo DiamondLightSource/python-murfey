@@ -114,6 +114,101 @@ def test_create_session_with_db(
         assert murfey_session.visit_end_time is None
 
 
+def test_get_preprocessed_movie_count(
+    tmp_path: Path,
+    murfey_db_session: SQLModelSession,
+):
+    # Set up parameters
+    session_id = ExampleVisit.murfey_session_id
+
+    # Create some DataCollectionGroups, DataCollections, and Movies
+    num_dcgs = 3
+    num_dcs = 3
+    num_movies = 4
+    for i in range(num_dcgs):
+        dcg_id = i + 1
+        dcg_name = f"dcg_{dcg_id}"
+        dcg_entry = MurfeyDB.DataCollectionGroup(
+            dataCollectionGroupId=dcg_id,
+            session_id=session_id,
+            tag=dcg_name,
+        )
+        murfey_db_session.add(dcg_entry)
+        for j in range(num_dcs):
+            dc_id = (i * num_dcs) + j + 1
+            dc_entry = MurfeyDB.DataCollection(
+                dataCollectionId=dc_id,
+                dataCollectionGroupId=dcg_id,
+                tag=dcg_name,
+            )
+            murfey_db_session.add(dc_entry)
+            for k in range(num_movies):
+                # Add prerequisite table entriees
+                # ProcessingJob
+                pj_id = (i * num_dcs * num_movies) + (j * num_movies) + k + 1
+                pj_entry = MurfeyDB.ProcessingJob(
+                    processingJobId=pj_id,
+                    recipe="dummy",
+                    dataCollectionId=dc_id,
+                )
+                murfey_db_session.add(pj_entry)
+
+                # AutoProcProgram
+                app_entry = MurfeyDB.AutoProcProgram(
+                    autoProcProgramId=pj_entry.id,
+                    pj_id=pj_entry.id,
+                )
+                murfey_db_session.add(app_entry)
+
+                # MurfeyLedger
+                ledger_entry = MurfeyDB.MurfeyLedger(
+                    id=app_entry.id,
+                    app_id=app_entry.id,
+                )
+                murfey_db_session.add(ledger_entry)
+
+                # Add test Movie entry
+                movie_entry = MurfeyDB.Movie(
+                    movieId=ledger_entry.id,
+                    movieNumber=ledger_entry.id,
+                    dataCollectionId=dc_id,
+                    path=str(
+                        tmp_path / dcg_name / f"movie_{(j * num_movies) + k + 1}.mrc"
+                    ),
+                    tag=dcg_name,
+                    preprocessed=bool(j % 2),
+                )
+                murfey_db_session.add(movie_entry)
+    # Commit all at once
+    murfey_db_session.commit()
+
+    # Set up a mock Murfey database session
+    def mock_get_db_session():
+        yield murfey_db_session
+
+    # Set up the backend server
+    backend_server = set_up_test_backend_client(
+        router=router,
+        instrument_name=instrument_name,
+        session_id=session_id,
+        mock_db_session=mock_get_db_session,
+    )
+    # Construct the URL path to poke
+    backend_url_path = url_path_for(
+        "api.session_info.router",
+        "get_preprocessed_movie_count",
+        session_id=session_id,
+    )
+    # Poke the backend
+    response = backend_server.get(
+        backend_url_path,
+    )
+    assert response.status_code == 200
+    data: dict[str, int] = response.json()
+    assert data["complete"] == 12
+    assert data["incomplete"] == 24
+
+
 @pytest.mark.parametrize(
     "search_strings",
     (

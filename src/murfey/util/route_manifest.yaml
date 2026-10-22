@@ -725,32 +725,32 @@ murfey.server.api.processing_parameters.router:
     methods:
       - POST
 murfey.server.api.prometheus.router:
-  - path: /prometheus/visits/{visit_name}/increment_rsync_file_count
+  - path: /prometheus/sessions/{session_id}/increment_rsync_file_count
     function: increment_rsync_file_count
     path_params:
-      - name: visit_name
-        type: str
+      - name: session_id
+        type: int
     methods:
       - POST
-  - path: /prometheus/visits/{visit_name}/increment_rsync_transferred_files
+  - path: /prometheus/sessions/{session_id}/increment_rsync_transferred_files
     function: increment_rsync_transferred_files
     path_params:
-      - name: visit_name
-        type: str
+      - name: session_id
+        type: int
     methods:
       - POST
-  - path: /prometheus/visits/{visit_name}/increment_rsync_transferred_files_prometheus
+  - path: /prometheus/sessions/{session_id}/increment_rsync_transferred_files_prometheus
     function: increment_rsync_transferred_files_prometheus
     path_params:
-      - name: visit_name
-        type: str
+      - name: session_id
+        type: int
     methods:
       - POST
-  - path: /prometheus/visits/{visit_name}/increment_rsync_skipped_files_prometheus
+  - path: /prometheus/sessions/{session_id}/increment_rsync_skipped_files_prometheus
     function: increment_rsync_skipped_files_prometheus
     path_params:
-      - name: visit_name
-        type: str
+      - name: session_id
+        type: int
     methods:
       - POST
   - path: /prometheus/metrics/{metric_name}
@@ -1174,6 +1174,13 @@ murfey.server.api.session_info.router:
     path_params:
       - name: dcgid
         type: int
+      - name: session_id
+        type: int
+    methods:
+      - GET
+  - path: /session_info/sessions/{session_id}/movies/preprocessed
+    function: get_preprocessed_movie_count
+    path_params:
       - name: session_id
         type: int
     methods:
