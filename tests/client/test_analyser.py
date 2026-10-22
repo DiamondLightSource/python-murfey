@@ -37,6 +37,13 @@ example_files = {
         "visit/maps/visit/LayersData/Layer/Electron Snapshot (2)/Electron Snapshot (2).tiff",
     ],
     "SIMContext": [
+        # Atlas files
+        "visit/raw/CtrlApr_G2/mosaic.mrc",
+        "visit/raw/CtrlApr_G2/mosaic.txt",
+        "visit/raw/CtrlApr_G2/markers.txt",
+        "visit/raw/CtrlApr_G2/mosaic_new.mrc",
+        "visit/raw/CtrlApr_G2/mosaic_new.txt",
+        "visit/raw/CtrlApr_G2/markers_new.txt",
         # Bright field
         "visit/raw/CtrlApr_G2/20260703_132856_CtrlApr_G2_F3A_BF",
         # Fluorescent
@@ -147,6 +154,7 @@ contextless_files = [
     "visit/FoilHole_01234.mrc",
     "visit/FoilHole_01234.jpg",
     "visit/FoilHole_01234.xml",
+    # CLEM files
     "visit/images/test_file.lifext",
     "visit/images/2024_03_14_12_34_56--Project001/Project001.xlef",
     "visit/images/2024_03_14_12_34_56--Project001/Project001.xlef.lock",
