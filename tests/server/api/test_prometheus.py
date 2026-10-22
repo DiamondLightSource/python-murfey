@@ -1,9 +1,10 @@
 from pathlib import Path
 from typing import Callable
 
+import pytest
 from fastapi import APIRouter, FastAPI
 from fastapi.testclient import TestClient
-from sqlmodel import Session as SQLModelSession
+from sqlmodel import Session as SQLModelSession, select
 
 import murfey.util.db as MurfeyDB
 from murfey.server.api.auth import (
@@ -54,13 +55,22 @@ def set_up_test_backend_client(
     return TestClient(backend_app)
 
 
-def test_increment_rsync_file_count(tmp_path: Path, murfey_db_session: SQLModelSession):
+@pytest.mark.parametrize(
+    "test_params",
+    (  # File count | File bytes | Data count | Data bytes | Iterations
+        (1, 1024, 1, 1024, 1),
+        (1, 1024, 1, 1024, 3),
+    ),
+)
+def test_increment_rsync_file_count(
+    test_params: tuple[int, int, int, int, int],
+    tmp_path: Path,
+    murfey_db_session: SQLModelSession,
+):
+    # Unpack and set up test parameters
     src = str(tmp_path / "client" / visit_name / "raw")
     dst = str(tmp_path / "data" / visit_name / "raw")
-    file_count = 1
-    file_bytes = 1024
-    data_count = 1
-    data_bytes = 1024
+    file_count, file_bytes, data_count, data_bytes, iterations = test_params
 
     # Register an RsyncInstance table entry
     rsync_instance = MurfeyDB.RsyncInstance(
@@ -72,7 +82,7 @@ def test_increment_rsync_file_count(tmp_path: Path, murfey_db_session: SQLModelS
     murfey_db_session.add(rsync_instance)
     murfey_db_session.commit()
 
-    # Create a function that returns the database fixture
+    # Set up the backend test client
     def mock_get_db_session():
         yield murfey_db_session
 
@@ -80,20 +90,34 @@ def test_increment_rsync_file_count(tmp_path: Path, murfey_db_session: SQLModelS
         router=router,
         mock_db_session=mock_get_db_session,
     )
+
+    # Submit posts to the endpoint
     backend_url_path = url_path_for(
         "api.prometheus.router",
         "increment_rsync_file_count",
         session_id=session_id,
     )
-    response = backend_client.post(
-        backend_url_path,
-        json={
-            "source": src,
-            "destination": dst,
-            "increment_count": file_count,
-            "bytes": file_bytes,
-            "increment_data_count": data_count,
-            "data_bytes": data_bytes,
-        },
-    )
-    assert response.status_code == 200
+    for _ in range(iterations):
+        response = backend_client.post(
+            backend_url_path,
+            json={
+                "source": src,
+                "destination": dst,
+                "increment_count": file_count,
+                "bytes": file_bytes,
+                "increment_data_count": data_count,
+                "data_bytes": data_bytes,
+            },
+        )
+        assert response.status_code == 200
+
+    # Check that the database entry was updated correctly
+    assert (
+        rsync_instance := murfey_db_session.exec(
+            select(MurfeyDB.RsyncInstance)
+            .where(MurfeyDB.RsyncInstance.session_id == session_id)
+            .where(MurfeyDB.RsyncInstance.source == src)
+            .where(MurfeyDB.RsyncInstance.destination == dst)
+        ).one_or_none()
+    ) is not None
+    assert rsync_instance.files_counted == file_count * iterations
