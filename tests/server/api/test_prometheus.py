@@ -121,3 +121,20 @@ def test_increment_rsync_file_count(
         ).one_or_none()
     ) is not None
     assert rsync_instance.files_counted == file_count * iterations
+
+    # Check that the Prometheus objects were updated correctly
+    import murfey.server.prometheus as prom
+
+    # Collect the 'seen_files' metrics
+    seen_files_samples = prom.seen_files.collect()[0].samples
+    seen_files_sample = next(
+        s
+        for s in seen_files_samples
+        if s.labels
+        == {
+            "microscope": instrument_name,
+            "rsync_source": src,
+            "visit": visit_name,
+        }
+    )
+    assert seen_files_sample.value == file_count * iterations
