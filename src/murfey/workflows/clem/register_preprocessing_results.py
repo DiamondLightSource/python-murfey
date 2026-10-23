@@ -152,6 +152,8 @@ def _populate_clem_imaging_site_entry(
     """
     # Is this an atlas or grid square
     entry.data_type = "atlas" if result.is_atlas else "grid_square"
+    # Register expected DataCollectionGroup name
+    entry.dcg_name = result.site_name.split("/")[0]
     # Register file paths
     output_file = list(result.output_files.values())[0]
     entry.image_path = str(output_file.parent / "*.tiff")
@@ -251,15 +253,18 @@ def _register_dcg_and_atlas(
     After doing so, it will register the DataCollectionGroup ID in Murfey and add it
     to the ImagingSite entry.
     """
+    # 'dcg_name' should already be populated as part of initial ImagingSite registration
+    if (dcg_name := imaging_site.dcg_name) is None:
+        raise ValueError(
+            f"'dcg_name' not assigned to ImagingSite entry for {imaging_site.image_path}"
+        )
+
     # Determine variables to register data collection group and atlas with
     proposal_code = "".join(char for char in visit_name.split("-")[0] if char.isalpha())
     proposal_number = "".join(
         char for char in visit_name.split("-")[0] if char.isdigit()
     )
     visit_number = visit_name.split("-")[-1]
-
-    # Generate name/tag for data collection group based on series name
-    dcg_name = imaging_site.site_name.split("/")[0]
 
     # Check if there are already atlas candidates for this DataCollectionGroup
     # Only the largest of these should be retained as the atlas
@@ -290,6 +295,7 @@ def _register_dcg_and_atlas(
         largest_atlas = int(max(atlas_areas, key=lambda k: atlas_areas[k]))
 
         # Re-label all other atlas candidates as "grid_squares"
+        # This will also update the 'imaging_site' entry that was appended
         for i, atlas_candidate in enumerate(atlas_candidates):
             if i == largest_atlas:
                 continue
@@ -388,7 +394,7 @@ def _register_grid_square(
 ):
     if (dcg_name := imaging_site.dcg_name) is None:
         raise ValueError(
-            f"ImagingSite entry for {imaging_site.image_path} has no data collection group name"
+            f"'dcg_name' not assigned to ImagingSite entry for {imaging_site.image_path}"
         )
 
     # Check if an atlas has been registered
