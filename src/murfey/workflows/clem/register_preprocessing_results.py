@@ -258,7 +258,7 @@ def _register_dcg_and_atlas(
     )
     visit_number = visit_name.split("-")[-1]
 
-    # Generate name/tag for data colleciton group based on series name
+    # Generate name/tag for data collection group based on series name
     dcg_name = imaging_site.site_name.split("/")[0]
 
     # Determine values for atlas
@@ -292,6 +292,7 @@ def _register_dcg_and_atlas(
         select(MurfeyDB.DataCollectionGroup)
         .where(MurfeyDB.DataCollectionGroup.session_id == session_id)
         .where(MurfeyDB.DataCollectionGroup.tag == dcg_name)
+        .order_by(MurfeyDB.DataCollectionGroup.id)
     ).all():
         dcg_entry = dcg_search[0]
         # Update if current dataset is atlas and data collection group exists
@@ -307,6 +308,7 @@ def _register_dcg_and_atlas(
             )
             # Update atlas path on Murfey DataCollectionGroup record as well
             dcg_entry.atlas = atlas_path
+            murfey_db.add(dcg_entry)
     else:
         # Register data collection group and placeholder for the atlas
         dcg_message = {
