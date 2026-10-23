@@ -350,6 +350,7 @@ def _register_dcg_and_atlas(
             )
             # Update atlas path on Murfey DataCollectionGroup record as well
             dcg_entry.atlas = atlas_path
+            dcg_entry.atlas_pixel_size = atlas_pixel_size
             murfey_db.add(dcg_entry)
     else:
         # Register data collection group and placeholder for the atlas
