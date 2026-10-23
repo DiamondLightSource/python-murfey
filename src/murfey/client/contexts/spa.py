@@ -159,16 +159,16 @@ class SPAContext(Context):
                 )  # convert e / m^2 to e / A^2
             except ValueError:
                 metadata["total_exposed_dose"] = 1
-            c2_index = 3
-            for i, el in enumerate(
-                data["MicroscopeImage"]["CustomData"]["a:KeyValueOfstringanyType"]
-            ):
-                if el["a:Key"] == "Aperture[C2].Name":
-                    c2_index = i
-                    break
-            metadata["c2aperture"] = data["MicroscopeImage"]["CustomData"][
-                "a:KeyValueOfstringanyType"
-            ][c2_index]["a:Value"]["#text"]
+            try:
+                c2_index = _get_xml_list_index(
+                    "Aperture[C2].Name",
+                    data["MicroscopeImage"]["CustomData"]["a:KeyValueOfstringanyType"],
+                )
+                metadata["c2aperture"] = data["MicroscopeImage"]["CustomData"][
+                    "a:KeyValueOfstringanyType"
+                ][c2_index]["a:Value"]["#text"]
+            except ValueError:
+                metadata["c2aperture"] = None
             metadata["exposure_time"] = data["MicroscopeImage"]["microscopeData"][
                 "acquisition"
             ]["camera"]["ExposureTime"]
@@ -178,14 +178,21 @@ class SPAContext(Context):
                 ]["EnergyFilter"]["EnergySelectionSlitWidth"]
             except KeyError:
                 metadata["slit_width"] = None
-            metadata["phase_plate"] = (
-                1
-                if data["MicroscopeImage"]["CustomData"]["a:KeyValueOfstringanyType"][
-                    11
-                ]["a:Value"]["#text"]
-                == "true"
-                else 0
-            )
+            try:
+                phase_plate_index = _get_xml_list_index(
+                    "PhasePlateUsed",
+                    data["MicroscopeImage"]["CustomData"]["a:KeyValueOfstringanyType"],
+                )
+                metadata["phase_plate"] = (
+                    1
+                    if data["MicroscopeImage"]["CustomData"][
+                        "a:KeyValueOfstringanyType"
+                    ][phase_plate_index]["a:Value"]["#text"]
+                    == "true"
+                    else 0
+                )
+            except ValueError:
+                metadata["phase_plate"] = 0
         else:
             logger.warning("Metadata file format is not recognised")
             return OrderedDict({})
