@@ -28,7 +28,7 @@ def increment_rsync_file_count(
 ):
     session = db.exec(select(MurfeySession).where(MurfeySession.id == session_id)).one()
     instrument_name = session.instrument_name
-    visit_name = session.visit_name
+    visit_name = session.visit
     try:
         rsync_instance = db.exec(
             select(RsyncInstance).where(
@@ -80,7 +80,7 @@ def increment_rsync_transferred_files_prometheus(
 ):
     session = db.exec(select(MurfeySession).where(MurfeySession.id == session_id)).one()
     instrument_name = session.instrument_name
-    visit_name = session.visit_name
+    visit_name = session.visit
     prom.transferred_files.labels(
         microscope=instrument_name, rsync_source=rsyncer_info.source, visit=visit_name
     ).inc(rsyncer_info.increment_count)
@@ -101,7 +101,7 @@ def increment_rsync_skipped_files_prometheus(
 ):
     session = db.exec(select(MurfeySession).where(MurfeySession.id == session_id)).one()
     instrument_name = session.instrument_name
-    visit_name = session.visit_name
+    visit_name = session.visit
     prom.skipped_files.labels(
         microscope=instrument_name,
         rsync_source=rsyncer_skipped_files.source,
