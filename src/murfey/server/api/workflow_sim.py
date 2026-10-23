@@ -53,14 +53,32 @@ def get_otf_files(otf_dir: Path):
     return otf_files
 
 
-class SIMDataFile(BaseModel):
+class SIMAtlasData(BaseModel):
+    mosaic_mrc: Path
+    mosaic_txt: Path
+    markers_txt: Path | None = None
+
+
+@router.post("/sessions/{session_id}/sim_atlas")
+def request_sim_atlas_stitching(
+    session_id: int,
+    sim_data: SIMAtlasData,
+    murfey_db: SQLModelSession = murfey_db,
+):
+    logger.info(
+        "Received the following cryoSIM atlas stitching request:\n"
+        f"{json.dumps(sim_data.model_dump(), indent=2, default=str)}"
+    )
+
+
+class SIMReconData(BaseModel):
     file: Path
 
 
 @router.post("/sessions/{session_id}/sim_recon")
 def request_sim_reconstruction(
     session_id: int,
-    sim_data: SIMDataFile,
+    sim_data: SIMReconData,
     murfey_db: SQLModelSession = murfey_db,
 ):
     if murfey.server._transport_object is None:

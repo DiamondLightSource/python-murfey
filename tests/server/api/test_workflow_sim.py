@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 import pytest
 from pytest_mock import MockerFixture
 
-from murfey.server.api.workflow_sim import SIMDataFile, request_sim_reconstruction
+from murfey.server.api.workflow_sim import SIMReconData, request_sim_reconstruction
 from murfey.util import sanitise_path
 from murfey.util.config import MachineConfig
 
@@ -58,7 +58,7 @@ def test_request_sim_reconstruction(
         if output_dir_success
         else tmp_path / "dummy"  # Provide incorrect file path
     )
-    sim_data = SIMDataFile(**{"file": str(test_file)})
+    sim_data = SIMReconData(**{"file": str(test_file)})
     output_dir = visit_dir / "processed" / "grid_1"
     output_dir.mkdir(parents=True, exist_ok=True)
 
