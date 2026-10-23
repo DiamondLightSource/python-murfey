@@ -261,8 +261,46 @@ def _register_dcg_and_atlas(
     # Generate name/tag for data collection group based on series name
     dcg_name = imaging_site.site_name.split("/")[0]
 
+    # Check if there are already atlas candidates for this DataCollectionGroup
+    # Only the largest of these should be retained as the atlas
+    if atlas_candidates := list(
+        murfey_db.exec(
+            select(MurfeyDB.ImagingSite)
+            .where(MurfeyDB.ImagingSite.session_id == session_id)
+            .where(MurfeyDB.ImagingSite.dcg_name == dcg_name)
+            .where(MurfeyDB.ImagingSite.data_type == "atlas")
+            .order_by(MurfeyDB.ImagingSite.id)
+        ).all()
+    ):
+        atlas_candidates.append(imaging_site)
+        atlas_areas: dict[int, float] = {}
+        for i, atlas_candidate in enumerate(atlas_candidates):
+            # Ensure that the fields needed are not empty
+            if not (
+                atlas_candidate.x0 is not None
+                and atlas_candidate.x1 is not None
+                and atlas_candidate.y0 is not None
+                and atlas_candidate.y1 is not None
+            ):
+                continue
+            atlas_areas[i] = (atlas_candidate.x1 - atlas_candidate.x0) * (
+                atlas_candidate.y1 - atlas_candidate.y0
+            )
+        # Find index of the largest atlas
+        largest_atlas = int(max(atlas_areas, key=lambda k: atlas_areas[k]))
+
+        # Re-label all other atlas candidates as "grid_squares"
+        for i, atlas_candidate in enumerate(atlas_candidates):
+            if i == largest_atlas:
+                continue
+            atlas_candidate.data_type == "grid_square"
+            murfey_db.add(atlas_candidate)
+        # Commit once after this reassignment
+        murfey_db.commit()
+
     # Determine values for atlas
-    if is_atlas := imaging_site.data_type == "atlas":
+    is_atlas = imaging_site.data_type == "atlas"
+    if is_atlas:
         # Register using thumbnail values
         if not (
             imaging_site.thumbnail_path is not None
