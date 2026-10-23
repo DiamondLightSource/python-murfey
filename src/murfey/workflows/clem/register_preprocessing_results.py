@@ -248,10 +248,12 @@ def _register_dcg_and_atlas(
     murfey_db: Session,
 ):
     """
-    Takes an ImagingSite entry and uses it to create and register DataCollectionGroup
-    entries in ISPyB if they don't already exist, or to populate existing entries.
-    After doing so, it will register the DataCollectionGroup ID in Murfey and add it
-    to the ImagingSite entry.
+    Takes an ImagingSite entry and uses it to create/update a DataCollectionGroup
+    and Atlas entry in ISPyB, and to create a DataCollectionGroup record in Murfey.
+
+    For a given DataCollectionGroup, it will check to make sure that only the image
+    with the largest field of view is kept as the atlas. All others will be relabelled
+    as grid squares.
     """
     # 'dcg_name' should already be populated as part of initial ImagingSite registration
     if (dcg_name := imaging_site.dcg_name) is None:
@@ -394,8 +396,9 @@ def _register_single_grid_square(
     murfey_db: Session,
 ):
     """
-    Helper function containing the logic for registering/updating a single GridSquare
-    entry in ISPyB, and creating/updating the accompanying record in Murfey.
+    Helper function containing the logic to calculate the relevant values and populate the
+    table columns when registering/updating a single GridSquare entry in ISPyB, and the
+    accompanying record in Murfey.
     """
     if not (
         atlas_entry.x0 is not None
@@ -559,6 +562,16 @@ def _register_grid_square(
     transport_object: TransportManager,
     murfey_db: Session,
 ):
+    """
+    Helper function to create or update GridSquare entries in both ISPyB and Murfey.
+
+    If the incoming ImagingSite entry is an atlas, it will load up all grid square-
+    class ImagingSites associated with the DataCollectionGroup and create or update
+    GridSquare entries for them.
+
+    For incoming grid square-class entries, it will load up the associated atlas
+    and create or update the GridSquare entry for this entry.
+    """
     if (dcg_name := imaging_site.dcg_name) is None:
         raise ValueError(
             f"'dcg_name' not assigned to ImagingSite entry for {imaging_site.image_path}"
