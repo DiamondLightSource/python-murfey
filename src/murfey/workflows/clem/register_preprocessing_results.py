@@ -128,6 +128,92 @@ def _get_color_flags(
     return color_flags
 
 
+def _register_clem_imaging_site(
+    session_id: int,
+    result: CLEMPreprocessingResult,
+    murfey_db: Session,
+):
+    """
+    Creates an ImagingSite database entry for the current CLEM preprocessing result
+    if one doesn't already exist, or modifies the existing one if it does. Each entry
+    corresponds to a unique site on the sample grid, and results containing cleared
+    data will supersede existing rows for the same position that contain only raw
+    data. Returns the created/queried entry.
+    """
+
+    def _populate(
+        entry: MurfeyDB.ImagingSite,
+        result: CLEMPreprocessingResult,
+    ):
+        """
+        Helper function to populate the ImagingSite column values with CLEM data.
+        """
+        # Is this an atlas or grid square
+        entry.data_type = "atlas" if result.is_atlas else "grid_square"
+        # Register expected DataCollectionGroup name
+        entry.dcg_name = result.site_name.split("/")[0]
+        # Register file paths
+        output_file = list(result.output_files.values())[0]
+        entry.image_path = str(output_file.parent / "*.tiff")
+        # Shape and resolution information
+        entry.image_pixels_x = result.pixels_x
+        entry.image_pixels_y = result.pixels_y
+        entry.image_pixel_size = result.pixel_size
+        entry.units = result.units
+        # Extent of imaged area in real space
+        entry.x0 = result.extent[0]
+        entry.x1 = result.extent[1]
+        entry.y0 = result.extent[2]
+        entry.y1 = result.extent[3]
+
+        # Iteratively add colour channel information
+        entry.number_of_members = result.number_of_members
+        for col_name, value in _get_color_flags(result.output_files.keys()).items():
+            setattr(entry, col_name, value)
+        entry.collection_mode = _determine_collection_mode(result.output_files.keys())
+
+        # Register thumbnail information if present
+        if result.thumbnails and result.thumbnail_size:
+            thumbnail = list(result.thumbnails.values())[0]
+            entry.thumbnail_path = str(thumbnail.parent / "*.png")
+
+            thumbnail_height, thumbnail_width = result.thumbnail_size
+            scaling_factor = min(
+                thumbnail_height / result.pixels_y, thumbnail_width / result.pixels_x
+            )
+            entry.thumbnail_pixel_size = result.pixel_size / scaling_factor
+            entry.thumbnail_pixels_x = int(round(result.pixels_x * scaling_factor)) or 1
+            entry.thumbnail_pixels_y = int(round(result.pixels_y * scaling_factor)) or 1
+        return entry
+
+    # Create a new entry if one doesn't already exist
+    if not (
+        clem_img_site := murfey_db.exec(
+            select(MurfeyDB.ImagingSite)
+            .where(MurfeyDB.ImagingSite.session_id == session_id)
+            .where(MurfeyDB.ImagingSite.site_name == result.site_name)
+        ).one_or_none()
+    ):
+        clem_img_site = MurfeyDB.ImagingSite(
+            session_id=session_id,
+            site_name=result.site_name,
+        )
+        clem_img_site = _populate(clem_img_site, result)
+
+    # Prepare to overwrite existing entry if current result is a cleared dataset
+    if result.is_cc:
+        # Proceed with overwrite if current result is different from existing entry
+        output_file = list(result.output_files.values())[0]
+        if str(output_file.parent / "*.tiff") != clem_img_site.image_path:
+            clem_img_site = _populate(clem_img_site, result)
+
+    # Commit changes and return entry
+    murfey_db.add(clem_img_site)
+    murfey_db.commit()
+    logger.info(f"CLEM preprocessing results registered for {result.series_name!r} ")
+    return clem_img_site
+
+
 def _determine_collection_mode(
     colors: Collection[str] | None = None,
 ):
@@ -141,92 +227,6 @@ def _determine_collection_mode(
             return "Bright Field and Fluorescent"
     else:
         return "Fluorescent"
-
-
-def _populate_clem_imaging_site_entry(
-    entry: MurfeyDB.ImagingSite,
-    result: CLEMPreprocessingResult,
-):
-    """
-    Helper function to populate the ImagingSite column values with CLEM data.
-    """
-    # Is this an atlas or grid square
-    entry.data_type = "atlas" if result.is_atlas else "grid_square"
-    # Register expected DataCollectionGroup name
-    entry.dcg_name = result.site_name.split("/")[0]
-    # Register file paths
-    output_file = list(result.output_files.values())[0]
-    entry.image_path = str(output_file.parent / "*.tiff")
-    # Shape and resolution information
-    entry.image_pixels_x = result.pixels_x
-    entry.image_pixels_y = result.pixels_y
-    entry.image_pixel_size = result.pixel_size
-    entry.units = result.units
-    # Extent of imaged area in real space
-    entry.x0 = result.extent[0]
-    entry.x1 = result.extent[1]
-    entry.y0 = result.extent[2]
-    entry.y1 = result.extent[3]
-
-    # Iteratively add colour channel information
-    entry.number_of_members = result.number_of_members
-    for col_name, value in _get_color_flags(result.output_files.keys()).items():
-        setattr(entry, col_name, value)
-    entry.collection_mode = _determine_collection_mode(result.output_files.keys())
-
-    # Register thumbnail information if present
-    if result.thumbnails and result.thumbnail_size:
-        thumbnail = list(result.thumbnails.values())[0]
-        entry.thumbnail_path = str(thumbnail.parent / "*.png")
-
-        thumbnail_height, thumbnail_width = result.thumbnail_size
-        scaling_factor = min(
-            thumbnail_height / result.pixels_y, thumbnail_width / result.pixels_x
-        )
-        entry.thumbnail_pixel_size = result.pixel_size / scaling_factor
-        entry.thumbnail_pixels_x = int(round(result.pixels_x * scaling_factor)) or 1
-        entry.thumbnail_pixels_y = int(round(result.pixels_y * scaling_factor)) or 1
-    return entry
-
-
-def _register_clem_imaging_site(
-    session_id: int,
-    result: CLEMPreprocessingResult,
-    murfey_db: Session,
-):
-    """
-    Creates an ImagingSite database entry for the current CLEM preprocessing result
-    if one doesn't already exist, or modifies the existing one if it does. Each entry
-    corresponds to a unique site on the sample grid, and results containing cleared
-    data will supersede existing rows for the same position that contain only raw
-    data. Returns the created/queried entry.
-    """
-    # Create a new entry if one doesn't already exist
-    if not (
-        clem_img_site := murfey_db.exec(
-            select(MurfeyDB.ImagingSite)
-            .where(MurfeyDB.ImagingSite.session_id == session_id)
-            .where(MurfeyDB.ImagingSite.site_name == result.site_name)
-        ).one_or_none()
-    ):
-        clem_img_site = MurfeyDB.ImagingSite(
-            session_id=session_id,
-            site_name=result.site_name,
-        )
-        clem_img_site = _populate_clem_imaging_site_entry(clem_img_site, result)
-
-    # Prepare to overwrite existing entry if current result is a cleared dataset
-    if result.is_cc:
-        # Proceed with overwrite if current result is different from existing entry
-        output_file = list(result.output_files.values())[0]
-        if str(output_file.parent / "*.tiff") != clem_img_site.image_path:
-            clem_img_site = _populate_clem_imaging_site_entry(clem_img_site, result)
-
-    # Commit changes and return entry
-    murfey_db.add(clem_img_site)
-    murfey_db.commit()
-    logger.info(f"CLEM preprocessing results registered for {result.series_name!r} ")
-    return clem_img_site
 
 
 def _snake_to_camel_case(string: str):
