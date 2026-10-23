@@ -301,8 +301,6 @@ def _register_dcg_and_atlas(
                 continue
             atlas_candidate.data_type == "grid_square"
             murfey_db.add(atlas_candidate)
-        # Commit once after this reassignment
-        murfey_db.commit()
 
     # Determine values for atlas
     is_atlas = imaging_site.data_type == "atlas"
@@ -386,6 +384,174 @@ def _register_dcg_and_atlas(
     return imaging_site
 
 
+def _register_single_grid_square(
+    session_id: int,
+    dcg_name: str,
+    atlas_entry: MurfeyDB.ImagingSite,
+    imaging_site: MurfeyDB.ImagingSite,
+    transport_object: TransportManager,
+    murfey_db: Session,
+):
+    """
+    Helper function containing the logic for registering/updating a single GridSquare
+    entry in ISPyB, and creating/updating the accompanying record in Murfey.
+    """
+    if not (
+        atlas_entry.x0 is not None
+        and atlas_entry.x1 is not None
+        and atlas_entry.y0 is not None
+        and atlas_entry.y1 is not None
+        and atlas_entry.thumbnail_pixels_x is not None
+        and atlas_entry.thumbnail_pixels_y is not None
+    ):
+        raise ValueError(
+            f"Atlas ImagingSite {imaging_site.image_path} not populated with required values"
+        )
+    atlas_width_real = atlas_entry.x1 - atlas_entry.x0
+    atlas_height_real = atlas_entry.y1 - atlas_entry.y0
+
+    # Register datasets using thumbnail sizes and scales
+    if not (
+        imaging_site.id is not None
+        and imaging_site.x0 is not None
+        and imaging_site.x1 is not None
+        and imaging_site.y0 is not None
+        and imaging_site.y1 is not None
+    ):
+        raise ValueError(
+            f"ImagingSite for {imaging_site.image_path} not populated with required values"
+        )
+    # Find the real coordinates of the image midpoint
+    x_mid_real = 0.5 * (imaging_site.x0 + imaging_site.x1)
+    y_mid_real = 0.5 * (imaging_site.y0 + imaging_site.y1)
+
+    # Find pixel coordinates corresponding to image midpoint on atlas
+    x_mid_px = int(
+        round(
+            (x_mid_real - atlas_entry.x0)
+            / atlas_width_real
+            * atlas_entry.thumbnail_pixels_x
+        )
+    )
+    y_mid_px = int(
+        round(
+            (y_mid_real - atlas_entry.y0)
+            / atlas_height_real
+            * atlas_entry.thumbnail_pixels_y
+        )
+    )
+
+    # Find the size of the image, in pixels, when overlaid on the atlas
+    width_scaled = int(
+        round(
+            (imaging_site.x1 - imaging_site.x0)
+            / atlas_width_real
+            * atlas_entry.thumbnail_pixels_x
+        )
+        or 1
+    )
+    height_scaled = int(
+        round(
+            (imaging_site.y1 - imaging_site.y0)
+            / atlas_height_real
+            * atlas_entry.thumbnail_pixels_y
+        )
+        or 1
+    )
+
+    # Populate grid square Pydantic model
+    grid_square_params = GridSquareParameters(
+        tag=dcg_name,
+        x_location=imaging_site.x0,
+        x_location_scaled=x_mid_px,
+        y_location=imaging_site.y0,
+        y_location_scaled=y_mid_px,
+        readout_area_x=imaging_site.image_pixels_x,
+        readout_area_y=imaging_site.image_pixels_y,
+        thumbnail_size_x=imaging_site.thumbnail_pixels_x,
+        thumbnail_size_y=imaging_site.thumbnail_pixels_y,
+        width=imaging_site.image_pixels_x,
+        width_scaled=width_scaled,
+        height=imaging_site.image_pixels_y,
+        height_scaled=height_scaled,
+        x_stage_position=0.5 * (imaging_site.x0 + imaging_site.x1),
+        y_stage_position=0.5 * (imaging_site.y0 + imaging_site.y1),
+        pixel_size=imaging_site.image_pixel_size,
+        image=imaging_site.thumbnail_path,
+        collection_mode=imaging_site.collection_mode,
+    )
+    # Construct colour flags for ISPyB
+    color_flags = {
+        ispyb_color_flags: int(getattr(imaging_site, murfey_color_flags, 0))
+        for murfey_color_flags, ispyb_color_flags in COLOR_FLAGS_MURFEY_TO_ISPYB.items()
+    }
+    # Register or update the grid square entry as required
+    if grid_square_entry := murfey_db.exec(
+        select(MurfeyDB.GridSquare)
+        .where(MurfeyDB.GridSquare.name == imaging_site.id)
+        .where(MurfeyDB.GridSquare.tag == grid_square_params.tag)
+        .where(MurfeyDB.GridSquare.session_id == session_id)
+    ).one_or_none():
+        # Update existing grid square entry on Murfey
+        grid_square_entry.x_location = grid_square_params.x_location
+        grid_square_entry.y_location = grid_square_params.y_location
+        grid_square_entry.x_stage_position = grid_square_params.x_stage_position
+        grid_square_entry.y_stage_position = grid_square_params.y_stage_position
+        grid_square_entry.readout_area_x = grid_square_params.readout_area_x
+        grid_square_entry.readout_area_y = grid_square_params.readout_area_y
+        grid_square_entry.thumbnail_size_x = grid_square_params.thumbnail_size_x
+        grid_square_entry.thumbnail_size_y = grid_square_params.thumbnail_size_y
+        grid_square_entry.pixel_size = grid_square_params.pixel_size
+        grid_square_entry.image = grid_square_params.image
+
+        # Update existing entry on ISPyB
+        transport_object.do_update_grid_square(
+            grid_square_id=grid_square_entry.id,
+            grid_square_parameters=grid_square_params,
+            color_flags=color_flags,
+        )
+    else:
+        # Look up data collection group for current series
+        dcg_entry = murfey_db.exec(
+            select(MurfeyDB.DataCollectionGroup)
+            .where(MurfeyDB.DataCollectionGroup.session_id == session_id)
+            .where(MurfeyDB.DataCollectionGroup.tag == grid_square_params.tag)
+        ).one()
+        # Register to ISPyB
+        grid_square_ispyb_result = transport_object.do_insert_grid_square(
+            atlas_id=dcg_entry.atlas_id,
+            grid_square_id=imaging_site.id,
+            grid_square_parameters=grid_square_params,
+            color_flags=color_flags,
+        )
+        # Register to Murfey
+        grid_square_entry = MurfeyDB.GridSquare(
+            id=grid_square_ispyb_result.get("return_value", None),
+            name=imaging_site.id,
+            session_id=session_id,
+            tag=grid_square_params.tag,
+            x_location=grid_square_params.x_location,
+            y_location=grid_square_params.y_location,
+            x_stage_position=grid_square_params.x_stage_position,
+            y_stage_position=grid_square_params.y_stage_position,
+            readout_area_x=grid_square_params.readout_area_x,
+            readout_area_y=grid_square_params.readout_area_y,
+            thumbnail_size_x=grid_square_params.thumbnail_size_x,
+            thumbnail_size_y=grid_square_params.thumbnail_size_y,
+            pixel_size=grid_square_params.pixel_size,
+            image=grid_square_params.image,
+        )
+    murfey_db.add(grid_square_entry)
+
+    # Add grid square ID to existing CLEM image series entry
+    imaging_site.grid_square_id = grid_square_entry.id
+    murfey_db.add(imaging_site)
+
+    # Commit once at the end
+    murfey_db.commit()
+    return imaging_site
+
+
 def _register_grid_square(
     session_id: int,
     imaging_site: MurfeyDB.ImagingSite,
@@ -397,205 +563,56 @@ def _register_grid_square(
             f"'dcg_name' not assigned to ImagingSite entry for {imaging_site.image_path}"
         )
 
-    # Check if an atlas has been registered
-    if not (
-        # Sort by ascending insertion order
-        atlas_results := murfey_db.exec(
+    if imaging_site.data_type == "atlas":
+        # If the current ImagingSite is an atlas
+        # Iterate over known grid square ImagingSite entries for this DataCollectionGroup
+        # and register/update them with reference to this atlas
+        for grid_square_candidate in murfey_db.exec(
+            select(MurfeyDB.ImagingSite)
+            .where(MurfeyDB.ImagingSite.session_id == session_id)
+            .where(MurfeyDB.ImagingSite.dcg_name == dcg_name)
+            .where(MurfeyDB.ImagingSite.data_type == "grid_square")
+        ).all():
+            try:
+                _register_single_grid_square(
+                    session_id=session_id,
+                    dcg_name=dcg_name,
+                    atlas_entry=imaging_site,
+                    imaging_site=grid_square_candidate,
+                    transport_object=transport_object,
+                    murfey_db=murfey_db,
+                )
+            except Exception:
+                logger.warning(
+                    f"Could not add/update GridSquare entry for ImagingSite {grid_square_candidate.image_path}",
+                    exc_info=True,
+                )
+                continue
+    elif imaging_site.data_type == "grid_square":
+        # Otherwise, load the atlas associated with this DataCollectionGroup
+        # and register/update this one
+        if atlas_search := murfey_db.exec(
             select(MurfeyDB.ImagingSite)
             .where(MurfeyDB.ImagingSite.session_id == session_id)
             .where(MurfeyDB.ImagingSite.dcg_name == dcg_name)
             .where(MurfeyDB.ImagingSite.data_type == "atlas")
             .order_by(MurfeyDB.ImagingSite.id)
-        ).all()
-    ):
-        logger.info(
-            f"No atlas has been registered for data collection group {dcg_name!r} yet"
-        )
-        return imaging_site
-    atlas_entry = atlas_results[-1]  # Use the latest registered atlas
-
-    # Check if there are CLEM entries to register
-    if clem_img_site_to_register := murfey_db.exec(
-        select(MurfeyDB.ImagingSite)
-        .where(MurfeyDB.ImagingSite.session_id == session_id)
-        .where(MurfeyDB.ImagingSite.dcg_name == dcg_name)
-        .where(MurfeyDB.ImagingSite.data_type == "grid_square")
-    ).all():
-        if not (
-            atlas_entry.x0 is not None
-            and atlas_entry.x1 is not None
-            and atlas_entry.y0 is not None
-            and atlas_entry.y1 is not None
-            and atlas_entry.thumbnail_pixels_x is not None
-            and atlas_entry.thumbnail_pixels_y is not None
-        ):
-            logger.warning("Atlas entry not populated with required values")
-            return imaging_site
-        atlas_width_real = atlas_entry.x1 - atlas_entry.x0
-        atlas_height_real = atlas_entry.y1 - atlas_entry.y0
-
-        for clem_img_site in clem_img_site_to_register:
-            try:
-                # Register datasets using thumbnail sizes and scales
-                if not (
-                    clem_img_site.x0 is not None
-                    and clem_img_site.x1 is not None
-                    and clem_img_site.y0 is not None
-                    and clem_img_site.y1 is not None
-                ):
-                    logger.warning(
-                        f"Image series {clem_img_site.site_name!r} not populated with required values"
-                    )
-                    continue
-                # Find the real coordinates of the image midpoint
-                x_mid_real = 0.5 * (clem_img_site.x0 + clem_img_site.x1)
-                y_mid_real = 0.5 * (clem_img_site.y0 + clem_img_site.y1)
-
-                # Find pixel coordinates corresponding to image midpoint on atlas
-                x_mid_px = int(
-                    round(
-                        (x_mid_real - atlas_entry.x0)
-                        / atlas_width_real
-                        * atlas_entry.thumbnail_pixels_x
-                    )
-                )
-                y_mid_px = int(
-                    round(
-                        (y_mid_real - atlas_entry.y0)
-                        / atlas_height_real
-                        * atlas_entry.thumbnail_pixels_y
-                    )
-                )
-
-                # Find the size of the image, in pixels, when overlaid on the atlas
-                width_scaled = int(
-                    round(
-                        (clem_img_site.x1 - clem_img_site.x0)
-                        / atlas_width_real
-                        * atlas_entry.thumbnail_pixels_x
-                    )
-                    or 1
-                )
-                height_scaled = int(
-                    round(
-                        (clem_img_site.y1 - clem_img_site.y0)
-                        / atlas_height_real
-                        * atlas_entry.thumbnail_pixels_y
-                    )
-                    or 1
-                )
-
-                # Populate grid square Pydantic model
-                grid_square_params = GridSquareParameters(
-                    tag=dcg_name,
-                    x_location=clem_img_site.x0,
-                    x_location_scaled=x_mid_px,
-                    y_location=clem_img_site.y0,
-                    y_location_scaled=y_mid_px,
-                    readout_area_x=clem_img_site.image_pixels_x,
-                    readout_area_y=clem_img_site.image_pixels_y,
-                    thumbnail_size_x=clem_img_site.thumbnail_pixels_x,
-                    thumbnail_size_y=clem_img_site.thumbnail_pixels_y,
-                    width=clem_img_site.image_pixels_x,
-                    width_scaled=width_scaled,
-                    height=clem_img_site.image_pixels_y,
-                    height_scaled=height_scaled,
-                    x_stage_position=0.5 * (clem_img_site.x0 + clem_img_site.x1),
-                    y_stage_position=0.5 * (clem_img_site.y0 + clem_img_site.y1),
-                    pixel_size=clem_img_site.image_pixel_size,
-                    image=clem_img_site.thumbnail_path,
-                    collection_mode=clem_img_site.collection_mode,
-                )
-                # Construct colour flags for ISPyB
-                color_flags = {
-                    ispyb_color_flags: int(
-                        getattr(clem_img_site, murfey_color_flags, 0)
-                    )
-                    for murfey_color_flags, ispyb_color_flags in COLOR_FLAGS_MURFEY_TO_ISPYB.items()
-                }
-                # Register or update the grid square entry as required
-                if grid_square_entry := murfey_db.exec(
-                    select(MurfeyDB.GridSquare)
-                    .where(MurfeyDB.GridSquare.name == clem_img_site.id)
-                    .where(MurfeyDB.GridSquare.tag == grid_square_params.tag)
-                    .where(MurfeyDB.GridSquare.session_id == session_id)
-                ).one_or_none():
-                    # Update existing grid square entry on Murfey
-                    grid_square_entry.x_location = grid_square_params.x_location
-                    grid_square_entry.y_location = grid_square_params.y_location
-                    grid_square_entry.x_stage_position = (
-                        grid_square_params.x_stage_position
-                    )
-                    grid_square_entry.y_stage_position = (
-                        grid_square_params.y_stage_position
-                    )
-                    grid_square_entry.readout_area_x = grid_square_params.readout_area_x
-                    grid_square_entry.readout_area_y = grid_square_params.readout_area_y
-                    grid_square_entry.thumbnail_size_x = (
-                        grid_square_params.thumbnail_size_x
-                    )
-                    grid_square_entry.thumbnail_size_y = (
-                        grid_square_params.thumbnail_size_y
-                    )
-                    grid_square_entry.pixel_size = grid_square_params.pixel_size
-                    grid_square_entry.image = grid_square_params.image
-
-                    # Update existing entry on ISPyB
-                    transport_object.do_update_grid_square(
-                        grid_square_id=grid_square_entry.id,
-                        grid_square_parameters=grid_square_params,
-                        color_flags=color_flags,
-                    )
-                else:
-                    # Look up data collection group for current series
-                    dcg_entry = murfey_db.exec(
-                        select(MurfeyDB.DataCollectionGroup)
-                        .where(MurfeyDB.DataCollectionGroup.session_id == session_id)
-                        .where(
-                            MurfeyDB.DataCollectionGroup.tag == grid_square_params.tag
-                        )
-                    ).one()
-                    # Register to ISPyB
-                    grid_square_ispyb_result = transport_object.do_insert_grid_square(
-                        atlas_id=dcg_entry.atlas_id,
-                        grid_square_id=clem_img_site.id,
-                        grid_square_parameters=grid_square_params,
-                        color_flags=color_flags,
-                    )
-                    # Register to Murfey
-                    grid_square_entry = MurfeyDB.GridSquare(
-                        id=grid_square_ispyb_result.get("return_value", None),
-                        name=clem_img_site.id,
-                        session_id=session_id,
-                        tag=grid_square_params.tag,
-                        x_location=grid_square_params.x_location,
-                        y_location=grid_square_params.y_location,
-                        x_stage_position=grid_square_params.x_stage_position,
-                        y_stage_position=grid_square_params.y_stage_position,
-                        readout_area_x=grid_square_params.readout_area_x,
-                        readout_area_y=grid_square_params.readout_area_y,
-                        thumbnail_size_x=grid_square_params.thumbnail_size_x,
-                        thumbnail_size_y=grid_square_params.thumbnail_size_y,
-                        pixel_size=grid_square_params.pixel_size,
-                        image=grid_square_params.image,
-                    )
-                murfey_db.add(grid_square_entry)
-
-                # Add grid square ID to existing CLEM image series entry
-                clem_img_site.grid_square_id = grid_square_entry.id
-                murfey_db.add(clem_img_site)
-            except Exception:
-                logger.warning(
-                    f"Could not add/update GridSquare entry for ImagingSite {clem_img_site.site_name}",
-                    exc_info=True,
-                )
-                continue
-
-        # Do one commit at the end
-        murfey_db.commit()
+        ).all():
+            imaging_site = _register_single_grid_square(
+                session_id=session_id,
+                dcg_name=dcg_name,
+                atlas_entry=atlas_search[0],
+                imaging_site=imaging_site,
+                transport_object=transport_object,
+                murfey_db=murfey_db,
+            )
+        else:
+            logger.info(
+                "No atlas ImagingSite entry has been registered for this DataCollectionGroup yet"
+            )
     else:
-        logger.info(
-            f"No grid squares to register for data collection group {dcg_name!r} yet"
+        raise ValueError(
+            f"Unexpected 'data_type' value for ImagingSite entry for {imaging_site.image_path}"
         )
     return imaging_site
 
