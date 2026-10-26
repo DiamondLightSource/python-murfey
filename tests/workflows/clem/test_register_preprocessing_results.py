@@ -372,7 +372,10 @@ def test_run_with_db(
     # Construct test datasets to use
     processed_dir = rsync_basepath / "2020" / visit_name / processed_dir_name
     grid_dir = processed_dir / grid_name
+
+    expected_grid_squares = 0
     datasets: list[tuple[Path, bool, bool, tuple[int, int], float, list[float]]] = [
+        # Add atlas dataset
         (
             grid_dir / "Overview 1" / "Image 1",
             False,
@@ -396,11 +399,12 @@ def test_run_with_db(
             for n in range(3)
         ]
     )
+    expected_grid_squares += 3
     # Add on metadata for denoised datasets
     datasets.extend(
         [
             (
-                grid_dir / "TileScan 2" / f"Position {n + 1}_Lng_LVCC",
+                grid_dir / "TileScan 1" / f"Position {n + 1}_Lng_LVCC",
                 True,
                 False,
                 (2048, 2048),
@@ -414,7 +418,7 @@ def test_run_with_db(
     datasets.extend(
         [
             (
-                grid_dir / "TileScan 3",
+                grid_dir / "TileScan 2",
                 False,
                 True,
                 (2048, 2048),
@@ -423,6 +427,8 @@ def test_run_with_db(
             )
         ]
     )
+    expected_grid_squares += 1
+
     preprocessing_messages = generate_preprocessing_messages(
         session_id=ExampleVisit.murfey_session_id,
         processed_dir=processed_dir,
@@ -459,7 +465,7 @@ def test_run_with_db(
             MurfeyDB.GridSquare.session_id == session_id
         )
     ).all()
-    assert len(murfey_gs_search) == len(preprocessing_messages) - 1
+    assert len(murfey_gs_search) == expected_grid_squares
 
     # ISPyB's DataCollectionGroup should have an entry
     murfey_dcg = murfey_dcg_search[0]
@@ -510,7 +516,7 @@ def test_run_with_db(
         .scalars()
         .all()
     )
-    assert len(ispyb_gs_search) == len(preprocessing_messages) - 1
+    assert len(ispyb_gs_search) == expected_grid_squares
     for gs in ispyb_gs_search:
         # Check that all entries point to the denoised images
         assert gs.gridSquareImage is not None and denoising_suffix in gs.gridSquareImage
