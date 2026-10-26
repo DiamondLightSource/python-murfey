@@ -29,6 +29,7 @@ RUN \
         build-essential \
         busybox \
         curl \
+        git \
         net-tools && \
     busybox --install && \
     echo "Installing Murfey..." && \
