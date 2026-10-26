@@ -268,16 +268,22 @@ def _register_dcg_and_atlas(
     )
     visit_number = visit_name.split("-")[-1]
 
-    # Check if there are already atlas candidates for this DataCollectionGroup
+    # If the current imaginge site is an atlas, check if there are already atlas
+    # candidates for this DataCollectionGroup
     # Only the largest of these should be retained as the atlas
-    if atlas_candidates := list(
-        murfey_db.exec(
-            select(MurfeyDB.ImagingSite)
-            .where(MurfeyDB.ImagingSite.session_id == session_id)
-            .where(MurfeyDB.ImagingSite.dcg_name == dcg_name)
-            .where(MurfeyDB.ImagingSite.data_type == "atlas")
-            .order_by(MurfeyDB.ImagingSite.id)
-        ).all()
+    if imaging_site.data_type == "atlas" and (
+        atlas_candidates := list(
+            murfey_db.exec(
+                select(MurfeyDB.ImagingSite)
+                .where(MurfeyDB.ImagingSite.session_id == session_id)
+                .where(MurfeyDB.ImagingSite.dcg_name == dcg_name)
+                .where(MurfeyDB.ImagingSite.data_type == "atlas")
+                .where(
+                    MurfeyDB.ImagingSite.site_name != imaging_site.site_name
+                )  # Don't double count the current site
+                .order_by(MurfeyDB.ImagingSite.id)
+            ).all()
+        )
     ):
         atlas_candidates.append(imaging_site)
         atlas_areas: dict[int, float] = {}
@@ -289,20 +295,22 @@ def _register_dcg_and_atlas(
                 and atlas_candidate.y0 is not None
                 and atlas_candidate.y1 is not None
             ):
-                continue
+                atlas_areas[i] = 0
             atlas_areas[i] = (atlas_candidate.x1 - atlas_candidate.x0) * (
                 atlas_candidate.y1 - atlas_candidate.y0
             )
         # Find index of the largest atlas
-        largest_atlas = int(max(atlas_areas, key=lambda k: atlas_areas[k]))
+        largest_atlas_index = int(max(atlas_areas, key=lambda k: atlas_areas[k]))
 
         # Re-label all other atlas candidates as "grid_squares"
         # This will also update the 'imaging_site' entry that was appended
         for i, atlas_candidate in enumerate(atlas_candidates):
-            if i == largest_atlas:
+            if i == largest_atlas_index:
                 continue
-            atlas_candidate.data_type == "grid_square"
+            atlas_candidate.data_type = "grid_square"
             murfey_db.add(atlas_candidate)
+        # Commit all at once
+        murfey_db.commit()
 
     # Determine values for atlas
     is_atlas = imaging_site.data_type == "atlas"
