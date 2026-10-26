@@ -136,6 +136,13 @@ def test_find_context(file_and_context, tmp_path):
     # Set up the Analyser
     analyser = Analyser(basepath_local=tmp_path, token="")
 
+    # Add items to stored MachineConfig depending on context
+    match context:
+        case "SIMContext":
+            analyser._murfey_config = {"acquisition_software": ["sim"]}
+        case _:
+            pass
+
     # Pass the file to the function, and check that outputs are as expected
     assert analyser._find_context(tmp_path / file_name)
     assert analyser._context is not None and context in str(analyser._context)
@@ -302,6 +309,7 @@ def test_analyse_sim(
 
     # Initialise the Analyser
     analyser = Analyser(tmp_path, "")
+    analyser._murfey_config = {"acquisition_software": ["sim"]}
     for file in test_files:
         analyser._analyse(tmp_path / file)
 

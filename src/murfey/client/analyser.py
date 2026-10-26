@@ -218,7 +218,7 @@ class Analyser(Observer):
         # -----------------------------------------------------------------------------
         # SIM workflow checks
         # -----------------------------------------------------------------------------
-        if (
+        if ("sim" in self._murfey_config.get("acquisition_software", [])) and (
             (
                 # CryoSIM raw data files have no extension
                 # Bright field files end with "_BF"
