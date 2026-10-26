@@ -274,10 +274,10 @@ def test_register_dcg_and_atlas(
     assert len(imaging_sites) == 2
     for site in imaging_sites:
         # The "Overview" image should stay as an atlas
-        if "Overview 1/Image 1" in site.site_name:
+        if "Overview_1/Image_1" in site.site_name:
             assert site.data_type == "atlas"
         # "TileScan1" should be bumped down to grid square
-        elif "TileScan1" in site.site_name:
+        elif "TileScan_1" in site.site_name:
             assert site.data_type == "grid_square"
 
     # Murfey' DataCollectionGroup table should have 1 entry
@@ -287,7 +287,7 @@ def test_register_dcg_and_atlas(
         )
     ).one()
     # "Overview" should be the registered atlas image
-    assert "Overview" in murfey_dcg_entry.atlas
+    assert "Overview_1" in murfey_dcg_entry.atlas
 
     # ISPyB's DataCollectionGroup table should have 1 entry
     assert (
@@ -395,24 +395,11 @@ def test_run_with_db(
             for n in range(3)
         ]
     )
-    # Add a second atlas dataset
-    datasets.extend(
-        [
-            (
-                grid_dir / "Overview 2" / "Image 1",
-                False,
-                True,
-                (2400, 2400),
-                1e-6,
-                [0.002, 0.0044, 0.002, 0.0044],
-            )
-        ]
-    )
     # Add on metadata for denoised datasets
     datasets.extend(
         [
             (
-                grid_dir / "TileScan 1" / f"Position {n + 1}_Lng_LVCC",
+                grid_dir / "TileScan 2" / f"Position {n + 1}_Lng_LVCC",
                 True,
                 False,
                 (2048, 2048),
@@ -420,6 +407,19 @@ def test_run_with_db(
                 [0.003, 0.00332768, 0.003, 0.00332768],
             )
             for n in range(3)
+        ]
+    )
+    # Add a large tile scan dataset
+    datasets.extend(
+        [
+            (
+                grid_dir / "TileScan 3",
+                False,
+                True,
+                (2048, 2048),
+                1e-6,
+                [0.002, 0.004048, 0.002, 0.004048],
+            )
         ]
     )
     preprocessing_messages = generate_preprocessing_messages(
@@ -509,7 +509,7 @@ def test_run_with_db(
         .scalars()
         .all()
     )
-    assert len(ispyb_gs_search) == (len(preprocessing_messages) - 2) // 2
+    assert len(ispyb_gs_search) == ((len(preprocessing_messages) - 2) // 2) + 1
     for gs in ispyb_gs_search:
         # Check that all entries point to the denoised images
         assert gs.gridSquareImage is not None and denoising_suffix in gs.gridSquareImage
