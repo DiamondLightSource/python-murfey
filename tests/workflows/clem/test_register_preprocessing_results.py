@@ -219,7 +219,7 @@ def test_register_dcg_and_atlas_with_db(
     datasets: list[tuple[Path, bool, bool, tuple[int, int], float, list[float]]] = [
         # Atlas image
         (
-            grid_dir / "Overview 1" / "Image 1",
+            grid_dir / "Overview_1" / "Image_1",
             False,
             True,
             (2400, 2400),
@@ -231,7 +231,7 @@ def test_register_dcg_and_atlas_with_db(
     datasets.extend(
         [
             (
-                grid_dir / "TileScan 1",
+                grid_dir / "TileScan_1",
                 True,
                 False,
                 (2048, 2048),
@@ -377,7 +377,7 @@ def test_run_with_db(
     datasets: list[tuple[Path, bool, bool, tuple[int, int], float, list[float]]] = [
         # Add atlas dataset
         (
-            grid_dir / "Overview 1" / "Image 1",
+            grid_dir / "Overview_1" / "Image_1",
             False,
             True,
             (2400, 2400),
@@ -389,7 +389,7 @@ def test_run_with_db(
     datasets.extend(
         [
             (
-                grid_dir / "TileScan 1" / f"Position {n + 1}",
+                grid_dir / "TileScan_1" / f"Position_{n + 1}",
                 True,
                 False,
                 (2048, 2048),
@@ -404,7 +404,7 @@ def test_run_with_db(
     datasets.extend(
         [
             (
-                grid_dir / "TileScan 1" / f"Position {n + 1}_Lng_LVCC",
+                grid_dir / "TileScan_1" / f"Position_{n + 1}_Lng_LVCC",
                 True,
                 False,
                 (2048, 2048),
@@ -418,7 +418,7 @@ def test_run_with_db(
     datasets.extend(
         [
             (
-                grid_dir / "TileScan 2",
+                grid_dir / "TileScan_2",
                 False,
                 True,
                 (2048, 2048),
