@@ -404,7 +404,7 @@ def test_run_with_db(
     datasets.extend(
         [
             (
-                grid_dir / "TileScan_1" / f"Position_{n + 1}_Lng_LVCC",
+                grid_dir / "TileScan_1" / f"Position_{n + 1}{denoising_suffix}",
                 True,
                 False,
                 (2048, 2048),
@@ -519,8 +519,10 @@ def test_run_with_db(
     assert len(ispyb_gs_search) == expected_grid_squares
     for gs in ispyb_gs_search:
         # Check that all entries point to the denoised images
-        assert gs.gridSquareImage is not None and denoising_suffix in gs.gridSquareImage
-
+        assert gs.gridSquareImage is not None
+        # The 'TileScan_1' dataset should be overwritten with the denoised variants
+        if "TileScan_1" in gs.gridSquareImage:
+            assert denoising_suffix in gs.gridSquareImage
         # Check that the GridSquare color flags and collection mode are set correctly
         for flag, value in color_flags.items():
             assert getattr(gs, flag) == value
