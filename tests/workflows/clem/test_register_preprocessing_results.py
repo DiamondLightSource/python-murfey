@@ -180,7 +180,7 @@ def test_snake_to_camel_case(
     "shuffle_message",
     (True, False),
 )
-def test_register_dcg_and_atlas(
+def test_register_dcg_and_atlas_with_db(
     mocker: MockerFixture,
     shuffle_message: bool,
     rsync_basepath: Path,
@@ -263,6 +263,7 @@ def test_register_dcg_and_atlas(
             visit_name=visit_name,
             imaging_site=imaging_site,
             transport_object=transport_object,
+            murfey_db=murfey_db_session,
         )
 
     # Verify that the ImagingSite entries were created
@@ -458,7 +459,7 @@ def test_run_with_db(
             MurfeyDB.GridSquare.session_id == session_id
         )
     ).all()
-    assert len(murfey_gs_search) == (len(preprocessing_messages) - 2) // 2
+    assert len(murfey_gs_search) == len(preprocessing_messages) - 1
 
     # ISPyB's DataCollectionGroup should have an entry
     murfey_dcg = murfey_dcg_search[0]
@@ -509,7 +510,7 @@ def test_run_with_db(
         .scalars()
         .all()
     )
-    assert len(ispyb_gs_search) == ((len(preprocessing_messages) - 2) // 2) + 1
+    assert len(ispyb_gs_search) == len(preprocessing_messages) - 1
     for gs in ispyb_gs_search:
         # Check that all entries point to the denoised images
         assert gs.gridSquareImage is not None and denoising_suffix in gs.gridSquareImage
