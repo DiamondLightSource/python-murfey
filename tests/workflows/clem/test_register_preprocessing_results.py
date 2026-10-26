@@ -249,7 +249,7 @@ def test_register_dcg_and_atlas(
     if shuffle_message:
         preprocessing_messages.reverse()
     for message in preprocessing_messages:
-        result = CLEMPreprocessingResult(**message["result]"])
+        result = CLEMPreprocessingResult(**message["result"])
         # Register imaging site
         imaging_site = _register_clem_imaging_site(
             session_id=session_id,
