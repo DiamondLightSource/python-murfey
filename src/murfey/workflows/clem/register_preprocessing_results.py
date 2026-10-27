@@ -336,9 +336,9 @@ def _register_dcg_and_atlas(
     is_atlas = imaging_site.data_type == "atlas"
     if is_atlas:
         # Register using thumbnail values
-        if not (
-            imaging_site.thumbnail_path is not None
-            and imaging_site.thumbnail_pixel_size is not None
+        if (
+            imaging_site.thumbnail_path is None
+            or imaging_site.thumbnail_pixel_size is None
         ):
             raise ValueError(
                 f"ImagingSite entry for {imaging_site.site_name} missing one or more required values:\n"
@@ -428,13 +428,13 @@ def _register_single_grid_square(
     table columns when registering/updating a single GridSquare entry in ISPyB, and the
     accompanying record in Murfey.
     """
-    if not (
-        atlas_entry.x0 is not None
-        and atlas_entry.x1 is not None
-        and atlas_entry.y0 is not None
-        and atlas_entry.y1 is not None
-        and atlas_entry.thumbnail_pixels_x is not None
-        and atlas_entry.thumbnail_pixels_y is not None
+    if (
+        atlas_entry.x0 is None
+        or atlas_entry.x1 is None
+        or atlas_entry.y0 is None
+        or atlas_entry.y1 is None
+        or atlas_entry.thumbnail_pixels_x is None
+        or atlas_entry.thumbnail_pixels_y is None
     ):
         raise ValueError(
             f"Atlas ImagingSite entry for {imaging_site.site_name} missing one or more required values:\n"
@@ -449,12 +449,12 @@ def _register_single_grid_square(
     atlas_height_real = atlas_entry.y1 - atlas_entry.y0
 
     # Register datasets using thumbnail sizes and scales
-    if not (
-        imaging_site.id is not None
-        and imaging_site.x0 is not None
-        and imaging_site.x1 is not None
-        and imaging_site.y0 is not None
-        and imaging_site.y1 is not None
+    if (
+        imaging_site.id is None
+        or imaging_site.x0 is None
+        or imaging_site.x1 is None
+        or imaging_site.y0 is None
+        or imaging_site.y1 is None
     ):
         raise ValueError(
             f"ImagingSite entry for {imaging_site.site_name} missing one or more required values:\n"
