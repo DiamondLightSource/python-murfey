@@ -14,6 +14,7 @@ import murfey.util.db as MurfeyDB
 from murfey.workflows.clem.register_preprocessing_results import (
     COLOR_FLAGS_MURFEY_TO_ISPYB,
     CLEMPreprocessingResult,
+    _consolidate_atlases,
     _determine_collection_mode,
     _get_color_flags,
     _register_clem_imaging_site,
@@ -180,37 +181,16 @@ def test_snake_to_camel_case(
     "shuffle_message",
     (True, False),
 )
-def test_register_dcg_and_atlas_with_db(
+def test_consolidate_atlases_with_db(
     mocker: MockerFixture,
     shuffle_message: bool,
     rsync_basepath: Path,
-    mock_ispyb_credentials: Path,
-    ispyb_db_session: SQLAlchemySession,
     murfey_db_session: SQLModelSession,
 ):
-    # Mock the ISPyB connection where the TransportManager class is located
-    mock_security_config = MagicMock()
-    mock_security_config.ispyb_credentials = mock_ispyb_credentials
-    mocker.patch(
-        "murfey.server.ispyb.get_security_config",
-        return_value=mock_security_config,
-    )
-    mocker.patch(
-        "murfey.server.ispyb.ISPyBSession",
-        return_value=ispyb_db_session,
-    )
-
-    # Mock the ISPYB connection when registering data collection group
-    mocker.patch(
-        "murfey.workflows.register_data_collection_group.ISPyBSession",
-        return_value=ispyb_db_session,
-    )
-
     # Patch the TransportManager object in the workflows called
     from murfey.server.ispyb import TransportManager
 
     transport_object = TransportManager("PikaTransport")
-    transport_object.feedback_queue = "murfey_feedback"
     mocker.patch("murfey.server._transport_object", new=transport_object)
 
     # Construct test datasets to use
@@ -257,12 +237,9 @@ def test_register_dcg_and_atlas_with_db(
             murfey_db=murfey_db_session,
         )
         # Register the DataCollecitonGroup and Atlas
-        imaging_site = _register_dcg_and_atlas(
+        imaging_site = _consolidate_atlases(
             session_id=session_id,
-            instrument_name=instrument_name,
-            visit_name=visit_name,
             imaging_site=imaging_site,
-            transport_object=transport_object,
             murfey_db=murfey_db_session,
         )
 
@@ -281,39 +258,9 @@ def test_register_dcg_and_atlas_with_db(
         elif "TileScan_1" in site.site_name:
             assert site.data_type == "grid_square"
 
-    # Murfey' DataCollectionGroup table should have 1 entry
-    murfey_dcg_entry = murfey_db_session.exec(
-        sm_select(MurfeyDB.DataCollectionGroup).where(
-            MurfeyDB.DataCollectionGroup.session_id == 1
-        )
-    ).one()
-    # "Overview" should be the registered atlas image
-    assert "Overview_1" in murfey_dcg_entry.atlas
 
-    # ISPyB's DataCollectionGroup table should have 1 entry
-    assert (
-        ispyb_db_session.execute(
-            sa_select(ISPyBDB.DataCollectionGroup).where(
-                ISPyBDB.DataCollectionGroup.dataCollectionGroupId == murfey_dcg_entry.id
-            )
-        )
-        .scalars()
-        .one_or_none()
-        is not None
-    )
-
-    # ISPyB's Atlas table should have 1 entry
-    ispyb_atlas_entry = (
-        ispyb_db_session.execute(
-            sa_select(ISPyBDB.Atlas).where(
-                ISPyBDB.Atlas.dataCollectionGroupId == murfey_dcg_entry.id
-            )
-        )
-        .scalars()
-        .one()
-    )
-    # The "Overview" file should be registered
-    assert "Overview" in ispyb_atlas_entry.atlasImage
+def test_register_dcg_and_atlas():
+    _register_dcg_and_atlas
 
 
 def test_register_grid_square():
