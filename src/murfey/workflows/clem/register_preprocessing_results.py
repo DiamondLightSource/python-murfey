@@ -244,9 +244,9 @@ def _consolidate_atlases(
     dcg_name = imaging_site.dcg_name
     if site_name is None or dcg_name is None:
         raise ValueError(
-            f"ImagingSite {imaging_site.image_path} not populated with required values:\n"
+            f"ImagingSite entry for {imaging_site.site_name} missing one or more required values:\n"
             "  'site_name'\n"
-            "  'dcg_name'\n"
+            "  'dcg_name'"
         )
 
     # Load all atlas candidates for this DataCollectionGroup
@@ -321,7 +321,8 @@ def _register_dcg_and_atlas(
     # 'dcg_name' should already be populated as part of initial ImagingSite registration
     if (dcg_name := imaging_site.dcg_name) is None:
         raise ValueError(
-            f"'dcg_name' not assigned to ImagingSite entry for {imaging_site.image_path}"
+            f"ImagingSite entry for {imaging_site.site_name} missing a required value:\n"
+            "  'dcg_name'"
         )
 
     # Determine variables to register data collection group and atlas with
@@ -340,7 +341,7 @@ def _register_dcg_and_atlas(
             and imaging_site.thumbnail_pixel_size is not None
         ):
             raise ValueError(
-                f"ImagingSIte entry for {imaging_site.image_path} missing one or more required values:\n"
+                f"ImagingSite entry for {imaging_site.site_name} missing one or more required values:\n"
                 "  'thumbnail_path'\n"
                 "  'thumbnail_pixel_size'\n"
             )
@@ -403,7 +404,7 @@ def _register_dcg_and_atlas(
         )
         if not dcg_entry:
             raise RuntimeError(
-                f"Could not register DataCollectionGroup entry for {imaging_site.image_path}"
+                f"Could not register DataCollectionGroup entry for {imaging_site.site_name}"
             )
     # Update imaging site with new information
     imaging_site.dcg_id = dcg_entry.id
@@ -436,7 +437,13 @@ def _register_single_grid_square(
         and atlas_entry.thumbnail_pixels_y is not None
     ):
         raise ValueError(
-            f"Atlas ImagingSite {imaging_site.image_path} not populated with required values"
+            f"Atlas ImagingSite entry for {imaging_site.site_name} missing one or more required values:\n"
+            "  'x0'\n"
+            "  'x1'\n"
+            "  'y0'\n"
+            "  'y1'\n"
+            "  'thumbnail_pixels_x'\n"
+            "  'thumbnail_pixels_y'"
         )
     atlas_width_real = atlas_entry.x1 - atlas_entry.x0
     atlas_height_real = atlas_entry.y1 - atlas_entry.y0
@@ -450,7 +457,12 @@ def _register_single_grid_square(
         and imaging_site.y1 is not None
     ):
         raise ValueError(
-            f"ImagingSite for {imaging_site.image_path} not populated with required values"
+            f"ImagingSite entry for {imaging_site.site_name} missing one or more required values:\n"
+            "  'id'\n"
+            "  'x0'\n"
+            "  'x1'\n"
+            "  'y0'\n"
+            "  'y1'"
         )
     # Find the real coordinates of the image midpoint
     x_mid_real = 0.5 * (imaging_site.x0 + imaging_site.x1)
@@ -601,7 +613,8 @@ def _register_grid_square(
     """
     if (dcg_name := imaging_site.dcg_name) is None:
         raise ValueError(
-            f"'dcg_name' not assigned to ImagingSite entry for {imaging_site.image_path}"
+            f"ImagingSite entry for {imaging_site.site_name} missing a required value:\n"
+            "  'dcg_name'"
         )
 
     if imaging_site.data_type == "atlas":
@@ -625,7 +638,7 @@ def _register_grid_square(
                 )
             except Exception:
                 logger.warning(
-                    f"Could not add/update GridSquare entry for ImagingSite {grid_square_candidate.image_path}",
+                    f"Could not add/update GridSquare entry for ImagingSite {grid_square_candidate.site_name}",
                     exc_info=True,
                 )
                 continue
@@ -653,7 +666,7 @@ def _register_grid_square(
             )
     else:
         raise ValueError(
-            f"Unexpected 'data_type' value for ImagingSite entry for {imaging_site.image_path}"
+            f"Unexpected 'data_type' value for ImagingSite entry for {imaging_site.site_name}"
         )
     return imaging_site
 
