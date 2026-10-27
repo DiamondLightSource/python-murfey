@@ -313,10 +313,6 @@ def _register_dcg_and_atlas(
     """
     Takes an ImagingSite entry and uses it to create/update a DataCollectionGroup
     and Atlas entry in ISPyB, and to create a DataCollectionGroup record in Murfey.
-
-    For a given DataCollectionGroup, it will check to make sure that only the image
-    with the largest field of view is kept as the atlas. All others will be relabelled
-    as grid squares.
     """
     # 'dcg_name' should already be populated as part of initial ImagingSite registration
     if (dcg_name := imaging_site.dcg_name) is None:
