@@ -236,7 +236,7 @@ def _consolidate_atlases(
 ):
     """
     Helper function that ensures that only the image with the largest field of view
-    for a given DataCollectionGroup is retained as the atlas. All other candiddates
+    for a given DataCollectionGroup is retained as the atlas. All other candidates
     will be re-labelled as grid squares.
     """
     # Store site name so that it can be recalled later
