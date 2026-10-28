@@ -704,7 +704,7 @@ def run(message: dict, murfey_db: Session) -> dict[str, bool]:
 
     # If the current entry is an atlas, consolidate existing atlases
     if clem_img_site.data_type == "atlas":
-        _consolidate_atlases(
+        clem_img_site = _consolidate_atlases(
             session_id=session_id,
             imaging_site=clem_img_site,
             murfey_db=murfey_db,
