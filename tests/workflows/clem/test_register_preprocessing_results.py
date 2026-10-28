@@ -332,11 +332,25 @@ def test_run_with_db(
             [0.002, 0.0044, 0.002, 0.0044],
         )
     ]
+    # Add a large tile scan dataset
+    datasets.extend(
+        [
+            (
+                grid_dir / "TileScan_1",
+                False,
+                True,
+                (2048, 2048),
+                1e-6,
+                [0.002, 0.004048, 0.002, 0.004048],
+            )
+        ]
+    )
+    expected_grid_squares += 1
     # Add on metadata for a few grid squares
     datasets.extend(
         [
             (
-                grid_dir / "TileScan_1" / f"Position_{n + 1}",
+                grid_dir / "TileScan_2" / f"Position_{n + 1}",
                 True,
                 False,
                 (2048, 2048),
@@ -351,7 +365,7 @@ def test_run_with_db(
     datasets.extend(
         [
             (
-                grid_dir / "TileScan_1" / f"Position_{n + 1}{denoising_suffix}",
+                grid_dir / "TileScan_2" / f"Position_{n + 1}{denoising_suffix}",
                 True,
                 False,
                 (2048, 2048),
@@ -361,20 +375,6 @@ def test_run_with_db(
             for n in range(3)
         ]
     )
-    # Add a large tile scan dataset
-    datasets.extend(
-        [
-            (
-                grid_dir / "TileScan_2",
-                False,
-                True,
-                (2048, 2048),
-                1e-6,
-                [0.002, 0.004048, 0.002, 0.004048],
-            )
-        ]
-    )
-    expected_grid_squares += 1
 
     preprocessing_messages = generate_preprocessing_messages(
         session_id=ExampleVisit.murfey_session_id,
@@ -468,7 +468,7 @@ def test_run_with_db(
         # Check that all entries point to the denoised images
         assert gs.gridSquareImage is not None
         # The 'TileScan_1' dataset should be overwritten with the denoised variants
-        if "TileScan_1" in gs.gridSquareImage:
+        if "TileScan_2" in gs.gridSquareImage:
             assert denoising_suffix in gs.gridSquareImage
         # Check that the GridSquare color flags and collection mode are set correctly
         for flag, value in color_flags.items():
