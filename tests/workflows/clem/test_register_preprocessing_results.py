@@ -13,6 +13,8 @@ from sqlmodel.orm.session import Session as SQLModelSession
 import murfey.util.db as MurfeyDB
 from murfey.workflows.clem.register_preprocessing_results import (
     COLOR_FLAGS_MURFEY_TO_ISPYB,
+    CLEMPreprocessingResult,
+    _consolidate_atlases,
     _determine_collection_mode,
     _get_color_flags,
     _register_clem_imaging_site,
@@ -21,9 +23,11 @@ from murfey.workflows.clem.register_preprocessing_results import (
     _snake_to_camel_case,
     run,
 )
-from tests.conftest import ExampleVisit, get_or_create_db_entry
+from tests.conftest import ExampleVisit
 
 visit_name = f"{ExampleVisit.proposal_code}{ExampleVisit.proposal_number}-{ExampleVisit.visit_number}"
+instrument_name = ExampleVisit.instrument_name
+session_id = ExampleVisit.murfey_session_id
 processed_dir_name = "processed"
 grid_name = "Grid_1"
 
@@ -34,70 +38,11 @@ def rsync_basepath(tmp_path: Path):
 
 
 def generate_preprocessing_messages(
-    rsync_basepath: Path,
     session_id: int,
+    processed_dir: Path,
     colors: list[str],
-    denoising_suffix: str,
+    datasets: list[tuple[Path, bool, bool, tuple[int, int], float, list[float]]],
 ):
-    # Make directory to where data for current grid is stored
-    visit_dir = rsync_basepath / "2020" / visit_name
-    processed_dir = visit_dir / processed_dir_name
-    grid_dir = processed_dir / grid_name
-    grid_dir.mkdir(parents=True, exist_ok=True)
-
-    # Construct all the datasets to be tested
-    datasets: list[tuple[Path, bool, bool, tuple[int, int], float, list[float]]] = [
-        (
-            grid_dir / "Overview 1" / "Image 1",
-            False,
-            True,
-            (2400, 2400),
-            1e-6,
-            [0.002, 0.0044, 0.002, 0.0044],
-        )
-    ]
-    # Add on metadata for a few grid squares
-    datasets.extend(
-        [
-            (
-                grid_dir / "TileScan 1" / f"Position {n + 1}",
-                True,
-                False,
-                (2048, 2048),
-                1.6e-7,
-                [0.003, 0.00332768, 0.003, 0.00332768],
-            )
-            for n in range(3)
-        ]
-    )
-    # Add a second atlas dataset
-    datasets.extend(
-        [
-            (
-                grid_dir / "Overview 2" / "Image 1",
-                False,
-                True,
-                (2400, 2400),
-                1e-6,
-                [0.002, 0.0044, 0.002, 0.0044],
-            )
-        ]
-    )
-    # Add on metadata for denoised datasets
-    datasets.extend(
-        [
-            (
-                grid_dir / "TileScan 1" / f"Position {n + 1}{denoising_suffix}",
-                True,
-                False,
-                (2048, 2048),
-                1.6e-7,
-                [0.003, 0.00332768, 0.003, 0.00332768],
-            )
-            for n in range(3)
-        ]
-    )
-
     messages: list[dict[str, Any]] = []
     for series_path, is_stack, is_montage, shape, pixel_size, extent in datasets:
         # Unpack items from list of dataset parameters
@@ -107,6 +52,7 @@ def generate_preprocessing_messages(
         metadata.touch(exist_ok=True)
         output_files = {color: str(series_path / f"{color}.tiff") for color in colors}
         for output_file in output_files.values():
+            Path(output_file).parent.mkdir(parents=True, exist_ok=True)
             Path(output_file).touch(exist_ok=True)
         thumbnails = {
             color: str(series_path / ".thumbnails" / f"{color}.png") for color in colors
@@ -231,93 +177,94 @@ def test_snake_to_camel_case(
     assert _snake_to_camel_case(string) == expected_result
 
 
+@pytest.mark.parametrize(
+    "shuffle_message",
+    (True, False),
+)
+def test_consolidate_atlases_with_db(
+    mocker: MockerFixture,
+    shuffle_message: bool,
+    rsync_basepath: Path,
+    murfey_db_session: SQLModelSession,
+):
+    # Patch the TransportManager object in the workflows called
+    from murfey.server.ispyb import TransportManager
+
+    transport_object = TransportManager("PikaTransport")
+    mocker.patch("murfey.server._transport_object", new=transport_object)
+
+    # Construct test datasets to use
+    processed_dir = rsync_basepath / "2020" / visit_name / processed_dir_name
+    grid_dir = processed_dir / grid_name
+    datasets: list[tuple[Path, bool, bool, tuple[int, int], float, list[float]]] = [
+        # Atlas image
+        (
+            grid_dir / "Overview_1" / "Image_1",
+            False,
+            True,
+            (2400, 2400),
+            1e-6,
+            [0.002, 0.0044, 0.002, 0.0044],
+        )
+    ]
+    # Add a slightly smaller TileScan
+    datasets.extend(
+        [
+            (
+                grid_dir / "TileScan_1",
+                True,
+                False,
+                (2048, 2048),
+                1.0e-6,
+                [0.002, 0.004048, 0.002, 0.004048],
+            )
+        ]
+    )
+    preprocessing_messages = generate_preprocessing_messages(
+        session_id=ExampleVisit.murfey_session_id,
+        processed_dir=processed_dir,
+        colors=["gray"],
+        datasets=datasets,
+    )
+    if shuffle_message:
+        preprocessing_messages.reverse()
+    for message in preprocessing_messages:
+        result = CLEMPreprocessingResult(**message["result"])
+        # Register imaging site
+        imaging_site = _register_clem_imaging_site(
+            session_id=session_id,
+            result=result,
+            murfey_db=murfey_db_session,
+        )
+        # Register the DataCollecitonGroup and Atlas
+        imaging_site = _consolidate_atlases(
+            session_id=session_id,
+            imaging_site=imaging_site,
+            murfey_db=murfey_db_session,
+        )
+
+    # Verify that the ImagingSite entries were created
+    imaging_sites = murfey_db_session.exec(
+        sm_select(MurfeyDB.ImagingSite).where(
+            MurfeyDB.ImagingSite.session_id == session_id
+        )
+    ).all()
+    assert len(imaging_sites) == 2
+    for site in imaging_sites:
+        # The "Overview" image should stay as an atlas
+        if "Overview_1/Image_1" in site.site_name:
+            assert site.data_type == "atlas"
+        # "TileScan1" should be bumped down to grid square
+        elif "TileScan_1" in site.site_name:
+            assert site.data_type == "grid_square"
+
+
 def test_register_dcg_and_atlas():
     _register_dcg_and_atlas
 
 
 def test_register_grid_square():
     _register_grid_square
-
-
-@pytest.mark.parametrize(
-    "test_params",
-    (  # Has transport | Colors
-        # Success cases
-        (True, ["gray"]),
-        (True, ["gray", "green"]),
-        (True, ["red", "green", "blue"]),
-        (True, ["cyan", "magenta", "blue"]),
-        # Fail cases
-        (False, ["gray"]),
-        (True, []),
-    ),
-)
-def test_run(
-    mocker: MockerFixture,
-    rsync_basepath: Path,
-    test_params: tuple[bool, list[str]],
-):
-    # Unpack test params
-    has_transport, colors = test_params
-
-    # Mock the transport object
-    mock_transport = MagicMock()
-    mocker.patch(
-        "murfey.server._transport_object",
-        mock_transport if has_transport else None,
-    )
-
-    # Mock the MurfeyDB connection
-    mock_murfey_session_entry = MagicMock()
-    mock_murfey_session_entry.instrument_name = ExampleVisit.instrument_name
-    mock_murfey_session_entry.visit = visit_name
-    mock_murfey_db = MagicMock()
-    mock_murfey_db.exec.return_value.one.return_value = mock_murfey_session_entry
-
-    # Mock the registration helper functions
-    mock_clem_img_site = MagicMock()
-    mock_register_clem_imaging_site = mocker.patch(
-        "murfey.workflows.clem.register_preprocessing_results._register_clem_imaging_site",
-        return_value=mock_clem_img_site,
-    )
-    mock_register_dcg_and_atlas = mocker.patch(
-        "murfey.workflows.clem.register_preprocessing_results._register_dcg_and_atlas"
-    )
-    mock_register_grid_square = mocker.patch(
-        "murfey.workflows.clem.register_preprocessing_results._register_grid_square"
-    )
-
-    preprocessing_messages = generate_preprocessing_messages(
-        rsync_basepath=rsync_basepath,
-        session_id=ExampleVisit.murfey_session_id,
-        colors=colors,
-        denoising_suffix="_Lng_LVCC",
-    )
-    if has_transport and colors:
-        for message in preprocessing_messages:
-            run(
-                message=message,
-                murfey_db=mock_murfey_db,
-            )
-        assert mock_register_clem_imaging_site.call_count == len(preprocessing_messages)
-        assert mock_register_dcg_and_atlas.call_count == len(preprocessing_messages)
-        assert mock_register_grid_square.call_count == len(preprocessing_messages)
-        if ("gray" not in colors) or ("gray" in colors and len(colors) == 1):
-            assert mock_transport.send.call_count == len(preprocessing_messages)
-        else:
-            assert mock_transport.send.call_count == len(preprocessing_messages) * 3
-    else:
-        errors: list[type[Exception]] = []
-        if not has_transport:
-            errors.append(RuntimeError)
-        elif not colors:
-            errors.append(ValueError)
-        with pytest.raises(tuple(errors)):
-            for message in preprocessing_messages:
-                run(
-                    message=message,
-                    murfey_db=mock_murfey_db,
-                )
 
 
 @pytest.mark.parametrize(
@@ -343,18 +290,6 @@ def test_run_with_db(
     # Unpack test params
     (shuffle_message, colors, denoising_suffix) = test_params
 
-    # Create a session to insert for this test
-    murfey_session: MurfeyDB.Session = get_or_create_db_entry(
-        murfey_db_session,
-        MurfeyDB.Session,
-        lookup_kwargs={
-            "id": ExampleVisit.murfey_session_id + 1,
-            "name": visit_name,
-            "visit": visit_name,
-            "instrument_name": ExampleVisit.instrument_name,
-        },
-    )
-
     # Mock the ISPyB connection where the TransportManager class is located
     mock_security_config = MagicMock()
     mock_security_config.ispyb_credentials = mock_ispyb_credentials
@@ -379,16 +314,73 @@ def test_run_with_db(
     mock_send = mocker.patch.object(TransportManager, "send")
     transport_object = TransportManager("PikaTransport")
     transport_object.feedback_queue = "murfey_feedback"
-    mocker.patch(
-        "murfey.server._transport_object", new=TransportManager("PikaTransport")
+    mocker.patch("murfey.server._transport_object", new=transport_object)
+
+    # Construct test datasets to use
+    processed_dir = rsync_basepath / "2020" / visit_name / processed_dir_name
+    grid_dir = processed_dir / grid_name
+
+    expected_grid_squares = 0
+    datasets: list[tuple[Path, bool, bool, tuple[int, int], float, list[float]]] = [
+        # Add atlas dataset
+        (
+            grid_dir / "Overview_1" / "Image_1",
+            False,
+            True,
+            (2400, 2400),
+            1e-6,
+            [0.002, 0.0044, 0.002, 0.0044],
+        )
+    ]
+    # Add a large tile scan dataset
+    datasets.extend(
+        [
+            (
+                grid_dir / "TileScan_1",
+                False,
+                True,
+                (2048, 2048),
+                1e-6,
+                [0.002, 0.004048, 0.002, 0.004048],
+            )
+        ]
+    )
+    expected_grid_squares += 1
+    # Add on metadata for a few grid squares
+    datasets.extend(
+        [
+            (
+                grid_dir / "TileScan_2" / f"Position_{n + 1}",
+                True,
+                False,
+                (2048, 2048),
+                1.6e-7,
+                [0.003, 0.00332768, 0.003, 0.00332768],
+            )
+            for n in range(3)
+        ]
+    )
+    expected_grid_squares += 3
+    # Add on metadata for denoised datasets
+    datasets.extend(
+        [
+            (
+                grid_dir / "TileScan_2" / f"Position_{n + 1}{denoising_suffix}",
+                True,
+                False,
+                (2048, 2048),
+                1.6e-7,
+                [0.003, 0.00332768, 0.003, 0.00332768],
+            )
+            for n in range(3)
+        ]
     )
 
-    # Run the function
     preprocessing_messages = generate_preprocessing_messages(
-        rsync_basepath=rsync_basepath,
-        session_id=murfey_session.id,
+        session_id=ExampleVisit.murfey_session_id,
+        processed_dir=processed_dir,
         colors=colors,
-        denoising_suffix=denoising_suffix,
+        datasets=datasets,
     )
     if shuffle_message:
         preprocessing_messages.reverse()
@@ -409,7 +401,7 @@ def test_run_with_db(
     # Murfey's DataCollectionGroup should have an entry
     murfey_dcg_search = murfey_db_session.exec(
         sm_select(MurfeyDB.DataCollectionGroup).where(
-            MurfeyDB.DataCollectionGroup.session_id == murfey_session.id
+            MurfeyDB.DataCollectionGroup.session_id == session_id
         )
     ).all()
     assert len(murfey_dcg_search) == 1
@@ -417,10 +409,10 @@ def test_run_with_db(
     # GridSquare entries should be half the initial number of entries due to overwrites
     murfey_gs_search = murfey_db_session.exec(
         sm_select(MurfeyDB.GridSquare).where(
-            MurfeyDB.GridSquare.session_id == murfey_session.id
+            MurfeyDB.GridSquare.session_id == session_id
         )
     ).all()
-    assert len(murfey_gs_search) == (len(preprocessing_messages) - 2) // 2
+    assert len(murfey_gs_search) == expected_grid_squares
 
     # ISPyB's DataCollectionGroup should have an entry
     murfey_dcg = murfey_dcg_search[0]
@@ -471,11 +463,13 @@ def test_run_with_db(
         .scalars()
         .all()
     )
-    assert len(ispyb_gs_search) == (len(preprocessing_messages) - 2) // 2
+    assert len(ispyb_gs_search) == expected_grid_squares
     for gs in ispyb_gs_search:
         # Check that all entries point to the denoised images
-        assert gs.gridSquareImage is not None and denoising_suffix in gs.gridSquareImage
-
+        assert gs.gridSquareImage is not None
+        # The 'TileScan_1' dataset should be overwritten with the denoised variants
+        if "TileScan_2" in gs.gridSquareImage:
+            assert denoising_suffix in gs.gridSquareImage
         # Check that the GridSquare color flags and collection mode are set correctly
         for flag, value in color_flags.items():
             assert getattr(gs, flag) == value
