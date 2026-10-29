@@ -54,7 +54,7 @@ developer = [
     "pytest-mock", # Additional mocking tools for unit tests
 ]
 server = [
-    "ccpem-pipeliner@git+https://gitlab.com/ccpem/ccpem-pipeliner.git@live-processing#egg=ccpem-pipeliner",
+    "ccpem-pipeliner",
     "cryptography",
     "graypy",
     "ispyb>=12.1.0", # Responsible for setting requirements for SQLAlchemy and mysql-connector-python;
@@ -83,6 +83,7 @@ Documentation = "https://github.com/DiamondLightSource/python-murfey"
 GitHub = "https://github.com/DiamondLightSource/python-murfey"
 [project.scripts]
 "murfey.add_user" = "murfey.cli.add_user:run"
+"murfey.check_pipeliner_jobs" = "murfey.cli.check_pipeliner_jobs:run"
 "murfey.create_db" = "murfey.cli.create_db:run"
 "murfey.db_sql" = "murfey.cli.murfey_db_sql:run"
 "murfey.decrypt_password" = "murfey.cli.decrypt_db_password:run"
@@ -97,7 +98,6 @@ GitHub = "https://github.com/DiamondLightSource/python-murfey"
 "murfey.simulate" = "murfey.cli.dummy:run"
 "murfey.spa_inject" = "murfey.cli.inject_spa_processing:run"
 "murfey.transfer" = "murfey.cli.transfer:run"
-"murfey.check_pipeliner_jobs" = "murfey.cli.check_pipeliner_jobs:run"
 [project.entry-points."murfey.config.extraction"]
 "murfey_machine" = "murfey.util.config:get_extended_machine_config"
 [project.entry-points."murfey.contexts"]
