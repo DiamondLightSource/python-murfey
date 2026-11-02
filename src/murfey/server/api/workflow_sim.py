@@ -95,9 +95,9 @@ def request_sim_atlas_stitching(
             # PySIMRecon parameters
             "visit_name": visit_name,
             "output_dir": str(output_dir),
-            "mosaic_mrc_file": sim_data.mosaic_mrc,
-            "mosaic_text_file": sim_data.mosaic_txt,
-            "markers_file": sim_data.markers_txt,
+            "mosaic_mrc_file": str(sim_data.mosaic_mrc),
+            "mosaic_text_file": str(sim_data.mosaic_txt),
+            "markers_file": str(sim_data.markers_txt),
             # Return message
             "session_id": session_id,
             "feedback_queue": murfey.server._transport_object.feedback_queue,
