@@ -1,40 +1,31 @@
-import os
 from datetime import datetime
 from logging import getLogger
 from pathlib import Path
 from typing import Dict, List, Optional
 
-import requests
 from fastapi import APIRouter, Depends
 from fastapi.responses import FileResponse
 from ispyb.sqlalchemy import AutoProcProgram as ISPyBAutoProcProgram
 from pydantic import BaseModel
-from sqlalchemy import desc, func
+from sqlalchemy import func
 from sqlmodel import select
 
 try:
-    from smartem_agent.fs_parser import EpuParser
     from smartem_backend.api_client import SmartEMAPIClient
-    from smartem_backend.keycloak_client import KeycloakClient, load_keycloak_config
-    from smartem_common.schemas import AtlasTileGridSquarePositionData
+    from smartem_backend.model.http_request import GridSquareUpdateRequest
 
-    from murfey.util.config import get_security_config
+    from murfey.util.config import get_smartem_keycloak_client
 
-    keycloak_client = KeycloakClient(
-        load_keycloak_config(
-            Path(
-                os.getenv("SMARTEM_KEYCLOAK_CONFIGURATION")
-                or get_security_config().smartem_keycloak_config
-            )
-        )
-    )
-    SMARTEM_ACTIVE = True
+    if keycloak_client := get_smartem_keycloak_client():
+        SMARTEM_ACTIVE = True
+    else:
+        SMARTEM_ACTIVE = False
 except ImportError:
     keycloak_client = None
     SMARTEM_ACTIVE = False
 
+import murfey.server
 import murfey.server.prometheus as prom
-from murfey.server import _transport_object
 from murfey.server.api.auth import (
     MurfeySessionIDInstrument as MurfeySessionID,
     validate_instrument_token,
@@ -65,9 +56,10 @@ from murfey.util.db import (
     Movie,
     ProcessingJob,
     RsyncInstance,
-    Session,
+    Session as MurfeySession,
 )
 from murfey.util.models import (
+    AtlasRegistration,
     BatchPositionParameters,
     ClientInfo,
     FoilHoleParameters,
@@ -80,7 +72,6 @@ from murfey.util.models import (
 from murfey.workflows.spa.atlas import atlas_jpg_from_mrc
 from murfey.workflows.spa.flush_spa_preprocess import (
     register_foil_hole as _register_foil_hole,
-    register_grid_square as _register_grid_square,
 )
 from murfey.workflows.tomo.tomo_metadata import (
     register_batch_position_in_database,
@@ -135,7 +126,7 @@ def link_client_to_session(
 ):
     sid = sess.session_id
     if sid is None:
-        s = Session(name=sess.session_name, instrument_name=instrument_name)
+        s = MurfeySession(name=sess.session_name, instrument_name=instrument_name)
         db.add(s)
         db.commit()
         sid = s.id
@@ -154,7 +145,9 @@ def register_client_to_visit(visit_name: str, client_info: ClientInfo, db=murfey
     client_env = db.exec(
         select(ClientEnvironment).where(ClientEnvironment.client_id == client_info.id)
     ).one()
-    session = db.exec(select(Session).where(Session.id == client_env.session_id)).one()
+    session = db.exec(
+        select(MurfeySession).where(MurfeySession.id == client_env.session_id)
+    ).one()
     if client_env:
         client_env.visit = visit_name
         db.add(client_env)
@@ -169,7 +162,7 @@ def register_client_to_visit(visit_name: str, client_info: ClientInfo, db=murfey
 
 @router.get("/sessions")
 async def get_sessions(db=murfey_db):
-    sessions = db.exec(select(Session)).all()
+    sessions = db.exec(select(MurfeySession)).all()
     clients = db.exec(select(ClientEnvironment)).all()
     res = []
     for sess in sessions:
@@ -208,14 +201,14 @@ def register_processing_success_in_ispyb(
         .where(AutoProcProgram.pj_id == ProcessingJob.id)
     ).all()
     appids = [c[3].id for c in collected_ids]
-    if _transport_object:
+    if murfey.server._transport_object:
         if db is not None:
             apps = db.query(ISPyBAutoProcProgram).filter(
                 ISPyBAutoProcProgram.autoProcProgramId.in_(appids)
             )
             for updated in apps:
                 updated.processingStatus = True
-                _transport_object.do_update_processing_status(updated)
+                murfey.server._transport_object.do_update_processing_status(updated)
 
 
 @router.get("/num_movies")
@@ -242,16 +235,20 @@ def failed_client_post(instrument_name: str, post_info: PostInfo):
         "data": post_info.data,
         "kwargs": post_info.kwargs,
     }
-    if _transport_object:
-        _transport_object.send(_transport_object.feedback_queue, zocalo_message)
+    if murfey.server._transport_object:
+        murfey.server._transport_object.send(
+            murfey.server._transport_object.feedback_queue, zocalo_message
+        )
 
 
 @router.post("/sessions/{session_id}/rsyncer")
 def register_rsyncer(session_id: int, rsyncer_info: RsyncerInfo, db=murfey_db):
-    visit_name = db.exec(select(Session).where(Session.id == session_id)).one().visit
+    session = db.exec(select(MurfeySession).where(MurfeySession.id == session_id)).one()
+    instrument_name = session.instrument_name
+    visit_name = session.visit
     rsync_instance = RsyncInstance(
         source=rsyncer_info.source,
-        session_id=rsyncer_info.session_id,
+        session_id=session_id,
         transferring=rsyncer_info.transferring,
         destination=rsyncer_info.destination,
         tag=rsyncer_info.tag,
@@ -259,23 +256,27 @@ def register_rsyncer(session_id: int, rsyncer_info: RsyncerInfo, db=murfey_db):
     db.add(rsync_instance)
     db.commit()
     db.close()
-    prom.seen_files.labels(rsync_source=rsyncer_info.source, visit=visit_name).set(0)
+    prom.seen_files.labels(
+        microscope=instrument_name, rsync_source=rsyncer_info.source, visit=visit_name
+    ).set(0)
     prom.transferred_files.labels(
-        rsync_source=rsyncer_info.source, visit=visit_name
+        microscope=instrument_name, rsync_source=rsyncer_info.source, visit=visit_name
     ).set(0)
     prom.transferred_files_bytes.labels(
-        rsync_source=rsyncer_info.source, visit=visit_name
+        microscope=instrument_name, rsync_source=rsyncer_info.source, visit=visit_name
     ).set(0)
-    prom.seen_data_files.labels(rsync_source=rsyncer_info.source, visit=visit_name).set(
-        0
-    )
+    prom.seen_data_files.labels(
+        microscope=instrument_name, rsync_source=rsyncer_info.source, visit=visit_name
+    ).set(0)
     prom.transferred_data_files.labels(
-        rsync_source=rsyncer_info.source, visit=visit_name
+        microscope=instrument_name, rsync_source=rsyncer_info.source, visit=visit_name
     ).set(0)
     prom.transferred_data_files_bytes.labels(
-        rsync_source=rsyncer_info.source, visit=visit_name
+        microscope=instrument_name, rsync_source=rsyncer_info.source, visit=visit_name
     ).set(0)
-    prom.skipped_files.labels(rsync_source=rsyncer_info.source, visit=visit_name).set(0)
+    prom.skipped_files.labels(
+        microscope=instrument_name, rsync_source=rsyncer_info.source, visit=visit_name
+    ).set(0)
     return rsyncer_info
 
 
@@ -372,96 +373,20 @@ def get_foil_hole(
     return _get_foil_hole(session_id, fh_name, db)
 
 
-class AtlasRegistration(BaseModel):
-    name: str
-    acquisition_uuid: str | None
-    storage_folder: str = ""
-    register_grid: bool = False
-    tag: str = ""
-
-
 @spa_router.post("/sessions/{session_id}/register_atlas")
 def register_atlas(
     session_id: MurfeySessionID,
     atlas_registration_data: AtlasRegistration,
     db=murfey_db,
 ):
-    if SMARTEM_ACTIVE and atlas_registration_data.acquisition_uuid is not None:
-        session = db.exec(select(Session).where(Session.id == session_id)).one()
-        machine_config = get_machine_config(session.instrument_name)[
-            session.instrument_name
-        ]
-        if machine_config.smartem_api_url:
-            smartem_client = SmartEMAPIClient(
-                base_url=machine_config.smartem_api_url,
-                logger=logger,
-                keycloak_client=keycloak_client,
-            )
-            grid_uuid = None
-            atlas_path = None
-            if atlas_registration_data.tag:
-                dcg = db.exec(
-                    select(DataCollectionGroup)
-                    .where(DataCollectionGroup.session_id == session_id)
-                    .where(DataCollectionGroup.tag == atlas_registration_data.tag)
-                ).one_or_none()
-                if dcg is None:
-                    sample = int(
-                        atlas_registration_data.tag.split("Sample")[1].split("/")[0]
-                    )
-                    dcg = db.exec(
-                        select(DataCollectionGroup)
-                        .where(DataCollectionGroup.session_id == session_id)
-                        .where(DataCollectionGroup.sample == sample)
-                        .order_by(desc(DataCollectionGroup.id))
-                    ).first()
-                grid_uuid = dcg.smartem_grid_uuid
-            else:
-                possible_grids = smartem_client.get_acquisition_grids(
-                    atlas_registration_data.acquisition_uuid
-                )
-                for grid in possible_grids:
-                    if grid.name == atlas_registration_data.name.replace("_atlas", ""):
-                        grid_uuid = grid.uuid
-                        atlas_path = Path(grid.atlas_dir).parent
-                        break
-            if grid_uuid is not None and atlas_path is not None:
-                existing_atlas = smartem_client.get_grid_atlas(grid_uuid)
-                if (
-                    existing_atlas.name == atlas_registration_data.name
-                    and existing_atlas.storage_folder
-                    == atlas_registration_data.storage_folder
-                ):
-                    # there is a question here of whether the grid should be registered if specified
-                    return
-                parser = EpuParser()
-                atlas_data = parser.parse_atlas_manifest(
-                    str(atlas_path / "Atlas.dm"), grid_uuid
-                )
-                atlas_data.acquisition_date = atlas_data.acquisition_date.replace(
-                    tzinfo=None
-                )  # timezone information is not consistently provided so drop it
-                smartem_client.create_grid_atlas(atlas_data)
-                registered_squares = smartem_client.get_grid_gridsquares(grid_uuid)
-                gs_uuid_map = {gs.gridsquare_id: gs.uuid for gs in registered_squares}
-                for atlastile in atlas_data.tiles:
-                    pos_data_for_tile = []
-                    for gsid, gs_tile_pos in atlastile.gridsquare_positions.items():
-                        for pos in gs_tile_pos:
-                            pos_data_for_tile.append(
-                                AtlasTileGridSquarePositionData(
-                                    gridsquare_uuid=gs_uuid_map[gsid],
-                                    tile_uuid=atlastile.uuid,
-                                    position=pos.position,
-                                    size=pos.size,
-                                )
-                            )
-                    smartem_client.link_atlas_tile_and_gridsquares(pos_data_for_tile)
-                if atlas_registration_data.register_grid:
-                    smartem_client.grid_registered(grid_uuid)
-    else:
-        logger.info(
-            f"smartem deactivated so did not register atlas for {sanitise(str(atlas_registration_data.acquisition_uuid))}"
+    if murfey.server._transport_object:
+        murfey.server._transport_object.send(
+            murfey.server._transport_object.feedback_queue,
+            {
+                "register": "spa.smartem_atlas",
+                "session_id": session_id,
+                "atlas_registration_data": atlas_registration_data.model_dump(),
+            },
         )
 
 
@@ -492,7 +417,9 @@ def register_square(
             ).one_or_none()
             smartem_uuid = gs.smartem_uuid if gs else None
         if smartem_uuid is not None:
-            session = db.exec(select(Session).where(Session.id == session_id)).one()
+            session = db.exec(
+                select(MurfeySession).where(MurfeySession.id == session_id)
+            ).one()
             machine_config = get_machine_config(session.instrument_name)[
                 session.instrument_name
             ]
@@ -502,17 +429,20 @@ def register_square(
                     logger=logger,
                     keycloak_client=keycloak_client,
                 )
-                smartem_client.gridsquare_registered(
-                    smartem_uuid, count=square_registration_data.count
-                )
-                result = requests.put(
-                    f"{machine_config.smartem_api_url}/gridsquares/{smartem_uuid}",
-                    json={"image_path": square_registration_data.image_path},
-                )
-                if not result.status_code == 200:
-                    logger.warning(
-                        f"Post to smartem gridsquares returned {result.status_code}"
+                if not square_registration_data.serialem:
+                    smartem_client.gridsquare_registered(
+                        smartem_uuid, count=square_registration_data.count
                     )
+                logger.info(
+                    f"updating gridsquare with image path {square_registration_data.image_path}"
+                )
+                smartem_client._request(
+                    "put",
+                    f"gridsquares/{smartem_uuid}",
+                    GridSquareUpdateRequest(
+                        image_path=square_registration_data.image_path
+                    ),
+                )
     else:
         logger.info("smartem deactivated so did not register square")
 
@@ -524,7 +454,7 @@ def make_atlas_jpg(
     logger.debug(
         f"Received request to create JPG image of atlas {sanitise(atlas_mrc.path)!r}"
     )
-    session = db.exec(select(Session).where(Session.id == session_id)).one()
+    session = db.exec(select(MurfeySession).where(MurfeySession.id == session_id)).one()
     return atlas_jpg_from_mrc(
         session.instrument_name, session.visit, Path(atlas_mrc.path)
     )
@@ -537,7 +467,16 @@ def register_grid_square(
     grid_square_params: GridSquareParameters,
     db=murfey_db,
 ):
-    return _register_grid_square(session_id, gsid, grid_square_params, db)
+    if murfey.server._transport_object:
+        murfey.server._transport_object.send(
+            murfey.server._transport_object.feedback_queue,
+            {
+                "register": "spa.register_grid_square",
+                "session_id": session_id,
+                "gsid": gsid,
+                "grid_square_params": grid_square_params.model_dump(),
+            },
+        )
 
 
 @spa_router.post("/sessions/{session_id}/grid_square/{gs_name}/foil_hole")

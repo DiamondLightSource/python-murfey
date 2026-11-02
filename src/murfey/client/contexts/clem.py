@@ -121,7 +121,7 @@ class CLEMContext(Context):
                 )
 
                 # Create a unique name for the series
-                series_name = "--".join(
+                series_name = "/".join(
                     [
                         *destination_file.parent.parts[
                             -2:
@@ -167,7 +167,7 @@ class CLEMContext(Context):
                 # Create series name for XLIF file
                 # XLIF files don't have the "--ZXX--CXX" additions in the file name
                 # But they have "/Metadata/" as the immediate parent
-                series_name = "--".join(
+                series_name = "/".join(
                     [
                         *destination_file.parent.parent.parts[-2:],
                         destination_file.stem.replace(" ", "_"),

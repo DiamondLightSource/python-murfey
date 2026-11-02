@@ -37,13 +37,20 @@ example_files = {
         "visit/maps/visit/LayersData/Layer/Electron Snapshot (2)/Electron Snapshot (2).tiff",
     ],
     "SIMContext": [
+        # Atlas files
+        "visit/raw/CtrlApr_G2/mosaic.mrc",
+        "visit/raw/CtrlApr_G2/mosaic.txt",
+        "visit/raw/CtrlApr_G2/markers.txt",
+        "visit/raw/CtrlApr_G2/mosaic_new.mrc",
+        "visit/raw/CtrlApr_G2/mosaic_new.txt",
+        "visit/raw/CtrlApr_G2/markers_new.txt",
         # Bright field
         "visit/raw/CtrlApr_G2/20260703_132856_CtrlApr_G2_F3A_BF",
         # Fluorescent
-        "visit/raw/SR002_G1/20260707_112417_SR002G1_F1F_BR",
-        "visit/raw/SR002_G1/20260707_112417_SR002G1_F1F_BFR",
-        "visit/raw/44drug_G2/20260703_114348_44drug_G2_E2DR_GR",
-        "visit/raw/44drug_G2/20260703_113142_44drug_G2_E2DR_GFR",
+        "visit/raw/SR002_G1/20260707_112417_SR002G1_F1F_B_FL",
+        "visit/raw/SR002_G1/20260707_112417_SR002G1_F1F_G_FL",
+        "visit/raw/44drug_G2/20260703_114348_44drug_G2_E2DR_R_FL",
+        "visit/raw/44drug_G2/20260703_113142_44drug_G2_E2DR_FR_FL",
         "visit/raw/SR002_G1/20260707_112417_SR002G1_F1F_BR_FL",
         "visit/raw/SR002_G1/20260707_112417_SR002G1_F1F_BFR_FL",
         "visit/raw/44drug_G2/20260703_114348_44drug_G2_E2DR_GR_FL",
@@ -129,6 +136,13 @@ def test_find_context(file_and_context, tmp_path):
     # Set up the Analyser
     analyser = Analyser(basepath_local=tmp_path, token="")
 
+    # Add items to stored MachineConfig depending on context
+    match context:
+        case "SIMContext":
+            analyser._murfey_config = {"acquisition_software": ["sim"]}
+        case _:
+            pass
+
     # Pass the file to the function, and check that outputs are as expected
     assert analyser._find_context(tmp_path / file_name)
     assert analyser._context is not None and context in str(analyser._context)
@@ -147,6 +161,7 @@ contextless_files = [
     "visit/FoilHole_01234.mrc",
     "visit/FoilHole_01234.jpg",
     "visit/FoilHole_01234.xml",
+    # CLEM files
     "visit/images/test_file.lifext",
     "visit/images/2024_03_14_12_34_56--Project001/Project001.xlef",
     "visit/images/2024_03_14_12_34_56--Project001/Project001.xlef.lock",
@@ -294,6 +309,7 @@ def test_analyse_sim(
 
     # Initialise the Analyser
     analyser = Analyser(tmp_path, "")
+    analyser._murfey_config = {"acquisition_software": ["sim"]}
     for file in test_files:
         analyser._analyse(tmp_path / file)
 

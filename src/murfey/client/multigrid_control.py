@@ -687,7 +687,7 @@ class MultigridController:
             function_name="increment_rsync_file_count",
             token=self.token,
             instrument_name=self._environment.instrument_name,
-            visit_name=self._environment.visit,
+            session_id=self.session_id,
             data=data,
         )
 
@@ -721,7 +721,7 @@ class MultigridController:
                 function_name="increment_rsync_transferred_files_prometheus",
                 token=self.token,
                 instrument_name=self._environment.instrument_name,
-                visit_name=self._environment.visit,
+                session_id=self.session_id,
                 data=data,
             )
 
@@ -738,7 +738,7 @@ class MultigridController:
             function_name="increment_rsync_skipped_files_prometheus",
             token=self.token,
             instrument_name=self._environment.instrument_name,
-            visit_name=self._environment.visit,
+            session_id=self.session_id,
             data={
                 "source": source,
                 "session_id": self.session_id,
@@ -774,6 +774,6 @@ class MultigridController:
             function_name="increment_rsync_transferred_files",
             token=self.token,
             instrument_name=self._environment.instrument_name,
-            visit_name=self._environment.visit,
+            session_id=self.session_id,
             data=data,
         )

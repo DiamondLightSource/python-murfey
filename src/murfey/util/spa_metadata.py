@@ -95,7 +95,8 @@ def get_grid_square_atlas_positions(
                 break
         if not required_key:
             continue
-        for gs in nodes[required_key]:
+        if isinstance(nodes[required_key], dict):
+            gs = nodes[required_key]
             if not isinstance(gs, dict):
                 continue
             if not grid_square or gs["key"] == grid_square:
@@ -115,7 +116,43 @@ def get_grid_square_atlas_positions(
                     float(gs["value"]["b:PositionOnTheAtlas"]["c:Rotation"]),
                 )
                 if grid_square:
-                    break
+                    return gs_pix_positions
+        else:
+            for gs in nodes[required_key]:
+                if not isinstance(gs, dict):
+                    continue
+                if not grid_square or gs["key"] == grid_square:
+                    gs_pix_positions[gs["key"]] = (
+                        int(
+                            float(
+                                gs["value"]["b:PositionOnTheAtlas"]["c:Center"]["d:x"]
+                            )
+                        ),
+                        int(
+                            float(
+                                gs["value"]["b:PositionOnTheAtlas"]["c:Center"]["d:y"]
+                            )
+                        ),
+                        float(gs["value"]["b:PositionOnTheAtlas"]["c:Physical"]["d:x"])
+                        * 1e9,
+                        float(gs["value"]["b:PositionOnTheAtlas"]["c:Physical"]["d:y"])
+                        * 1e9,
+                        int(
+                            float(
+                                gs["value"]["b:PositionOnTheAtlas"]["c:Size"]["d:width"]
+                            )
+                        ),
+                        int(
+                            float(
+                                gs["value"]["b:PositionOnTheAtlas"]["c:Size"][
+                                    "d:height"
+                                ]
+                            )
+                        ),
+                        float(gs["value"]["b:PositionOnTheAtlas"]["c:Rotation"]),
+                    )
+                    if grid_square:
+                        return gs_pix_positions
     return gs_pix_positions
 
 

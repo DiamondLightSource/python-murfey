@@ -1,6 +1,11 @@
 import pytest
 
 from murfey.util.fib import number_from_name
+from tests.conftest import ExampleVisit
+
+session_id = 10
+visit_name = f"{ExampleVisit.proposal_code}{ExampleVisit.proposal_number}-{ExampleVisit.visit_number}"
+instrument_name = ExampleVisit.instrument_name
 
 
 @pytest.mark.parametrize(

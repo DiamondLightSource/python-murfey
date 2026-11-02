@@ -398,12 +398,7 @@ def test_run_with_db(
     from murfey.server.ispyb import TransportManager
 
     mocker.patch(
-        "murfey.workflows.register_data_collection_group._transport_object",
-        new=TransportManager("PikaTransport"),
-    )
-    mocker.patch(
-        "murfey.workflows.fib.register_milling_progress._transport_object",
-        new=TransportManager("PikaTransport"),
+        "murfey.server._transport_object", new=TransportManager("PikaTransport")
     )
 
     # Run the workflow twice (fresh insert and update existing)
@@ -419,7 +414,7 @@ def test_run_with_db(
         sm_select(MurfeyDB.DataCollectionGroup)
         .where(MurfeyDB.DataCollectionGroup.session_id == session_id)
         .where(
-            MurfeyDB.DataCollectionGroup.tag == f"{site_info['project_name']}--slot_1"
+            MurfeyDB.DataCollectionGroup.tag == f"{site_info['project_name']}/grid_1"
         )
     ).one_or_none()
     assert dcg_murfey is not None
@@ -477,6 +472,7 @@ def test_run_with_db(
 @pytest.mark.parametrize(
     "test_params",
     (  # TransportManager | Project name | Site number | Site name | Stage info | Preparation site | Slot number
+        # Flip to 'True' one by one going down the list
         (False, False, False, False, False, False, False),
         (True, False, False, False, False, False, False),
         (True, True, False, False, False, False, False),
@@ -504,10 +500,7 @@ def test_run_fails(
 
     # Mock TransportManager accordingly
     mock_transport_object = MagicMock() if has_transport_object else None
-    mocker.patch(
-        "murfey.workflows.fib.register_milling_progress._transport_object",
-        mock_transport_object,
-    )
+    mocker.patch("murfey.server._transport_object", mock_transport_object)
 
     # Mock the Murfey database
     mock_murfey_db = MagicMock()
@@ -541,6 +534,10 @@ def test_run_fails(
         },
     }
 
-    # Run the function and check that the correct message is returned
-    result = run(message, mock_murfey_db)
-    assert result == {"success": False, "requeue": False}
+    # Run the function and check that the correct message or error is detected
+    if not has_transport_object:
+        result = run(message, mock_murfey_db)
+        assert result == {"success": False, "requeue": False}
+    else:
+        with pytest.raises((ValueError, RuntimeError)):
+            run(message, mock_murfey_db)

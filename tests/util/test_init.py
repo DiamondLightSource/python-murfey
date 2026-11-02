@@ -5,8 +5,9 @@ Test module for the functions located in murfey.util.__init__
 from pathlib import Path
 
 import pytest
+from pytest_mock import MockerFixture
 
-from murfey.util import secure_path
+from murfey.util import safe_chmod, secure_path
 
 secure_path_test_matrix = (
     # Keep spaces? | Input path | Expected output
@@ -61,3 +62,43 @@ def test_secure_path(test_params: tuple[bool, str, str]):
     # Unpack test params
     keep_spaces, input_path, expected_output = test_params
     assert secure_path(Path(input_path), keep_spaces) == Path(expected_output)
+
+
+@pytest.mark.parametrize(
+    "error_raised",
+    (
+        None,
+        PermissionError,
+        FileNotFoundError,
+        Exception,
+    ),
+)
+def test_safe_chmod(
+    mocker: MockerFixture,
+    error_raised: None | Exception,
+    tmp_path: Path,
+):
+    # Create a test dir
+    test_dir = tmp_path / "test"
+    test_dir.mkdir(parents=True, exist_ok=True)
+
+    # Mock the logger
+    mock_logger = mocker.patch("murfey.util.logger")
+
+    # Smooth case
+    if error_raised is None:
+        safe_chmod(test_dir, 0o777)
+        mock_logger.warning.assert_not_called()
+    # PermissionError allowed
+    elif error_raised is PermissionError:
+        mocker.patch("murfey.util.os.chmod", side_effect=[error_raised])
+        safe_chmod(test_dir, 0o777)
+        mock_logger.warning.assert_called_with(
+            f"Unable to change permissions of {test_dir}, will attempt to proceed",
+            exc_info=True,
+        )
+    # Every other exception should be raised
+    else:
+        mocker.patch("murfey.util.os.chmod", side_effect=[error_raised])
+        with pytest.raises(error_raised):
+            safe_chmod(test_dir, 0o777)

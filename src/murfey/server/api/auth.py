@@ -110,6 +110,8 @@ async def submit_to_auth_endpoint(
     Helper function to forward incoming requests to an authentication server
     to verify that they are allowed to inspect the
     """
+    if security_config.auth_type == "none":
+        return {"valid": True}
 
     # Forward only essentials auth-related headers
     headers = {
@@ -189,6 +191,9 @@ async def validate_instrument_token(
     """
     Used by the backend routers to check the incoming instrument server token.
     """
+    if security_config.instrument_auth_type == "none":
+        return None
+
     try:
         # Validate using auth URL if provided
         if security_config.instrument_auth_url:

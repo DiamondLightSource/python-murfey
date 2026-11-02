@@ -5,9 +5,9 @@ import ispyb.sqlalchemy._auto_db_schema as ISPyBDB
 from sqlmodel import select
 from sqlmodel.orm.session import Session as SQLModelSession
 
+import murfey.server
 import murfey.server.prometheus as prom
 import murfey.util.db as MurfeyDB
-from murfey.server import _transport_object
 from murfey.server.ispyb import ISPyBSession
 from murfey.util import sanitise
 
@@ -16,13 +16,16 @@ logger = logging.getLogger("murfey.workflows.register_processing_job")
 
 def run(message: dict, murfey_db: SQLModelSession):
     # Faill immediately if not transport manager is set
-    if _transport_object is None:
+    if murfey.server._transport_object is None:
         logger.error("Unable to find transport manager")
         return {"success": False, "requeue": False}
 
     logger.info(f"Registering the following processing job: \n{message}")
 
-    murfey_session_id = message["session_id"]
+    murfey_session_id = int(message["session_id"])
+    session = murfey_db.exec(
+        select(MurfeyDB.Session).where(MurfeyDB.Session.id == murfey_session_id)
+    ).one()
     dc = murfey_db.exec(
         select(MurfeyDB.DataCollection, MurfeyDB.DataCollectionGroup)
         .where(MurfeyDB.DataCollection.dcg_id == MurfeyDB.DataCollectionGroup.id)
@@ -56,11 +59,11 @@ def run(message: dict, murfey_db: SQLModelSession):
                     ISPyBDB.ProcessingJobParameter(parameterKey=k, parameterValue=v)
                     for k, v in message["job_parameters"].items()
                 ]
-                pid = _transport_object.do_create_ispyb_job(
+                pid = murfey.server._transport_object.do_create_ispyb_job(
                     record, params=job_parameters
                 ).get("return_value", None)
             else:
-                pid = _transport_object.do_create_ispyb_job(record).get(
+                pid = murfey.server._transport_object.do_create_ispyb_job(record).get(
                     "return_value", None
                 )
             if pid is None:
@@ -74,7 +77,11 @@ def run(message: dict, murfey_db: SQLModelSession):
         murfey_db.close()
 
     # Update Prometheus counter for preprocessed movies
-    prom.preprocessed_movies.labels(processing_job=pid)
+    prom.preprocessed_movies.labels(
+        microscope=session.instrument_name,
+        rsync_source=message["tag"],
+        visit=session.visit,
+    )
 
     # Register AutoProcProgram database entry if it doesn't already exist
     if not murfey_db.exec(
@@ -86,9 +93,9 @@ def run(message: dict, murfey_db: SQLModelSession):
             record = ISPyBDB.AutoProcProgram(
                 processingJobId=pid, processingStartTime=datetime.now()
             )
-            appid = _transport_object.do_update_processing_status(record).get(
-                "return_value", None
-            )
+            appid = murfey.server._transport_object.do_update_processing_status(
+                record
+            ).get("return_value", None)
             if appid is None:
                 return {"success": False, "requeue": True}
             murfey_app = MurfeyDB.AutoProcProgram(id=appid, pj_id=pid)

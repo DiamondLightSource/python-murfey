@@ -8,7 +8,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Dict, Tuple
 
-from murfey.util import secure_path
+from murfey.util import safe_chmod, secure_path
 
 logger = logging.getLogger("murfey.server.gain")
 
@@ -61,7 +61,7 @@ async def prepare_gain(
         gain_tag = f"gain_{tag}" if tag else "gain"
         gain_dir = secure_path(gain_path.parent / gain_tag)
         gain_dir.mkdir(exist_ok=True)
-        os.chmod(gain_dir, chmod)
+        safe_chmod(gain_dir, chmod)
         gain_path = _sanitise(gain_path, tag)
         flip = "flipx" if camera == Camera.K3_FLIPX else "flipy"
         gain_path_mrc = gain_path.with_suffix(".mrc")

@@ -1,5 +1,4 @@
 import asyncio
-import os
 from datetime import datetime
 from logging import getLogger
 from pathlib import Path
@@ -16,13 +15,14 @@ from ispyb.sqlalchemy import (
     BLSubSample,
 )
 from pydantic import BaseModel
-from sqlalchemy.exc import OperationalError
-from sqlmodel import col, select
+from sqlalchemy.exc import NoResultFound, OperationalError
+from sqlmodel import Session as SQLModelSession, col, select
 from werkzeug.utils import secure_filename
+
+import murfey.server
 
 try:
     from smartem_backend.api_client import SmartEMAPIClient
-    from smartem_backend.keycloak_client import KeycloakClient, load_keycloak_config
     from smartem_common.schemas import (
         AcquisitionData as SmartEMAcquisitionData,
         GridData as SmartEMGridData,
@@ -30,23 +30,17 @@ try:
         MicrographManifest as SmartEMMicrographManifest,
     )
 
-    from murfey.util.config import get_security_config
+    from murfey.util.config import get_smartem_keycloak_client
 
-    keycloak_client = KeycloakClient(
-        load_keycloak_config(
-            Path(
-                os.getenv("SMARTEM_KEYCLOAK_CONFIGURATION")
-                or get_security_config().smartem_keycloak_config
-            )
-        )
-    )
-    SMARTEM_ACTIVE = True
+    if keycloak_client := get_smartem_keycloak_client():
+        SMARTEM_ACTIVE = True
+    else:
+        SMARTEM_ACTIVE = False
 except ImportError:
     keycloak_client = None
     SMARTEM_ACTIVE = False
 
 import murfey.server.prometheus as prom
-from murfey.server import _transport_object
 from murfey.server.api.auth import (
     MurfeySessionIDInstrument as MurfeySessionID,
     validate_instrument_token,
@@ -62,10 +56,9 @@ from murfey.server.feedback import (
 from murfey.server.ispyb import DB as ispyb_db, get_proposal_id
 from murfey.server.murfey_db import murfey_db
 from murfey.util import sanitise
-from murfey.util.config import get_machine_config
+from murfey.util.config import MachineConfig, get_machine_config
 from murfey.util.db import (
     AutoProcProgram,
-    ClassificationFeedbackParameters,
     DataCollection,
     DataCollectionGroup,
     FoilHole,
@@ -75,7 +68,7 @@ from murfey.util.db import (
     PreprocessStash,
     ProcessingJob,
     SearchMap,
-    Session,
+    Session as MurfeySession,
     SessionProcessingParameters,
     SPARelionParameters,
     Tilt,
@@ -119,31 +112,11 @@ class DCGroupParameters(BaseModel):
     acquisition_uuid: Optional[str] = None
 
 
-@router.post(
-    "/visits/{visit_name}/sessions/{session_id}/register_data_collection_group"
-)
-def register_dc_group(
-    visit_name: str,
-    session_id: MurfeySessionID,
-    dcg_params: DCGroupParameters,
-    db=murfey_db,
-):
-    ispyb_proposal_code = visit_name[:2]
-    ispyb_proposal_number = visit_name.split("-")[0][2:]
-    ispyb_visit_number = visit_name.split("-")[-1]
-    instrument_name = (
-        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
-    )
-    logger.info(f"Registering data collection group on microscope {instrument_name}")
-    machine_config = get_machine_config(instrument_name=instrument_name)[
-        instrument_name
-    ]
-    smartem_grid_uuid = None
-    if (
-        dcg_params.create_smartem_grid
-        and SMARTEM_ACTIVE
-        and dcg_params.acquisition_uuid
-    ):
+def _register_smartem_grid(
+    machine_config: MachineConfig, dcg_params: DCGroupParameters, visit_name: str
+) -> str:
+    smartem_grid_uuid = ""
+    if SMARTEM_ACTIVE and dcg_params.acquisition_uuid:
         if machine_config.smartem_api_url:
             try:
                 smartem_client = SmartEMAPIClient(
@@ -151,21 +124,56 @@ def register_dc_group(
                     logger=logger,
                     keycloak_client=keycloak_client,
                 )
-                grid_data = SmartEMGridData(
-                    data_dir=Path(dcg_params.tag),
-                    atlas_dir=Path(dcg_params.atlas) if dcg_params.atlas else None,
-                    acquisition_data=SmartEMAcquisitionData(
-                        uuid=dcg_params.acquisition_uuid,
-                        name=f"{visit_name}-sample-{dcg_params.sample}"
-                        if dcg_params.sample
-                        else f"{visit_name}-sample-unknown",
-                    ),
-                )
-                smartem_grid_uuid = smartem_client.create_acquisition_grid(
-                    grid_data
-                ).uuid
+                if dcg_params.create_smartem_grid:
+                    grid_data = SmartEMGridData(
+                        data_dir=Path(dcg_params.tag),
+                        atlas_dir=Path(dcg_params.atlas) if dcg_params.atlas else None,
+                        acquisition_data=SmartEMAcquisitionData(
+                            uuid=dcg_params.acquisition_uuid,
+                            name=f"{visit_name}-slot-{dcg_params.sample}"
+                            if dcg_params.sample
+                            else f"{visit_name}-slot-unknown",
+                        ),
+                    )
+                    smartem_grid_uuid = smartem_client.create_acquisition_grid(
+                        grid_data
+                    ).uuid
+                else:
+                    possible_grids = smartem_client.get_acquisition_grids(
+                        dcg_params.acquisition_uuid
+                    )
+                    for grid in possible_grids:
+                        if grid.name.endswith(str(dcg_params.sample)):
+                            smartem_grid_uuid = grid.uuid
+                            break
+
             except Exception:
                 logger.warning("Failed to register SmartEM grid", exc_info=True)
+    return smartem_grid_uuid
+
+
+@router.post(
+    "/visits/{visit_name}/sessions/{session_id}/register_data_collection_group"
+)
+def register_dc_group(
+    visit_name: str,
+    session_id: MurfeySessionID,
+    dcg_params: DCGroupParameters,
+    db: SQLModelSession = murfey_db,
+):
+    ispyb_proposal_code = visit_name[:2]
+    ispyb_proposal_number = visit_name.split("-")[0][2:]
+    ispyb_visit_number = visit_name.split("-")[-1]
+    instrument_name = (
+        db.exec(select(MurfeySession).where(MurfeySession.id == session_id))
+        .one()
+        .instrument_name
+    )
+    logger.info(f"Registering data collection group on microscope {instrument_name}")
+    machine_config = get_machine_config(instrument_name=instrument_name)[
+        instrument_name
+    ]
+
     if (
         dcg_murfey := db.exec(
             select(DataCollectionGroup)
@@ -184,8 +192,27 @@ def register_dc_group(
     ):
         # Either switching atlas for a common (atlas or processing) tag
         # Or registering a new atlas-type dcg for a sample that is already present
+        smartem_grid_uuid = ""
+        for dcg in dcg_murfey:
+            if dcg.smartem_grid_uuid:
+                smartem_grid_uuid = dcg.smartem_grid_uuid
+                break
+        else:
+            smartem_grid_uuid = _register_smartem_grid(
+                machine_config, dcg_params, visit_name
+            )
         for dcg_instance in dcg_murfey:
             # Update all instances in case there are multiple processing runs
+            # Skip Scaup registration if sample is unchanged
+            sample_registered = (
+                dcg_instance.sample is not None
+                and dcg_params.sample
+                in [
+                    None,
+                    dcg_instance.sample,
+                ]
+            )
+            # Update dcg table
             dcg_instance.atlas = dcg_params.atlas or dcg_instance.atlas
             dcg_instance.sample = dcg_params.sample or dcg_instance.sample
             dcg_instance.atlas_pixel_size = (
@@ -228,23 +255,24 @@ def register_dc_group(
                 )
                 db.add(atlas_instance)
 
-            if _transport_object:
+            if murfey.server._transport_object:
                 if dcg_instance.atlas_id is not None:
-                    _transport_object.send(
-                        _transport_object.feedback_queue,
+                    murfey.server._transport_object.send(
+                        murfey.server._transport_object.feedback_queue,
                         {
                             "register": "atlas_update",
                             "tag": dcg_instance.tag,
                             "atlas_id": dcg_instance.atlas_id,
                             "atlas": dcg_params.atlas,
                             "sample": dcg_params.sample,
+                            "sample_registered": sample_registered,
                             "atlas_pixel_size": dcg_params.atlas_pixel_size,
                             "dcgid": dcg_instance.id,
                             "session_id": session_id,
                         },
                     )
                 else:
-                    atlas_id_response = _transport_object.do_insert_atlas(
+                    atlas_id_response = murfey.server._transport_object.do_insert_atlas(
                         Atlas(
                             dataCollectionGroupId=dcg_instance.id,
                             atlasImage=dcg_params.atlas,
@@ -268,9 +296,9 @@ def register_dc_group(
                 register_search_map_in_database(
                     session_id, sm.name, search_map_params, db, close_db=False
                 )
-            elif _transport_object:
-                _transport_object.send(
-                    _transport_object.feedback_queue,
+            elif murfey.server._transport_object:
+                murfey.server._transport_object.send(
+                    murfey.server._transport_object.feedback_queue,
                     {
                         "register": "sxt.register_roi",
                         "session_id": session_id,
@@ -288,11 +316,15 @@ def register_dc_group(
         )
     ).all():
         # Case where we switch from atlas to processing
+        if not dcg_murfey[0].smartem_grid_uuid:
+            dcg_murfey[0].smartem_grid_uuid = _register_smartem_grid(
+                machine_config, dcg_params, visit_name
+            )
         original_tag = dcg_murfey[0].tag
         dcg_murfey[0].tag = dcg_params.tag or dcg_murfey[0].tag
-        if _transport_object:
-            _transport_object.send(
-                _transport_object.feedback_queue,
+        if murfey.server._transport_object:
+            murfey.server._transport_object.send(
+                murfey.server._transport_object.feedback_queue,
                 {
                     "register": "experiment_type_update",
                     "experiment_type_id": dcg_params.experiment_type_id,
@@ -309,6 +341,9 @@ def register_dc_group(
             db.add(grid_square)
         db.commit()
     else:
+        smartem_grid_uuid = _register_smartem_grid(
+            machine_config, dcg_params, visit_name
+        )
         dcg_parameters = {
             "start_time": str(datetime.now()),
             "experiment_type_id": dcg_params.experiment_type_id,
@@ -323,9 +358,9 @@ def register_dc_group(
             "atlas_height": dcg_params.atlas_height,
         }
 
-        if _transport_object:
-            _transport_object.send(
-                _transport_object.feedback_queue,
+        if murfey.server._transport_object:
+            murfey.server._transport_object.send(
+                murfey.server._transport_object.feedback_queue,
                 {
                     "register": "data_collection_group",
                     **dcg_parameters,
@@ -369,13 +404,18 @@ class DCParameters(BaseModel):
 
 @router.post("/visits/{visit_name}/sessions/{session_id}/start_data_collection")
 def start_dc(
-    visit_name: str, session_id: MurfeySessionID, dc_params: DCParameters, db=murfey_db
+    visit_name: str,
+    session_id: MurfeySessionID,
+    dc_params: DCParameters,
+    db: SQLModelSession = murfey_db,
 ):
     ispyb_proposal_code = visit_name[:2]
     ispyb_proposal_number = visit_name.split("-")[0][2:]
     ispyb_visit_number = visit_name.split("-")[-1]
     instrument_name = (
-        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+        db.exec(select(MurfeySession).where(MurfeySession.id == session_id))
+        .one()
+        .instrument_name
     )
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
@@ -411,9 +451,9 @@ def start_dc(
         "session_id": session_id,
     }
 
-    if _transport_object:
-        _transport_object.send(
-            _transport_object.feedback_queue,
+    if murfey.server._transport_object:
+        murfey.server._transport_object.send(
+            murfey.server._transport_object.feedback_queue,
             {
                 "register": "data_collection",
                 **dc_parameters,
@@ -424,7 +464,9 @@ def start_dc(
             },
         )
     if dc_params.exposure_time:
-        prom.exposure_time.set(dc_params.exposure_time)
+        prom.exposure_time.labels(microscope=instrument_name, visit=visit_name).set(
+            dc_params.exposure_time
+        )
     return dc_params
 
 
@@ -441,7 +483,7 @@ def register_proc(
     visit_name: str,
     session_id: MurfeySessionID,
     proc_params: ProcessingJobParameters,
-    db=murfey_db,
+    db: SQLModelSession = murfey_db,
 ):
     proc_parameters: dict = {
         "session_id": session_id,
@@ -474,9 +516,9 @@ def register_proc(
         )
         proc_parameters["job_parameters"] = job_parameters
 
-    if _transport_object:
-        _transport_object.send(
-            _transport_object.feedback_queue,
+    if murfey.server._transport_object:
+        murfey.server._transport_object.send(
+            murfey.server._transport_object.feedback_queue,
             {"register": "processing_job", **proc_parameters},
         )
     return proc_params
@@ -491,7 +533,9 @@ spa_router = APIRouter(
 
 @spa_router.post("/sessions/{session_id}/spa_processing_parameters")
 def register_spa_proc_params(
-    session_id: MurfeySessionID, proc_params: ProcessingParametersSPA, db=murfey_db
+    session_id: MurfeySessionID,
+    proc_params: ProcessingParametersSPA,
+    db: SQLModelSession = murfey_db,
 ):
     session_processing_parameters = db.exec(
         select(SessionProcessingParameters).where(
@@ -511,8 +555,15 @@ def register_spa_proc_params(
         **dict(proc_params),
         "session_id": session_id,
     }
-    if _transport_object:
-        _transport_object.send(_transport_object.feedback_queue, zocalo_message)
+    if murfey.server._transport_object:
+        murfey.server._transport_object.send(
+            murfey.server._transport_object.feedback_queue, zocalo_message
+        )
+    else:
+        logger.error(
+            f"Pre-processing was requested for {sanitise(str(session_id))} "
+            "but no Zocalo transport object was found"
+        )
 
 
 class Tag(BaseModel):
@@ -521,15 +572,20 @@ class Tag(BaseModel):
 
 @spa_router.post("/visits/{visit_name}/sessions/{session_id}/flush_spa_processing")
 def flush_spa_processing(
-    visit_name: str, session_id: MurfeySessionID, tag: Tag, db=murfey_db
+    visit_name: str,
+    session_id: MurfeySessionID,
+    tag: Tag,
+    db: SQLModelSession = murfey_db,
 ):
     zocalo_message = {
         "register": "spa.flush_spa_preprocess",
         "session_id": session_id,
         "tag": tag.tag,
     }
-    if _transport_object:
-        _transport_object.send(_transport_object.feedback_queue, zocalo_message)
+    if murfey.server._transport_object:
+        murfey.server._transport_object.send(
+            murfey.server._transport_object.feedback_queue, zocalo_message
+        )
     return
 
 
@@ -556,10 +612,12 @@ async def request_spa_preprocessing(
     visit_name: str,
     session_id: MurfeySessionID,
     proc_file: SPAProcessFile,
-    db=murfey_db,
+    db: SQLModelSession = murfey_db,
 ):
     instrument_name = (
-        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+        db.exec(select(MurfeySession).where(MurfeySession.id == session_id))
+        .one()
+        .instrument_name
     )
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
@@ -575,13 +633,12 @@ async def request_spa_preprocessing(
             .where(AutoProcProgram.pj_id == ProcessingJob.id)
             .where(ProcessingJob.recipe == "em-spa-preprocess")
         ).one()
-        params = db.exec(
-            select(SPARelionParameters, ClassificationFeedbackParameters)
-            .where(SPARelionParameters.pj_id == collected_ids[2].id)
-            .where(ClassificationFeedbackParameters.pj_id == SPARelionParameters.pj_id)
-        ).one()
-        proc_params: Optional[dict] = dict(params[0])
-        feedback_params = params[1]
+        # SPARelionParameters is an ORM row
+        proc_params = db.exec(
+            select(SPARelionParameters).where(
+                SPARelionParameters.pj_id == collected_ids[2].id
+            )
+        ).one_or_none()
     except sqlalchemy.exc.NoResultFound:
         proc_params = None
     try:
@@ -596,6 +653,9 @@ async def request_spa_preprocessing(
             .one()[0]
             .id
         )
+    except NoResultFound:
+        logger.warning("No foil hole ID found")
+        foil_hole_id = None
     except Exception as e:
         logger.warning(
             f"Foil hole ID not found for foil hole {sanitise(str(proc_file.foil_hole_id))}: {e}",
@@ -606,10 +666,6 @@ async def request_spa_preprocessing(
         detached_ids = [c.id for c in collected_ids]
 
         murfey_ids = _murfey_id(detached_ids[3], db, number=2, close=False)
-
-        if feedback_params.picker_murfey_id is None:
-            feedback_params.picker_murfey_id = murfey_ids[1]
-            db.add(feedback_params)
         movie = Movie(
             murfey_id=murfey_ids[0],
             data_collection_id=detached_ids[1],
@@ -674,8 +730,6 @@ async def request_spa_preprocessing(
                     "Failed to register micrograph with smartem", exc_info=True
                 )
 
-        db.close()
-
         recipe_name = machine_config.recipes.get(
             "em-spa-preprocess", "em-spa-preprocess"
         )
@@ -684,24 +738,24 @@ async def request_spa_preprocessing(
             "parameters": {
                 "node_creator_queue": machine_config.node_creator_queue,
                 "dcid": detached_ids[1],
-                "kv": proc_params["voltage"],
+                "kv": proc_params.voltage,
                 "autoproc_program_id": detached_ids[3],
                 "movie": proc_file.path,
                 "mrc_out": str(mrc_out),
-                "pixel_size": proc_params["angpix"],
+                "pixel_size": proc_params.angpix,
                 "image_number": proc_file.image_number,
                 "microscope": instrument_name,
                 "mc_uuid": murfey_ids[0],
                 "foil_hole_id": foil_hole_id,
-                "ft_bin": proc_params["motion_corr_binning"],
-                "fm_dose": proc_params["dose_per_frame"],
-                "gain_ref": proc_params["gain_ref"],
+                "ft_bin": proc_params.motion_corr_binning,
+                "fm_dose": proc_params.dose_per_frame,
+                "gain_ref": proc_params.gain_ref,
                 "picker_uuid": murfey_ids[1],
                 "session_id": session_id,
-                "particle_diameter": proc_params["particle_diameter"] or 0,
+                "particle_diameter": proc_params.particle_diameter or 0,
                 "fm_int_file": (
-                    proc_params["eer_fractionation_file"]
-                    if proc_params["eer_fractionation_file"]
+                    proc_params.eer_fractionation_file
+                    if proc_params.eer_fractionation_file
                     else proc_file.eer_fractionation_file
                 ),
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
@@ -710,18 +764,17 @@ async def request_spa_preprocessing(
                 ),
             },
         }
-        # log.info(f"Sending Zocalo message {zocalo_message}")
-        if _transport_object:
+        if murfey.server._transport_object:
             zocalo_message["parameters"]["feedback_queue"] = (
-                _transport_object.feedback_queue
+                murfey.server._transport_object.feedback_queue
             )
-            _transport_object.send("processing_recipe", zocalo_message)
+            murfey.server._transport_object.send("processing_recipe", zocalo_message)
         else:
             logger.error(
                 f"Pre-processing was requested for {sanitise(Path(proc_file.path).name)} "
                 "but no Zocalo transport object was found"
             )
-            return proc_file
+        db.close()
 
     else:
         for_stash = PreprocessStash(
@@ -749,7 +802,9 @@ tomo_router = APIRouter(
 
 @tomo_router.post("/sessions/{session_id}/tomography_processing_parameters")
 def register_tomo_proc_params(
-    session_id: MurfeySessionID, proc_params: ProcessingParametersTomo, db=murfey_db
+    session_id: MurfeySessionID,
+    proc_params: ProcessingParametersTomo,
+    db: SQLModelSession = murfey_db,
 ):
     session_processing_parameters = db.exec(
         select(SessionProcessingParameters).where(
@@ -768,8 +823,10 @@ def register_tomo_proc_params(
         **dict(proc_params),
         "session_id": session_id,
     }
-    if _transport_object:
-        _transport_object.send(_transport_object.feedback_queue, zocalo_message)
+    if murfey.server._transport_object:
+        murfey.server._transport_object.send(
+            murfey.server._transport_object.feedback_queue, zocalo_message
+        )
 
 
 class Source(BaseModel):
@@ -780,7 +837,10 @@ class Source(BaseModel):
     "/visits/{visit_name}/sessions/{session_id}/flush_tomography_processing"
 )
 def flush_tomography_processing(
-    visit_name: str, session_id: MurfeySessionID, rsync_source: Source, db=murfey_db
+    visit_name: str,
+    session_id: MurfeySessionID,
+    rsync_source: Source,
+    db: SQLModelSession = murfey_db,
 ):
     zocalo_message = {
         "register": "flush_tomography_preprocess",
@@ -788,8 +848,10 @@ def flush_tomography_processing(
         "visit_name": visit_name,
         "data_collection_group_tag": rsync_source.rsync_source,
     }
-    if _transport_object:
-        _transport_object.send(_transport_object.feedback_queue, zocalo_message)
+    if murfey.server._transport_object:
+        murfey.server._transport_object.send(
+            murfey.server._transport_object.feedback_queue, zocalo_message
+        )
     return
 
 
@@ -801,7 +863,7 @@ class TiltSeriesInfo(BaseModel):
 
 @tomo_router.post("/visits/{visit_name}/tilt_series")
 def register_tilt_series(
-    visit_name: str, tilt_series_info: TiltSeriesInfo, db=murfey_db
+    visit_name: str, tilt_series_info: TiltSeriesInfo, db: SQLModelSession = murfey_db
 ):
     session_id = tilt_series_info.session_id
     if db.exec(
@@ -830,7 +892,7 @@ class TiltSeriesGroupInfo(BaseModel):
 def register_tilt_series_length(
     session_id: int,
     tilt_series_group: TiltSeriesGroupInfo,
-    db=murfey_db,
+    db: SQLModelSession = murfey_db,
 ):
     tilt_series_db = db.exec(
         select(TiltSeries)
@@ -868,10 +930,12 @@ async def request_tomography_preprocessing(
     visit_name: str,
     session_id: MurfeySessionID,
     proc_file: TomoProcessFile,
-    db=murfey_db,
+    db: SQLModelSession = murfey_db,
 ):
     instrument_name = (
-        db.exec(select(Session).where(Session.id == session_id)).one().instrument_name
+        db.exec(select(MurfeySession).where(MurfeySession.id == session_id))
+        .one()
+        .instrument_name
     )
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
@@ -924,6 +988,17 @@ async def request_tomography_preprocessing(
         db.commit()
         db.close()
 
+        lamella_angle = None
+        relevant_search_map = db.exec(
+            select(SearchMap)
+            .join(TiltSeries, TiltSeries.search_map_id == SearchMap.id)
+            .where(TiltSeries.tag == proc_file.tag)
+            .where(TiltSeries.session_id == session_id)
+            .where(TiltSeries.rsync_source == proc_file.rsync_source)
+        ).one_or_none()
+        if relevant_search_map:
+            lamella_angle = relevant_search_map.angle
+
         zocalo_message: dict = {
             "recipes": [recipe_name],
             "parameters": {
@@ -950,13 +1025,14 @@ async def request_tomography_preprocessing(
                     else proc_file.gain_ref
                 ),
                 "fm_int_file": proc_file.eer_fractionation_file,
+                "lamella_angle": lamella_angle,
             },
         }
-        if _transport_object:
+        if murfey.server._transport_object:
             zocalo_message["parameters"]["feedback_queue"] = (
-                _transport_object.feedback_queue
+                murfey.server._transport_object.feedback_queue
             )
-            _transport_object.send("processing_recipe", zocalo_message)
+            murfey.server._transport_object.send("processing_recipe", zocalo_message)
         else:
             logger.error(
                 f"Pre-processing was requested for {sanitise(Path(proc_file.path).name)} "
@@ -983,7 +1059,7 @@ def register_completed_tilt_series(
     visit_name: str,
     session_id: MurfeySessionID,
     tilt_series_group: TiltSeriesGroupInfo,
-    db=murfey_db,
+    db: SQLModelSession = murfey_db,
 ):
     tilt_series_db = db.exec(
         select(TiltSeries)
@@ -1005,6 +1081,13 @@ def register_completed_tilt_series(
             ts.processing_requested = True
             db.add(ts)
 
+            lamella_angle = None
+            if ts.search_map_id:
+                relevant_search_map = db.exec(
+                    select(SearchMap).where(SearchMap.id == ts.search_map_id)
+                ).one()
+                lamella_angle = relevant_search_map.angle
+
             collected_ids = db.exec(
                 select(
                     DataCollectionGroup, DataCollection, ProcessingJob, AutoProcProgram
@@ -1018,7 +1101,7 @@ def register_completed_tilt_series(
                 .where(ProcessingJob.recipe == "em-tomo-align")
             ).one()
             instrument_name = (
-                db.exec(select(Session).where(Session.id == session_id))
+                db.exec(select(MurfeySession).where(MurfeySession.id == session_id))
                 .one()
                 .instrument_name
             )
@@ -1069,11 +1152,12 @@ def register_completed_tilt_series(
                     "search_map_id": ts.search_map_id,
                     "x_location": ts.x_location,
                     "y_location": ts.y_location,
+                    "lamella_angle": lamella_angle,
                 },
             }
-            if _transport_object:
+            if murfey.server._transport_object:
                 logger.info(f"Sending Zocalo message for processing: {zocalo_message}")
-                _transport_object.send(
+                murfey.server._transport_object.send(
                     "processing_recipe", zocalo_message, new_connection=True
                 )
             else:
@@ -1085,7 +1169,7 @@ def register_completed_tilt_series(
 
 @tomo_router.post("/visits/{visit_name}/rerun_tilt_series")
 def register_tilt_series_for_rerun(
-    visit_name: str, tilt_series_info: TiltSeriesInfo, db=murfey_db
+    visit_name: str, tilt_series_info: TiltSeriesInfo, db: SQLModelSession = murfey_db
 ):
     """Set processing to false for cases where an extra tilt is found for a series"""
     session_id = tilt_series_info.session_id
@@ -1110,7 +1194,10 @@ class TiltInfo(BaseModel):
 
 @tomo_router.post("/visits/{visit_name}/sessions/{session_id}/tilt")
 async def register_tilt(
-    visit_name: str, session_id: MurfeySessionID, tilt_info: TiltInfo, db=murfey_db
+    visit_name: str,
+    session_id: MurfeySessionID,
+    tilt_info: TiltInfo,
+    db: SQLModelSession = murfey_db,
 ):
     def _add_tilt():
         tilt_series_id = (
@@ -1184,8 +1271,8 @@ def get_samples(visit_name: str, db=ispyb_db) -> List[Sample]:
 def register_sample_group(visit_name: str, db=ispyb_db) -> dict:
     proposal_id = get_proposal_id(visit_name[:2], visit_name.split("-")[0][2:], db=db)
     record = BLSampleGroup(proposalId=proposal_id)
-    if _transport_object:
-        return _transport_object.do_insert_sample_group(record)
+    if murfey.server._transport_object:
+        return murfey.server._transport_object.do_insert_sample_group(record)
     return {"success": False}
 
 
@@ -1196,8 +1283,10 @@ class BLSampleParameters(BaseModel):
 @correlative_router.post("/visit/{visit_name}/sample")
 def register_sample(visit_name: str, sample_params: BLSampleParameters) -> dict:
     record = BLSample()
-    if _transport_object:
-        return _transport_object.do_insert_sample(record, sample_params.sample_group_id)
+    if murfey.server._transport_object:
+        return murfey.server._transport_object.do_insert_sample(
+            record, sample_params.sample_group_id
+        )
     return {"success": False}
 
 
@@ -1213,8 +1302,8 @@ def register_subsample(
     record = BLSubSample(
         blSampleId=subsample_params.sample_id, imgFilePath=subsample_params.image_path
     )
-    if _transport_object:
-        return _transport_object.do_insert_subsample(record)
+    if murfey.server._transport_object:
+        return murfey.server._transport_object.do_insert_subsample(record)
     return {"success": False}
 
 
@@ -1231,6 +1320,6 @@ def register_sample_image(
         blSampleId=sample_image_params.sample_id,
         imageFullPath=sample_image_params.image_path,
     )
-    if _transport_object:
-        return _transport_object.do_insert_sample_image(record)
+    if murfey.server._transport_object:
+        return murfey.server._transport_object.do_insert_sample_image(record)
     return {"success": False}

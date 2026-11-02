@@ -4,14 +4,14 @@ import time
 import ispyb.sqlalchemy._auto_db_schema as ISPyBDB
 from sqlmodel.orm.session import Session as SQLModelSession
 
-from murfey.server import _transport_object
+import murfey.server
 
 logger = logging.getLogger("murfey.workflows.register_data_collection_group")
 
 
 def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
     # Fail immediately if no transport wrapper is found
-    if _transport_object is None:
+    if murfey.server._transport_object is None:
         logger.error("Unable to find transport manager")
         return {"success": False, "requeue": False}
 
@@ -21,7 +21,7 @@ def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
         dataCollectionGroupId=message["dcgid"],
         experimentTypeId=message["experiment_type_id"],
     )
-    dcgid = _transport_object.do_update_data_collection_group(record).get(
+    dcgid = murfey.server._transport_object.do_update_data_collection_group(record).get(
         "return_value", None
     )
 

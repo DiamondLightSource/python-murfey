@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import List, Optional
 
 import sqlalchemy
-from sqlmodel import Enum, Field, Relationship, SQLModel, create_engine
+from sqlmodel import DateTime, Enum, Field, Relationship, SQLModel, create_engine
 
 """
 =======================================================================================
@@ -24,6 +24,13 @@ class MurfeyUser(SQLModel, table=True):  # type: ignore
 class MagnificationLookup(SQLModel, table=True):  # type: ignore
     magnification: int = Field(primary_key=True)
     pixel_size: float = Field(primary_key=True)
+
+
+class MagnificationImageShift(SQLModel, table=True):  # type: ignore
+    magnification: int = Field(primary_key=True)
+    instrument_name: str = Field(primary_key=True)
+    x_shift: float  # in microns
+    y_shift: float  # in microns
 
 
 class ClientEnvironment(SQLModel, table=True):  # type: ignore
@@ -52,7 +59,15 @@ class Session(SQLModel, table=True):  # type: ignore
     current_gain_ref: str = Field(default="")
     instrument_name: str = Field(default="")
     process: bool = Field(default=True)
-    visit_end_time: Optional[datetime] = Field(default=None)
+    visit_end_time: Optional[datetime] = Field(
+        default=None, sa_type=DateTime(timezone=False)
+    )
+    last_active: Optional[datetime] = Field(
+        default=None, sa_type=DateTime(timezone=False)
+    )
+
+    # Relationships
+    # -------------
     smartem_acquisition_uuid: str | None = Field(default=None)
 
     # Image sites associated with this session
@@ -569,11 +584,6 @@ class MurfeyLedger(SQLModel, table=True):  # type: ignore
     refine_parameters: Optional["RefineParameters"] = Relationship(
         back_populates="murfey_ledger", sa_relationship_kwargs={"cascade": "delete"}
     )
-    classification_feedback_parameters: Optional["ClassificationFeedbackParameters"] = (
-        Relationship(
-            back_populates="murfey_ledger", sa_relationship_kwargs={"cascade": "delete"}
-        )
-    )
     movies: Optional["Movie"] = Relationship(
         back_populates="murfey_ledger", sa_relationship_kwargs={"cascade": "delete"}
     )
@@ -677,6 +687,7 @@ class Movie(SQLModel, table=True):  # type: ignore
     creation_time: datetime = Field(
         alias="createdTimeStamp",
         sa_column_kwargs={"name": "createdTimeStamp"},
+        sa_type=DateTime(timezone=False),
         default_factory=datetime.now,
     )
     tag: str
@@ -768,11 +779,7 @@ class ClassificationFeedbackParameters(SQLModel, table=True):  # type: ignore
     star_combination_job: int
     initial_model: str
     next_job: int
-    picker_murfey_id: Optional[int] = Field(default=None, foreign_key="murfeyledger.id")
     processing_job: Optional[ProcessingJob] = Relationship(
-        back_populates="classification_feedback_parameters"
-    )
-    murfey_ledger: Optional[MurfeyLedger] = Relationship(
         back_populates="classification_feedback_parameters"
     )
 
@@ -996,7 +1003,9 @@ class Tomogram(SQLModel, table=True):  # type: ignore
     xyShiftPlot: Optional[str] = None
     projXY: Optional[str] = None
     projXZ: Optional[str] = None
-    recordTimeStamp: Optional[datetime] = None
+    recordTimeStamp: Optional[datetime] = Field(
+        sa_type=DateTime(timezone=False), default_factory=datetime.now
+    )
     globalAlignmentQuality: Optional[float] = None
     gridSquareId: Optional[int] = Field(foreign_key="searchmap.id")
     pixelLocationX: Optional[int] = None

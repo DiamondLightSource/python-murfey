@@ -3,7 +3,7 @@ import logging
 from sqlmodel import select
 from sqlmodel.orm.session import Session as SQLModelSession
 
-from murfey.server import _transport_object
+import murfey.server
 from murfey.util import sanitise
 from murfey.util.db import DataCollectionGroup, ImagingSite, SearchMap
 from murfey.util.models import SearchMapParameters
@@ -36,12 +36,12 @@ def register_sxt_roi(
         roi.width = roi_parameters.width or roi.width
         roi.pixel_size = roi_parameters.pixel_size or roi.pixel_size
         roi.image = roi_parameters.image or roi.image
-        if _transport_object:
-            _transport_object.do_update_sxt_roi(roi.id, roi_parameters)
+        if murfey.server._transport_object:
+            murfey.server._transport_object.do_update_sxt_roi(roi.id, roi_parameters)
     else:
         logger.info(f"Registering new sxt roi {sanitise(roi_name)}")
-        if _transport_object:
-            roi_ispyb_response = _transport_object.do_insert_sxt_roi(
+        if murfey.server._transport_object:
+            roi_ispyb_response = murfey.server._transport_object.do_insert_sxt_roi(
                 dcg.atlas_id, roi_parameters
             )
         else:
@@ -80,29 +80,39 @@ def register_sxt_roi(
             atlas.image_pixels_y,
         ]
     ):
+        # Pixel size of full-size mosaic in metres
+        original_atlas_pixel_size = atlas.image_pixel_size * 1024 / atlas.image_pixels_x
+
         # Convert from stage position to pixel locations
-        roi.x_location = (roi.x_stage_position - atlas.pos_x) / atlas.image_pixel_size
-        roi.y_location = (roi.y_stage_position - atlas.pos_y) / atlas.image_pixel_size
+        # Stage position in microns, pixel size in metres
+        roi.x_location = (
+            (roi.x_stage_position - atlas.pos_x) / original_atlas_pixel_size / 1e6
+        )
+        roi.y_location = (
+            (roi.y_stage_position - atlas.pos_y) / original_atlas_pixel_size / 1e6
+        )
 
         # Scaling from different pixel size of atlas and roi, and atlas thumbnail size
         roi_parameters.x_location = roi.x_location * (512 / atlas.image_pixels_x) + 256
         roi_parameters.y_location = 256 - roi.y_location * (512 / atlas.image_pixels_y)
+        # Find size in terms of atlas pixels
+        # Factor of 512 to account for thumbnailing assumption in pato
         roi_parameters.width_on_atlas = int(
             round(
                 roi.width
-                * (roi.pixel_size / atlas.image_pixel_size)
+                * (roi.pixel_size / original_atlas_pixel_size)
                 * (512 / atlas.image_pixels_x)
             )
         )
         roi_parameters.height_on_atlas = int(
             round(
                 roi.height
-                * (roi.pixel_size / atlas.image_pixel_size)
+                * (roi.pixel_size / original_atlas_pixel_size)
                 * (512 / atlas.image_pixels_y)
             )
         )
-        if _transport_object:
-            _transport_object.do_update_sxt_roi(roi.id, roi_parameters)
+        if murfey.server._transport_object:
+            murfey.server._transport_object.do_update_sxt_roi(roi.id, roi_parameters)
         else:
             logger.warning("No transport object for register_sxt_roi")
     else:
@@ -120,7 +130,7 @@ def register_sxt_roi(
 
 def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
     return register_sxt_roi(
-        message["session_id"],
+        int(message["session_id"]),
         message["roi_name"],
         SearchMapParameters(**message["roi_info"]),
         murfey_db,

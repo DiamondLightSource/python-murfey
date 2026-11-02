@@ -192,7 +192,7 @@ def test_handle_failed_posts(tmp_path):
 @mock.patch("murfey.cli.repost_failed_calls.dlq_purge")
 @mock.patch("murfey.cli.repost_failed_calls.handle_failed_posts")
 @mock.patch("murfey.cli.repost_failed_calls.handle_dlq_messages")
-@mock.patch("murfey.cli.repost_failed_calls.url")
+@mock.patch("murfey.server.murfey_db.url")
 @mock.patch("murfey.cli.repost_failed_calls.create_engine")
 @mock.patch("murfey.cli.repost_failed_calls.Session")
 def test_run_repost_failed_calls(

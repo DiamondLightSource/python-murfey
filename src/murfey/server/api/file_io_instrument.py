@@ -1,4 +1,3 @@
-import os
 from datetime import datetime
 from logging import getLogger
 from pathlib import Path
@@ -18,7 +17,7 @@ from murfey.server.api.file_io_shared import (
     process_gain as _process_gain,
 )
 from murfey.server.murfey_db import murfey_db
-from murfey.util import sanitise, secure_path
+from murfey.util import safe_chmod, sanitise, secure_path
 from murfey.util.config import get_machine_config
 from murfey.util.db import Session, SessionProcessingParameters
 from murfey.util.eer import num_frames
@@ -91,11 +90,11 @@ def suggest_path(
             check_path = check_path.parent / f"{check_path_name}{count}"
     if params.touch:
         check_path.mkdir(exist_ok=True)
-        os.chmod(check_path, mode=machine_config.mkdir_chmod)
+        safe_chmod(check_path, mode=machine_config.mkdir_chmod)
         if params.extra_directory:
             extra_dir = check_path / secure_filename(params.extra_directory)
             extra_dir.mkdir(exist_ok=True)
-            os.chmod(extra_dir, mode=machine_config.mkdir_chmod)
+            safe_chmod(extra_dir, mode=machine_config.mkdir_chmod)
     return {"suggested_path": check_path.relative_to(rsync_basepath)}
 
 
@@ -131,11 +130,7 @@ def make_rsyncer_destination(session_id: int, destination: Dest, db=murfey_db):
     current_path = full_destination_path.parents[-(visit_index + 1)]
     for part in full_destination_path.parts[visit_index + 1 :]:
         current_path = current_path / part
-        try:
-            os.chmod(current_path, mode=machine_config.mkdir_chmod)
-        except PermissionError:
-            logger.warning(f"Unable to change permissions for {current_path}")
-            continue
+        safe_chmod(current_path, mode=machine_config.mkdir_chmod)
     return destination
 
 

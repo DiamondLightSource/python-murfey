@@ -1,4 +1,5 @@
 import logging
+from importlib.metadata import entry_points
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -228,21 +229,6 @@ class SPAMetadataContext(Context):
                                     "angle": pos_data[6],
                                 },
                             )
-                    if gs_pix_positions:
-                        capture_post(
-                            base_url=str(environment.url.geturl()),
-                            router_name="session_control.spa_router",
-                            function_name="register_atlas",
-                            token=self._token,
-                            instrument_name=environment.instrument_name,
-                            session_id=environment.murfey_session,
-                            data={
-                                "name": f"{environment.visit}-sample-{environment.samples[images_disc].sample}",
-                                "acquisition_uuid": environment.acquisition_uuid,
-                                "register_grid": True,
-                                "tag": dcg_tag,
-                            },
-                        )
 
         elif (
             transferred_file.suffix == ".dm"
@@ -346,3 +332,28 @@ class SPAMetadataContext(Context):
                         },
                     )
                     self._registered_squares.add(gs_name)
+
+        elif (
+            transferred_file.suffix == ".xml"
+            and transferred_file.name.startswith("GridSquare")
+            and environment
+        ):
+            source = _get_source(transferred_file, environment=environment)
+            if not source:
+                logger.warning(
+                    f"Source could not be identified for {str(transferred_file)}"
+                )
+                return
+
+            gridsquare_dm = source / "Metadata" / f"{transferred_file.parent.name}.dm"
+            for h in entry_points(group="murfey.hooks"):
+                try:
+                    if h.name == "get_gridsquare_dm":
+                        h.load()(
+                            destination_dir=source,
+                            gridsquare_dm=gridsquare_dm,
+                            environment=environment,
+                            token=self._token,
+                        )
+                except Exception as e:
+                    logger.warning(f"Get GridSquare dm hook failed: {e}")

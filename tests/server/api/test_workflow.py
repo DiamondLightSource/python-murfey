@@ -12,7 +12,7 @@ from murfey.util.models import SearchMapParameters
 from tests.conftest import ExampleVisit
 
 
-@mock.patch("murfey.server.api.workflow._transport_object")
+@mock.patch("murfey.server._transport_object")
 def test_register_dc_group_new_dcg(mock_transport, murfey_db_session: Session):
     """Test the request for a completely new data collection group"""
     mock_transport.feedback_queue = "mock_feedback_queue"
@@ -48,7 +48,7 @@ def test_register_dc_group_new_dcg(mock_transport, murfey_db_session: Session):
             "atlas_y_stage_position": None,
             "atlas_width": None,
             "atlas_height": None,
-            "microscope": "",
+            "microscope": ExampleVisit.instrument_name,
             "proposal_code": ExampleVisit.proposal_code,
             "proposal_number": str(ExampleVisit.proposal_number),
             "visit_number": str(ExampleVisit.visit_number),
@@ -56,7 +56,7 @@ def test_register_dc_group_new_dcg(mock_transport, murfey_db_session: Session):
     )
 
 
-@mock.patch("murfey.server.api.workflow._transport_object")
+@mock.patch("murfey.server._transport_object")
 def test_register_dc_group_atlas_to_processing(
     mock_transport, murfey_db_session: Session
 ):
@@ -126,7 +126,7 @@ def test_register_dc_group_atlas_to_processing(
     assert new_dcg.tag == "processing_tag"
 
 
-@mock.patch("murfey.server.api.workflow._transport_object")
+@mock.patch("murfey.server._transport_object")
 def test_register_dc_group_processing_to_atlas(
     mock_transport, murfey_db_session: Session
 ):
@@ -183,6 +183,7 @@ def test_register_dc_group_processing_to_atlas(
             "atlas_id": 90,
             "atlas": "/path/to/Sample10/Atlas/Atlas_2.jpg",
             "sample": 10,
+            "sample_registered": True,
             "atlas_pixel_size": 1e-4,
             "dcgid": 1,
             "session_id": ExampleVisit.murfey_session_id,
@@ -196,6 +197,7 @@ def test_register_dc_group_processing_to_atlas(
             "atlas_id": 90,
             "atlas": "/path/to/Sample10/Atlas/Atlas_2.jpg",
             "sample": 10,
+            "sample_registered": True,
             "atlas_pixel_size": 1e-4,
             "dcgid": 2,
             "session_id": ExampleVisit.murfey_session_id,
@@ -219,7 +221,7 @@ def test_register_dc_group_processing_to_atlas(
     assert second_new_dcg.tag != "/path/to/Sample10/Atlas"
 
 
-@mock.patch("murfey.server.api.workflow._transport_object")
+@mock.patch("murfey.server._transport_object")
 def test_register_dc_group_new_dcg_old_atlas(
     mock_transport, murfey_db_session: Session
 ):
@@ -273,7 +275,7 @@ def test_register_dc_group_new_dcg_old_atlas(
             "atlas_y_stage_position": None,
             "atlas_width": None,
             "atlas_height": None,
-            "microscope": "",
+            "microscope": ExampleVisit.instrument_name,
             "proposal_code": ExampleVisit.proposal_code,
             "proposal_number": str(ExampleVisit.proposal_number),
             "visit_number": str(ExampleVisit.visit_number),
@@ -281,7 +283,7 @@ def test_register_dc_group_new_dcg_old_atlas(
     )
 
 
-@mock.patch("murfey.server.api.workflow._transport_object")
+@mock.patch("murfey.server._transport_object")
 def test_register_dc_group_new_atlas(mock_transport, murfey_db_session: Session):
     """
     Test the request to update an existing data collection group
@@ -336,7 +338,7 @@ def test_register_dc_group_new_atlas(mock_transport, murfey_db_session: Session)
     assert new_dcg.atlas_id == 5
 
 
-@mock.patch("murfey.server.api.workflow._transport_object")
+@mock.patch("murfey.server._transport_object")
 @mock.patch("murfey.server.api.workflow.register_search_map_in_database")
 @mock.patch("murfey.server.api.workflow.get_machine_config")
 def test_register_dc_group_new_atlas_with_searchmaps(
@@ -351,7 +353,7 @@ def test_register_dc_group_new_atlas_with_searchmaps(
     """
     mock_transport.feedback_queue = "mock_feedback_queue"
     mock_machine_config.return_value = {
-        "": MachineConfig(acquisition_software=["tomo"])
+        ExampleVisit.instrument_name: MachineConfig(acquisition_software=["tomo"])
     }
 
     # Make sure dcg is present with an atlas id
@@ -414,6 +416,7 @@ def test_register_dc_group_new_atlas_with_searchmaps(
             "atlas_id": 90,
             "atlas": "/path/to/Sample12/Atlas/Atlas_2.jpg",
             "sample": 12,
+            "sample_registered": False,
             "atlas_pixel_size": 1e-4,
             "dcgid": 1,
             "session_id": ExampleVisit.murfey_session_id,
@@ -449,7 +452,7 @@ def test_register_dc_group_new_atlas_with_searchmaps(
     )
 
 
-@mock.patch("murfey.server.api.workflow._transport_object")
+@mock.patch("murfey.server._transport_object")
 @mock.patch("murfey.server.api.workflow.get_machine_config")
 def test_register_dc_group_new_atlas_with_sxt_roi(
     mock_machine_config,
@@ -461,7 +464,9 @@ def test_register_dc_group_new_atlas_with_sxt_roi(
     by adding an atlas, using the same tag, and also update sxt rois
     """
     mock_transport.feedback_queue = "mock_feedback_queue"
-    mock_machine_config.return_value = {"": MachineConfig(acquisition_software=["sxt"])}
+    mock_machine_config.return_value = {
+        ExampleVisit.instrument_name: MachineConfig(acquisition_software=["sxt"])
+    }
 
     # Make sure dcg is present with an atlas id
     dcg = DataCollectionGroup(
@@ -527,6 +532,7 @@ def test_register_dc_group_new_atlas_with_sxt_roi(
             "atlas_id": 90,
             "atlas": "/path/to/Sample12/Atlas/Atlas_2.jpg",
             "sample": 12,
+            "sample_registered": False,
             "atlas_pixel_size": 1e-4,
             "dcgid": 1,
             "session_id": ExampleVisit.murfey_session_id,
@@ -579,7 +585,7 @@ def test_register_dc_group_new_atlas_with_sxt_roi(
     )
 
 
-@mock.patch("murfey.server.api.workflow._transport_object")
+@mock.patch("murfey.server._transport_object")
 @mock.patch("murfey.server.api.workflow.get_machine_config")
 def test_register_dc_group_roi_update(
     mock_machine_config,
@@ -592,7 +598,7 @@ def test_register_dc_group_roi_update(
     """
     mock_transport.feedback_queue = "mock_feedback_queue"
     mock_machine_config.return_value = {
-        "": MachineConfig(acquisition_software=["tomo"])
+        ExampleVisit.instrument_name: MachineConfig(acquisition_software=["tomo"])
     }
 
     # Make sure dcg is present with an atlas id
@@ -643,6 +649,7 @@ def test_register_dc_group_roi_update(
             "atlas_id": 90,
             "atlas": "/path/to/Sample12/Atlas/Atlas_2.jpg",
             "sample": 12,
+            "sample_registered": False,
             "atlas_pixel_size": 1e-4,
             "dcgid": 1,
             "session_id": ExampleVisit.murfey_session_id,

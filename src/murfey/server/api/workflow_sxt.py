@@ -4,7 +4,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from murfey.server import _transport_object
+import murfey.server
 from murfey.server.api.auth import (
     MurfeySessionIDInstrument as MurfeySessionID,
     validate_instrument_token,
@@ -31,9 +31,9 @@ def process_sxt_tilt_series(
     tilt_series_info: SXTTiltSeriesInfo,
     db=murfey_db,
 ):
-    if _transport_object:
-        _transport_object.send(
-            _transport_object.feedback_queue,
+    if murfey.server._transport_object:
+        murfey.server._transport_object.send(
+            murfey.server._transport_object.feedback_queue,
             {
                 "register": "sxt.process_tilt_series",
                 "session_id": session_id,
@@ -50,9 +50,9 @@ class XrmFile(BaseModel):
 
 @router.post("/convert_xrm_to_tiff")
 def convert_xrm_to_tiff(xrm_file: XrmFile, db=murfey_db):
-    if _transport_object:
+    if murfey.server._transport_object:
         logger.info("Sending xrm conversion to images service")
-        _transport_object.send(
+        murfey.server._transport_object.send(
             "images",
             {
                 "image_command": "xrm_to_jpeg",
@@ -71,10 +71,10 @@ def register_sxt_roi(
     roi_info: SearchMapParameters,
     db=murfey_db,
 ):
-    if _transport_object:
+    if murfey.server._transport_object:
         logger.info(f"Registering SXT region {sanitise(roi_name)}")
-        _transport_object.send(
-            _transport_object.feedback_queue,
+        murfey.server._transport_object.send(
+            murfey.server._transport_object.feedback_queue,
             {
                 "register": "sxt.register_roi",
                 "session_id": session_id,

@@ -22,6 +22,13 @@ def visit_dir(tmp_path: Path):
 def sim_data(visit_dir: Path):
     file_list = []
     for path in [
+        # Atlas files
+        "raw/CtrlApr_G2/mosaic.mrc",
+        "raw/CtrlApr_G2/mosaic.txt",
+        "raw/CtrlApr_G2/markers.txt",
+        "raw/44drug_G2/mosaic_new.mrc",
+        "raw/44drug_G2/mosaic_new.txt",
+        "raw/44drug_G2/markers_new.txt",
         # Bright field
         "raw/CtrlApr_G2/20260703_132856_CtrlApr_G2_F3A_BF",
         # Fluorescent
@@ -130,11 +137,31 @@ def test_post_transfer(
 
     # Iterate across the FIB files to compare against
     destination_dir = tmp_path / "sim" / "data" / "current_year" / visit_name
-    destination_files = [
-        destination_dir / file.relative_to(visit_dir)
-        for file in sim_data
-        if file.stem.endswith("_FL")
-    ]
+    # Construct destination path for files that will trigger processing
+    atlas_files: dict[str, dict[str, str]] = {}
+    trigger_files: list[Path] = []
+    destination_files: list[Path] = []
+    for file in sim_data:
+        dst = destination_dir / file.relative_to(visit_dir)
+        # Sort atlas files into groups
+        if ("mosaic" in dst.stem and dst.suffix in (".mrc", ".txt")) or (
+            "markers" in dst.stem and dst.suffix == ".txt"
+        ):
+            atlas_parent = str(dst.parent)
+            if "mosaic" in dst.stem and dst.suffix == ".mrc":
+                file_type = "mosaic_mrc"
+            elif "mosaic" in dst.stem and dst.suffix == ".txt":
+                file_type = "mosaic_txt"
+            elif "markers" in dst.stem and dst.suffix == ".txt":
+                file_type = "markers_txt"
+            if not atlas_files.get(atlas_parent):
+                atlas_files[atlas_parent] = {}
+            atlas_files[atlas_parent][file_type] = str(dst)
+            trigger_files.append(file)
+            destination_files.append(dst)
+        elif not dst.suffix and dst.stem.endswith("_FL"):
+            trigger_files.append(file)
+            destination_files.append(dst)
 
     # Mock the functions used in 'post_transfer'
     mock_get_source = mocker.patch("murfey.client.contexts.sim._get_source")
@@ -162,17 +189,17 @@ def test_post_transfer(
     elif not has_src:
         mock_logger.warning.assert_called_with(f"No source found for file {file}")
     else:
-        for src, dst in zip(sim_data, [Path(""), *destination_files]):
-            if not src.stem.endswith("_FL"):
-                continue
-            else:
-                mock_get_source.assert_any_call(src, mock_environment)
-                mock_file_transferred_to.assert_any_call(
-                    environment=mock_environment,
-                    source=basepath,
-                    file_path=src,
-                    rsync_basepath=Path(""),
-                )
+        for src, dst in zip(trigger_files, destination_files):
+            # '_get_source' and '_file_transferred_to' should be called for all valid files
+            mock_get_source.assert_any_call(src, mock_environment)
+            mock_file_transferred_to.assert_any_call(
+                environment=mock_environment,
+                source=basepath,
+                file_path=src,
+                rsync_basepath=Path(""),
+            )
+            # Each data file ending in '_FL' should trigger processing
+            if src.stem.endswith("_FL"):
                 mock_capture_post.assert_any_call(
                     base_url=mock.ANY,
                     router_name="workflow_sim.router",
@@ -185,4 +212,17 @@ def test_post_transfer(
                     # Endpoint kwargs
                     session_id=session_id,
                 )
-        assert mock_capture_post.call_count == 4
+        for atlas_parent in atlas_files:
+            # Each compiled atlas dataset should trigger processing
+            mock_capture_post.assert_any_call(
+                base_url=mock.ANY,
+                router_name="workflow_sim.router",
+                function_name="request_sim_atlas_stitching",
+                token=context._token,
+                instrument_name=instrument_name,
+                data=atlas_files[atlas_parent],
+                # Endpoint kwargs
+                session_id=session_id,
+            )
+        # The SIM context's atlas dictionary should match this constructed one
+        assert context._atlas_files == atlas_files

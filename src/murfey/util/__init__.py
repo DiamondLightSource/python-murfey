@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Any, Callable
 
@@ -56,6 +57,22 @@ def posix_path(path: Path) -> str:
         posix_path = "/".join(path_parts)
         return posix_path
     return str(path)
+
+
+def safe_chmod(path: Path, mode: int):
+    """
+    Helper function to safely run chmod without raising an error. If Murfey doesn't
+    have the relevant permissions to perform chmod, it logs a warning and continues.
+    Otherwise, it will raise an error as normal.
+    """
+
+    try:
+        os.chmod(path, mode)
+    except PermissionError:
+        logger.warning(
+            f"Unable to change permissions of {path}, will attempt to proceed",
+            exc_info=True,
+        )
 
 
 def safe_run(

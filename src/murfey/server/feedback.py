@@ -12,16 +12,16 @@ import math
 import subprocess
 import time
 from datetime import datetime
-from functools import partial
 from importlib.metadata import (
     EntryPoint,  # For type hinting only
     entry_points,
 )
 from pathlib import Path
-from typing import Dict, List, NamedTuple, Tuple
+from typing import NamedTuple
 
 import mrcfile
 import numpy as np
+from pipeliner.project_graph import ProjectGraph
 from sqlalchemy import func
 from sqlalchemy.exc import (
     InvalidRequestError,
@@ -32,6 +32,7 @@ from sqlalchemy.exc import (
 )
 from sqlalchemy.orm.exc import ObjectDeletedError
 from sqlmodel import Session, create_engine, select
+from workflows import Disconnected
 
 import murfey.server
 import murfey.server.prometheus as prom
@@ -49,13 +50,174 @@ from murfey.util.tomo import midpoint
 
 logger = logging.getLogger("murfey.server.feedback")
 
+murfey_entry_points = entry_points(group="murfey.workflows")
 
+# Configure the engine used to access the Murfey database
 try:
     _url = url(get_security_config())
     engine = create_engine(_url)
-    murfey_db = Session(engine, expire_on_commit=False)
 except Exception:
-    murfey_db = None
+    engine = None
+
+
+def _first_feedback_job() -> int:
+    """The first job number available to dynamic SPA feedback jobs.
+
+    Jobs 1-6 are the fixed preprocessing jobs (Import, MotionCorr, CtfFind,
+    AutoPick, Extract, Select), plus 3 more when IceBreaker is enabled: the
+    motioncorr service sends micrograph analysis to MotionCorr+1 and contrast
+    enhancement to MotionCorr+2, icebreaker forwards summary to MotionCorr+3,
+    and CtfFind shifts to MotionCorr+4 (``ctf_job_number`` in
+    ``cryoemservices/services/motioncorr.py``). Class2D
+    and everything downstream start here. Used as a floor when allocating so a
+    feedback job is never handed a preprocessing job's number even if it is
+    scheduled before Extract/Select have been registered by the node creator
+    (which only happens once compute has finished).
+
+    This MUST stay a function. ``do_icebreaker_jobs`` is synced from the
+    Class2D recipe after import (Doppio's ``sync_icebreaker_to_murfey``), so a
+    module level constant would freeze the floor at the wrong value while the
+    per-call block sizes below see the right one.
+    """
+    return 10 if default_spa_parameters.do_icebreaker_jobs else 7
+
+
+def _jobs_per_class2d() -> int:
+    """Job numbers occupied by a Class2D job together with its IceBreaker job.
+
+    ``class2d_wrapper`` places the IceBreaker job at ``class2d + 1``,
+    so the two are always reserved as one unit.
+    """
+    return 2 if default_spa_parameters.do_icebreaker_jobs else 1
+
+
+def _allocation_floor(feedback_params: db.ClassificationFeedbackParameters) -> int:
+    """The lowest number the next reservation for this session may start at."""
+    return max(feedback_params.next_job or 0, _first_feedback_job())
+
+
+def _refinement_block_size(symmetry: str) -> int:
+    """Job numbers occupied by one refinement, counting from the re-extraction.
+
+    C1 runs the whole chain a second time for the symmetry determined from the
+    first refinement, so it needs three more numbers than any other symmetry.
+    See the block layout comment at the reservation call site.
+    """
+    return 8 if symmetry == "C1" else 5
+
+
+# Reservation contends with the node creator for the project lock, so a single
+# failure is not necessarily fatal but repeated failure is.
+RESERVE_ATTEMPTS = 3
+RESERVE_RETRY_SECONDS = 2.0
+
+
+def _reserve_pipeline_job_numbers(
+    visit_name: str, n_jobs: int, next_known_job: int
+) -> int:
+    """Atomically reserve a contiguous block of ``n_jobs`` job numbers.
+
+    Opens default_pipeline.star read/write under the project's ``.relion_lock``
+    and advances ``_rlnPipeLineJobCounter`` by ``n_jobs``. Because the counter is
+    consumed *now* — rather than when the job later completes and is registered
+    by the node creator — two feedback jobs (or a feedback job and a manually
+    launched job) can no longer be handed the same number during the window
+    between scheduling a job and its registration.
+
+    The reserved block must cover every job the scheduling step will create
+    (e.g. InitialModel + Class3D), so the next allocation starts strictly after
+    them. The node creator's ``adjust_job_counter`` keeps the on-disk counter to
+    ``max(disk, job_number + 1)``, so a correctly sized block leaves the counter
+    exactly where this function set it (no gaps, no double counting).
+
+    Returns the first job number of the reserved block: the caller owns
+    ``base`` through ``base + n_jobs - 1`` and should set ``next_job`` to
+    ``base + n_jobs``.
+
+    Raises after ``RESERVE_ATTEMPTS`` failures rather than returning a number
+    nothing has reserved.
+
+    The one case where nothing is reserved is a project with no
+    default_pipeline.star, then there is no counter to advance, so two calls made
+    with the same ``next_known_job`` return the same number. Blocks stay
+    disjointed there only because every caller advances ``feedback_params.next_job``
+    past its block and ``_allocation_floor`` feeds that back in as ``next_known_job``.
+    Do not drop those ``next_job`` updates on the assumption that the counter alone
+    keeps callers apart.
+    """
+    if n_jobs < 1:
+        raise ValueError("Must reserve at least one job number")
+    project_dir = Path(visit_name)
+    pipeline_file = project_dir / "default_pipeline.star"
+    if not pipeline_file.is_file():
+        # Non Doppio runs, or before the first job has been registered: there is
+        # no counter to reserve against, so start at the floor.
+        return next_known_job
+    last_error: Exception | None = None
+    for attempt in range(1, RESERVE_ATTEMPTS + 1):
+        try:
+            with ProjectGraph(
+                read_only=False, pipeline_dir=str(project_dir), name="default"
+            ) as project:
+                base = max(project.job_counter, next_known_job)
+                project.job_counter = base + n_jobs
+            return base
+        except Exception as exc:
+            last_error = exc
+            logger.error(
+                "Attempt %d/%d to reserve %d job number(s) in %s failed",
+                attempt,
+                RESERVE_ATTEMPTS,
+                n_jobs,
+                pipeline_file,
+                exc_info=True,
+            )
+            if attempt < RESERVE_ATTEMPTS:
+                time.sleep(RESERVE_RETRY_SECONDS)
+    raise RuntimeError(
+        f"Could not reserve {n_jobs} job number(s) in {pipeline_file} after "
+        f"{RESERVE_ATTEMPTS} attempts"
+    ) from last_error
+
+
+class _Class2DJobNumbers(NamedTuple):
+    """Job numbers reserved for one 2D batch."""
+
+    class2d: int
+    autoselect: int
+
+
+def _reserve_2d_classification_jobs(
+    visit_name: str, feedback_params: db.ClassificationFeedbackParameters
+) -> _Class2DJobNumbers:
+    """Reserve the Pipeliner jobs for one 2D batch, complete or incomplete.
+
+    Every batch reserves the same contiguous block — Class2D (+/- IceBreaker) then
+    the autoselect Select job — plus the one shared combine Select job that
+    all batches feed into, on the first reservation only.
+
+    Reserving the autoselect slot even for an incomplete batch (which will not
+    run it until it later completes) is deliberate, select_classes derives
+    the autoselect number positionally as class2d + _jobs_per_class2d().
+    Keeping the block contiguous for every batch is what makes that derivation correct,
+    and is why no explicit autoselect job number needs plumbing through the recipe.
+    """
+    per_class2d = _jobs_per_class2d()
+    needs_combine = not feedback_params.star_combination_job
+    block = per_class2d + 1 + (1 if needs_combine else 0)
+    base = _reserve_pipeline_job_numbers(
+        visit_name, block, _allocation_floor(feedback_params)
+    )
+    if needs_combine:
+        feedback_params.star_combination_job = base + per_class2d + 1
+    feedback_params.next_job = base + block
+    return _Class2DJobNumbers(class2d=base, autoselect=base + per_class2d)
+
+
+def _visit_name_for_session(session_id: int, _db) -> str:
+    """Return the visit (project directory) for a Murfey session id."""
+    session_row = _db.exec(select(db.Session).where(db.Session.id == session_id)).one()
+    return session_row.visit
 
 
 class JobIDs(NamedTuple):
@@ -85,7 +247,7 @@ def check_tilt_series_mc(tilt_series_id: int, _db) -> bool:
     )
 
 
-def get_all_tilts(tilt_series_id: int, _db) -> List[str]:
+def get_all_tilts(tilt_series_id: int, _db) -> list[str]:
     complete_results = _db.exec(
         select(db.Tilt, db.TiltSeries, db.Session)
         .where(db.Tilt.tilt_series_id == db.TiltSeries.id)
@@ -141,7 +303,7 @@ def get_tomo_proc_params(dcg_id: int, _db) -> db.TomographyProcessingParameters:
     return results
 
 
-def _murfey_id(app_id: int, _db, number: int = 1, close: bool = True) -> List[int]:
+def _murfey_id(app_id: int, _db, number: int = 1, close: bool = True) -> list[int]:
     murfey_ledger = [db.MurfeyLedger(app_id=app_id) for _ in range(number)]
     for ml in murfey_ledger:
         _db.add(ml)
@@ -169,7 +331,7 @@ def _murfey_id(app_id: int, _db, number: int = 1, close: bool = True) -> List[in
 
 
 def _murfey_class2ds(
-    murfey_ids: List[int], particles_file: str, app_id: int, _db, close: bool = False
+    murfey_ids: list[int], particles_file: str, app_id: int, _db, close: bool = False
 ):
     pj_id = _pj_id(app_id, _db, recipe="em-spa-class2d")
     class2ds = [
@@ -188,7 +350,7 @@ def _murfey_class2ds(
         _db.close()
 
 
-def _murfey_class3ds(murfey_ids: List[int], particles_file: str, app_id: int, _db):
+def _murfey_class3ds(murfey_ids: list[int], particles_file: str, app_id: int, _db):
     pj_id = _pj_id(app_id, _db, recipe="em-spa-class3d")
     class3ds = [
         db.Class3D(
@@ -218,7 +380,7 @@ def _murfey_refine(murfey_id: int, refine_dir: str, tag: str, app_id: int, _db):
     _db.close()
 
 
-def _2d_class_murfey_ids(particles_file: str, app_id: int, _db) -> Dict[str, int]:
+def _2d_class_murfey_ids(particles_file: str, app_id: int, _db) -> dict[str, int]:
     pj_id = (
         _db.exec(select(db.AutoProcProgram).where(db.AutoProcProgram.id == app_id))
         .one()
@@ -234,7 +396,7 @@ def _2d_class_murfey_ids(particles_file: str, app_id: int, _db) -> Dict[str, int
     return {str(cl.class_number): cl.murfey_id for cl in classes}
 
 
-def _3d_class_murfey_ids(particles_file: str, app_id: int, _db) -> Dict[str, int]:
+def _3d_class_murfey_ids(particles_file: str, app_id: int, _db) -> dict[str, int]:
     pj_id = (
         _db.exec(select(db.AutoProcProgram).where(db.AutoProcProgram.id == app_id))
         .one()
@@ -251,7 +413,7 @@ def _3d_class_murfey_ids(particles_file: str, app_id: int, _db) -> Dict[str, int
     return {str(cl.class_number): cl.murfey_id for cl in classes}
 
 
-def _refine_murfey_id(refine_dir: str, tag: str, app_id: int, _db) -> Dict[str, int]:
+def _refine_murfey_id(refine_dir: str, tag: str, app_id: int, _db) -> dict[str, int]:
     pj_id = (
         _db.exec(select(db.AutoProcProgram).where(db.AutoProcProgram.id == app_id))
         .one()
@@ -305,7 +467,7 @@ def _pj_id(app_id: int, _db, recipe: str = "") -> int:
 
 def _get_spa_params(
     app_id: int, _db
-) -> Tuple[db.SPARelionParameters, db.ClassificationFeedbackParameters]:
+) -> tuple[db.SPARelionParameters, db.ClassificationFeedbackParameters]:
     pj_id = _pj_id(app_id, _db, recipe="em-spa-preprocess")
     relion_params = _db.exec(
         select(db.SPARelionParameters).where(db.SPARelionParameters.pj_id == pj_id)
@@ -321,24 +483,28 @@ def _get_spa_params(
 
 
 def _release_2d_hold(message: dict, _db):
-    relion_params, feedback_params = _get_spa_params(message["program_id"], _db)
-    if not feedback_params.star_combination_job:
-        feedback_params.star_combination_job = feedback_params.next_job + (
-            3 if default_spa_parameters.do_icebreaker_jobs else 2
-        )
-    pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-class2d")
+    # Extract relevant IDs from message and ensure they are ints
+    session_id = int(message["session_id"])
+    program_id = int(message["program_id"])
+    relion_params, feedback_params = _get_spa_params(program_id, _db)
+    pj_id = _pj_id(program_id, _db, recipe="em-spa-class2d")
     if feedback_params.rerun_class2d:
         first_class2d = _db.exec(
             select(db.Class2DParameters).where(db.Class2DParameters.pj_id == pj_id)
         ).first()
         instrument_name = (
-            _db.exec(select(db.Session).where(db.Session.id == message["session_id"]))
+            _db.exec(select(db.Session).where(db.Session.id == session_id))
             .one()
             .instrument_name
         )
         machine_config = get_machine_config(instrument_name=instrument_name)[
             instrument_name
         ]
+        # Nothing to reserve here. This batch already dispatched once and
+        # re-uses its existing Class2D directory (message["job_dir"]) that
+        # dispatch reserved the whole block — Class2D, the autoselect Select job
+        # at class2d + _jobs_per_class2d(), and the shared combine Select job —
+        # so the numbers this rerun needs are already owned by the session.
         zocalo_message: dict = {
             "parameters": {
                 "particles_file": first_class2d.particles_file,
@@ -349,14 +515,14 @@ def _release_2d_hold(message: dict, _db):
                 "mask_diameter": relion_params.mask_diameter or 0,
                 "combine_star_job_number": feedback_params.star_combination_job,
                 "autoselect_min_score": feedback_params.class_selection_score or 0,
-                "autoproc_program_id": message["program_id"],
+                "autoproc_program_id": program_id,
                 "nr_iter": default_spa_parameters.nr_iter_2d,
                 "nr_classes": default_spa_parameters.nr_classes_2d,
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
                 "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
                 "seed": int(np.random.randint(1, 100)),
                 "class_uuids": _2d_class_murfey_ids(
-                    first_class2d.particles_file, message["program_id"], _db
+                    first_class2d.particles_file, program_id, _db
                 ),
                 "class2d_grp_uuid": _db.exec(
                     select(db.Class2DParameters)
@@ -368,15 +534,11 @@ def _release_2d_hold(message: dict, _db):
                 )
                 .one()
                 .murfey_id,
-                "session_id": message["session_id"],
+                "session_id": session_id,
                 "node_creator_queue": machine_config.node_creator_queue,
             },
             "recipes": [machine_config.recipes.get("em-spa-class2d", "em-spa-class2d")],
         }
-        if first_class2d.complete:
-            feedback_params.next_job += (
-                4 if default_spa_parameters.do_icebreaker_jobs else 3
-            )
         feedback_params.rerun_class2d = False
         _db.add(feedback_params)
         if first_class2d.complete:
@@ -398,8 +560,11 @@ def _release_2d_hold(message: dict, _db):
 
 
 def _release_3d_hold(message: dict, _db):
-    pj_id_params = _pj_id(message["program_id"], _db, recipe="em-spa-preprocess")
-    pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-class3d")
+    # Extract IDs and ensure they are ints
+    session_id = int(message["session_id"])
+    program_id = int(message["program_id"])
+    pj_id_params = _pj_id(program_id, _db, recipe="em-spa-preprocess")
+    pj_id = _pj_id(program_id, _db, recipe="em-spa-class3d")
     relion_params = _db.exec(
         select(db.SPARelionParameters).where(
             db.SPARelionParameters.pj_id == pj_id_params
@@ -415,7 +580,7 @@ def _release_3d_hold(message: dict, _db):
     ).one()
     if class3d_params.run:
         instrument_name = (
-            _db.exec(select(db.Session).where(db.Session.id == message["session_id"]))
+            _db.exec(select(db.Session).where(db.Session.id == session_id))
             .one()
             .instrument_name
         )
@@ -451,9 +616,9 @@ def _release_3d_hold(message: dict, _db):
                 "nr_classes": default_spa_parameters.nr_classes_3d,
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
                 "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
-                "session_id": message["session_id"],
+                "session_id": session_id,
                 "autoproc_program_id": _app_id(
-                    _pj_id(message["program_id"], _db, recipe="em-spa-class3d"), _db
+                    _pj_id(program_id, _db, recipe="em-spa-class3d"), _db
                 ),
                 "node_creator_queue": machine_config.node_creator_queue,
             },
@@ -476,8 +641,11 @@ def _release_3d_hold(message: dict, _db):
 
 
 def _release_refine_hold(message: dict, _db):
-    pj_id_params = _pj_id(message["program_id"], _db, recipe="em-spa-preprocess")
-    pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-refine")
+    # Extract IDs and ensure they are ints
+    session_id = int(message["session_id"])
+    program_id = int(message["program_id"])
+    pj_id_params = _pj_id(program_id, _db, recipe="em-spa-preprocess")
+    pj_id = _pj_id(program_id, _db, recipe="em-spa-refine")
     relion_params = _db.exec(
         select(db.SPARelionParameters).where(
             db.SPARelionParameters.pj_id == pj_id_params
@@ -500,7 +668,7 @@ def _release_refine_hold(message: dict, _db):
     ).one()
     if refine_params.run:
         instrument_name = (
-            _db.exec(select(db.Session).where(db.Session.id == message["session_id"]))
+            _db.exec(select(db.Session).where(db.Session.id == session_id))
             .one()
             .instrument_name
         )
@@ -533,9 +701,9 @@ def _release_refine_hold(message: dict, _db):
                     _db=_db,
                 ),
                 "symmetry_refined_grp_uuid": symmetry_refine_params.murfey_id,
-                "session_id": message["session_id"],
+                "session_id": session_id,
                 "autoproc_program_id": _app_id(
-                    _pj_id(message["program_id"], _db, recipe="em-spa-refine"), _db
+                    _pj_id(program_id, _db, recipe="em-spa-refine"), _db
                 ),
             },
             "recipes": [machine_config.recipes.get("em-spa-refine", "em-spa-refine")],
@@ -559,17 +727,19 @@ def _release_refine_hold(message: dict, _db):
 def _register_incomplete_2d_batch(message: dict, _db):
     """Received first batch from particle selection service"""
     # the general parameters are stored using the preprocessing auto proc program ID
+    session_id = int(message["session_id"])
     logger.info("Registering incomplete particle batch for 2D classification")
     instrument_name = (
-        _db.exec(select(db.Session).where(db.Session.id == message["session_id"]))
+        _db.exec(select(db.Session).where(db.Session.id == session_id))
         .one()
         .instrument_name
     )
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
-    pj_id_params = _pj_id(message["program_id"], _db, recipe="em-spa-preprocess")
-    pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-class2d")
+    program_id = int(message["program_id"])
+    pj_id_params = _pj_id(program_id, _db, recipe="em-spa-preprocess")
+    pj_id = _pj_id(program_id, _db, recipe="em-spa-class2d")
     relion_params = _db.exec(
         select(db.SPARelionParameters).where(
             db.SPARelionParameters.pj_id == pj_id_params
@@ -586,10 +756,15 @@ def _register_incomplete_2d_batch(message: dict, _db):
         _db.commit()
         _db.close()
         return
-    feedback_params.next_job = 10 if default_spa_parameters.do_icebreaker_jobs else 7
+    # Reserve the full block even though an incomplete batch only runs Class2D
+    # right now. When it later completes it runs the autoselect Select job at
+    # class2d + _jobs_per_class2d(), so that slot has to be held back from the
+    # next batch, reserving it here is what keeps the block contiguous and the
+    # positional derivation in select_classes correct.
+    visit_name = _visit_name_for_session(session_id, _db)
+    class2d_job = _reserve_2d_classification_jobs(visit_name, feedback_params).class2d
     feedback_params.hold_class2d = True
     relion_options = dict(relion_params)
-    other_options = dict(feedback_params)
     _db.add(feedback_params)
     _db.commit()
     _db.expunge(feedback_params)
@@ -602,7 +777,7 @@ def _register_incomplete_2d_batch(message: dict, _db):
     ).one():
         class2d_params = db.Class2DParameters(
             pj_id=pj_id,
-            murfey_id=_murfey_id(message["program_id"], _db)[0],
+            murfey_id=_murfey_id(program_id, _db)[0],
             particles_file=class2d_message["particles_file"],
             class2d_dir=class2d_message["class2d_dir"],
             batch_size=class2d_message["batch_size"],
@@ -611,15 +786,13 @@ def _register_incomplete_2d_batch(message: dict, _db):
         _db.add(class2d_params)
         _db.commit()
         murfey_ids = _murfey_id(
-            message["program_id"], _db, number=default_spa_parameters.nr_classes_2d
+            program_id, _db, number=default_spa_parameters.nr_classes_2d
         )
-        _murfey_class2ds(
-            murfey_ids, class2d_message["particles_file"], message["program_id"], _db
-        )
+        _murfey_class2ds(murfey_ids, class2d_message["particles_file"], program_id, _db)
     zocalo_message: dict = {
         "parameters": {
             "particles_file": class2d_message["particles_file"],
-            "class2d_dir": f"{class2d_message['class2d_dir']}{other_options['next_job']:03}",
+            "class2d_dir": f"{class2d_message['class2d_dir']}{class2d_job:03}",
             "batch_is_complete": False,
             "particle_diameter": relion_options["particle_diameter"],
             "combine_star_job_number": -1,
@@ -642,9 +815,9 @@ def _register_incomplete_2d_batch(message: dict, _db):
             )
             .one()
             .murfey_id,
-            "session_id": message["session_id"],
+            "session_id": session_id,
             "autoproc_program_id": _app_id(
-                _pj_id(message["program_id"], _db, recipe="em-spa-class2d"), _db
+                _pj_id(program_id, _db, recipe="em-spa-class2d"), _db
             ),
             "node_creator_queue": machine_config.node_creator_queue,
         },
@@ -663,8 +836,9 @@ def _register_incomplete_2d_batch(message: dict, _db):
 
 def _register_complete_2d_batch(message: dict, _db):
     """Received full batch from particle selection service"""
+    session_id = int(message["session_id"])
     instrument_name = (
-        _db.exec(select(db.Session).where(db.Session.id == message["session_id"]))
+        _db.exec(select(db.Session).where(db.Session.id == session_id))
         .one()
         .instrument_name
     )
@@ -673,8 +847,10 @@ def _register_complete_2d_batch(message: dict, _db):
     ]
     class2d_message = message.get("class2d_message")
     assert isinstance(class2d_message, dict)
-    pj_id_params = _pj_id(message["program_id"], _db, recipe="em-spa-preprocess")
-    pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-class2d")
+
+    program_id = int(message["program_id"])
+    pj_id_params = _pj_id(program_id, _db, recipe="em-spa-preprocess")
+    pj_id = _pj_id(program_id, _db, recipe="em-spa-class2d")
     relion_params = _db.exec(
         select(db.SPARelionParameters).where(
             db.SPARelionParameters.pj_id == pj_id_params
@@ -714,7 +890,7 @@ def _register_complete_2d_batch(message: dict, _db):
         else:
             class2d_params = db.Class2DParameters(
                 pj_id=pj_id,
-                murfey_id=_murfey_id(message["program_id"], _db)[0],
+                murfey_id=_murfey_id(program_id, _db)[0],
                 particles_file=class2d_message["particles_file"],
                 class2d_dir=class2d_message["class2d_dir"],
                 batch_size=class2d_message["batch_size"],
@@ -729,19 +905,9 @@ def _register_complete_2d_batch(message: dict, _db):
                 murfey_ids, class2d_message["particles_file"], _app_id(pj_id, _db), _db
             )
     elif not feedback_params.class_selection_score:
-        # For the first batch, start a container and set the database to wait
-        job_number_after_first_batch = (
-            10 if default_spa_parameters.do_icebreaker_jobs else 7
-        )
-        if (
-            feedback_params.next_job is not None
-            and feedback_params.next_job < job_number_after_first_batch
-        ):
-            feedback_params.next_job = job_number_after_first_batch
-        if not feedback_params.star_combination_job:
-            feedback_params.star_combination_job = feedback_params.next_job + (
-                3 if default_spa_parameters.do_icebreaker_jobs else 2
-            )
+        # Reserve Class2D + autoselect (+ combine on the first batch) up front so
+        # the numbers cannot be reused before the jobs are registered.
+        visit_name = _visit_name_for_session(session_id, _db)
         if _db.exec(
             select(func.count(db.Class2DParameters.particles_file))
             .where(db.Class2DParameters.pj_id == pj_id)
@@ -749,6 +915,18 @@ def _register_complete_2d_batch(message: dict, _db):
                 db.Class2DParameters.particles_file == class2d_message["particles_file"]
             )
         ).one():
+            # This particles file already ran as an incomplete batch and now
+            # reruns complete. Reserve a fresh block rather than trying to
+            # reuse the earlier Class2D number (that number is not recoverable
+            # here). Class2DParameters.class2d_dir stores only the directory
+            # prefix (the number is appended when the message is built) and,
+            # unlike _release_2d_hold, this handler's message carries no
+            # "job_dir". A fresh block costs one unused directory and is
+            # collision-free vs deriving the old number from the live counter
+            # guessed wrong as soon as anything else had allocated since.
+            class2d_job = _reserve_2d_classification_jobs(
+                visit_name, feedback_params
+            ).class2d
             class_uuids = _2d_class_murfey_ids(
                 class2d_message["particles_file"], _app_id(pj_id, _db), _db
             )
@@ -765,6 +943,10 @@ def _register_complete_2d_batch(message: dict, _db):
                 .murfey_id
             )
         else:
+            # No previous 2D batch has run for this particles file, so register freshly
+            class2d_job = _reserve_2d_classification_jobs(
+                visit_name, feedback_params
+            ).class2d
             class_uuids = {
                 str(i + 1): m
                 for i, m in enumerate(
@@ -779,7 +961,7 @@ def _register_complete_2d_batch(message: dict, _db):
         zocalo_message: dict = {
             "parameters": {
                 "particles_file": class2d_message["particles_file"],
-                "class2d_dir": f"{class2d_message['class2d_dir']}{feedback_params.next_job:03}",
+                "class2d_dir": f"{class2d_message['class2d_dir']}{class2d_job:03}",
                 "batch_is_complete": True,
                 "particle_diameter": relion_params.particle_diameter,
                 "mask_diameter": relion_params.mask_diameter or 0,
@@ -793,9 +975,9 @@ def _register_complete_2d_batch(message: dict, _db):
                 "nr_classes": default_spa_parameters.nr_classes_2d,
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
                 "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
-                "session_id": message["session_id"],
+                "session_id": session_id,
                 "autoproc_program_id": _app_id(
-                    _pj_id(message["program_id"], _db, recipe="em-spa-class2d"), _db
+                    _pj_id(program_id, _db, recipe="em-spa-class2d"), _db
                 ),
                 "node_creator_queue": machine_config.node_creator_queue,
             },
@@ -809,14 +991,16 @@ def _register_complete_2d_batch(message: dict, _db):
                 "processing_recipe", zocalo_message, new_connection=True
             )
         feedback_params.hold_class2d = True
-        feedback_params.next_job += (
-            4 if default_spa_parameters.do_icebreaker_jobs else 3
-        )
         _db.add(feedback_params)
         _db.commit()
         _db.close()
     else:
-        # Send all other messages on to a container
+        # star_combination_job is already set by now, so this reserves just the
+        # Class2D + autoselect jobs for this batch.
+        visit_name = _visit_name_for_session(session_id, _db)
+        class2d_job = _reserve_2d_classification_jobs(
+            visit_name, feedback_params
+        ).class2d
         if _db.exec(
             select(func.count(db.Class2DParameters.particles_file))
             .where(db.Class2DParameters.pj_id == pj_id)
@@ -854,7 +1038,7 @@ def _register_complete_2d_batch(message: dict, _db):
         zocalo_message = {
             "parameters": {
                 "particles_file": class2d_message["particles_file"],
-                "class2d_dir": f"{class2d_message['class2d_dir']}{feedback_params.next_job:03}",
+                "class2d_dir": f"{class2d_message['class2d_dir']}{class2d_job:03}",
                 "batch_is_complete": True,
                 "particle_diameter": relion_params.particle_diameter,
                 "mask_diameter": relion_params.mask_diameter or 0,
@@ -868,9 +1052,9 @@ def _register_complete_2d_batch(message: dict, _db):
                 "nr_classes": default_spa_parameters.nr_classes_2d,
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
                 "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
-                "session_id": message["session_id"],
+                "session_id": session_id,
                 "autoproc_program_id": _app_id(
-                    _pj_id(message["program_id"], _db, recipe="em-spa-class2d"), _db
+                    _pj_id(program_id, _db, recipe="em-spa-class2d"), _db
                 ),
                 "node_creator_queue": machine_config.node_creator_queue,
             },
@@ -883,9 +1067,7 @@ def _register_complete_2d_batch(message: dict, _db):
             murfey.server._transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
-        feedback_params.next_job += (
-            3 if default_spa_parameters.do_icebreaker_jobs else 2
-        )
+        feedback_params.hold_class2d = False
         _db.add(feedback_params)
         _db.commit()
         _db.close()
@@ -930,21 +1112,20 @@ def _flush_class2d(
         .where(db.Class2DParameters.pj_id == pj_id)
         .where(db.Class2DParameters.complete)
     ).all()
-    if not feedback_params.next_job:
-        feedback_params.next_job = (
-            10 if default_spa_parameters.do_icebreaker_jobs else 7
-        )
-    if not feedback_params.star_combination_job:
-        feedback_params.star_combination_job = feedback_params.next_job + (
-            3 if default_spa_parameters.do_icebreaker_jobs else 2
-        )
+    # Reserve each batch's Class2D + autoselect jobs (and the shared combine
+    # job the first time) as it is dispatched, so queued batches never share a
+    # number and the counter is advanced under the project lock.
+    visit_name = _visit_name_for_session(session_id, _db)
     for saved_message in class2d_db:
         # Send all held Class2D messages on with the selection score added
         _db.expunge(saved_message)
+        class2d_job = _reserve_2d_classification_jobs(
+            visit_name, feedback_params
+        ).class2d
         zocalo_message: dict = {
             "parameters": {
                 "particles_file": saved_message.particles_file,
-                "class2d_dir": f"{saved_message.class2d_dir}{feedback_params.next_job:03}",
+                "class2d_dir": f"{saved_message.class2d_dir}{class2d_job:03}",
                 "batch_is_complete": True,
                 "batch_size": saved_message.batch_size,
                 "particle_diameter": relion_params.particle_diameter,
@@ -973,9 +1154,6 @@ def _flush_class2d(
             murfey.server._transport_object.send(
                 "processing_recipe", zocalo_message, new_connection=True
             )
-        feedback_params.next_job += (
-            3 if default_spa_parameters.do_icebreaker_jobs else 2
-        )
         _db.delete(saved_message)
     _db.add(feedback_params)
     _db.commit()
@@ -983,8 +1161,10 @@ def _flush_class2d(
 
 def _register_class_selection(message: dict, _db):
     """Received selection score from class selection service"""
-    pj_id_params = _pj_id(message["program_id"], _db, recipe="em-spa-preprocess")
-    pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-class2d")
+    session_id = int(message["session_id"])
+    program_id = int(message["program_id"])
+    pj_id_params = _pj_id(program_id, _db, recipe="em-spa-preprocess")
+    pj_id = _pj_id(program_id, _db, recipe="em-spa-class2d")
     relion_params = _db.exec(
         select(db.SPARelionParameters).where(
             db.SPARelionParameters.pj_id == pj_id_params
@@ -1004,8 +1184,8 @@ def _register_class_selection(message: dict, _db):
     feedback_params.class_selection_score = message.get("class_selection_score") or 0
     feedback_params.hold_class2d = False
     _flush_class2d(
-        message["session_id"],
-        message["program_id"],
+        session_id,
+        program_id,
         _db,
         relion_params=relion_params,
         feedback_params=feedback_params,
@@ -1038,7 +1218,7 @@ def _find_initial_model(visit: str, machine_config: MachineConfig) -> Path | Non
 
 def _downscaled_box_size(
     particle_diameter_ang: float, pixel_size: float
-) -> Tuple[int, float]:
+) -> tuple[int, float]:
     particle_diameter = particle_diameter_ang / pixel_size
     box_size = int(math.ceil(1.2 * particle_diameter))
     box_size = box_size + box_size % 2
@@ -1079,8 +1259,9 @@ def _resize_initial_model(
     downscaled_pixel_size: float,
     input_path: Path,
     output_path: Path,
-    executables: Dict[str, str],
-    env: Dict[str, str],
+    symmetry: str,
+    executables: dict[str, str],
+    env: dict[str, str],
 ) -> None:
     with mrcfile.open(input_path) as input_mrc:
         input_size_x = input_mrc.header.nx
@@ -1139,12 +1320,31 @@ def _resize_initial_model(
                 f"\n {comp_proc.stdout} \n {comp_proc.stderr}"
             )
             raise RuntimeError(f"Resizing initial model {input_path} failed")
-        with mrcfile.open(output_path) as rescaled_mrc:
-            rescaled_mrc.header.cella = (
-                downscaled_pixel_size,
-                downscaled_pixel_size,
-                downscaled_pixel_size,
+    if executables.get("relion_align_symmetry") and symmetry != "C1":
+        align_proc = subprocess.run(
+            [
+                f"{executables['relion_align_symmetry']}",
+                "--i",
+                str(output_path),
+                "--o",
+                str(output_path),
+                "--sym",
+                symmetry,
+                "--apply_sym",
+            ],
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        logger.info(
+            f"Initial model symmetrisation finished with code {align_proc.returncode}"
+        )
+        if align_proc.returncode:
+            logger.error(
+                f"Applying symmetry to initial model {input_path} failed"
+                f"\n {align_proc.stdout} \n {align_proc.stderr}"
             )
+            raise RuntimeError(f"Symmetrising initial model {input_path} failed")
     return None
 
 
@@ -1152,16 +1352,20 @@ def _register_3d_batch(message: dict, _db):
     """Received 3d batch from class selection service"""
     class3d_message = message.get("class3d_message")
     assert isinstance(class3d_message, dict)
+
+    session_id = int(message["session_id"])
     instrument_name = (
-        _db.exec(select(db.Session).where(db.Session.id == message["session_id"]))
+        _db.exec(select(db.Session).where(db.Session.id == session_id))
         .one()
         .instrument_name
     )
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
-    pj_id_params = _pj_id(message["program_id"], _db, recipe="em-spa-preprocess")
-    pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-class3d")
+
+    program_id = int(message["program_id"])
+    pj_id_params = _pj_id(program_id, _db, recipe="em-spa-preprocess")
+    pj_id = _pj_id(program_id, _db, recipe="em-spa-class3d")
     relion_params = _db.exec(
         select(db.SPARelionParameters).where(
             db.SPARelionParameters.pj_id == pj_id_params
@@ -1173,12 +1377,9 @@ def _register_3d_batch(message: dict, _db):
             db.ClassificationFeedbackParameters.pj_id == pj_id_params
         )
     ).one()
-    other_options = dict(feedback_params)
 
     visit_name = (
-        _db.exec(select(db.Session).where(db.Session.id == message["session_id"]))
-        .one()
-        .visit
+        _db.exec(select(db.Session).where(db.Session.id == session_id)).one().visit
     )
 
     provided_initial_model = _find_initial_model(visit_name, machine_config)
@@ -1195,20 +1396,23 @@ def _register_3d_batch(message: dict, _db):
                 ),
                 provided_initial_model,
                 rescaled_initial_model_path,
+                relion_options["symmetry"],
                 machine_config.external_executables,
                 machine_config.external_environment,
             )
         feedback_params.initial_model = str(rescaled_initial_model_path)
-        other_options["initial_model"] = str(rescaled_initial_model_path)
-        class3d_dir = (
-            f"{class3d_message['class3d_dir']}{(feedback_params.next_job + 1):03}"
+        # Reserve the Class3D (base) job up front so
+        # the Class3D number cannot be reused before the job is registered.
+        class3d_job = _reserve_pipeline_job_numbers(
+            visit_name, 1, _allocation_floor(feedback_params)
         )
-        feedback_params.next_job += 1
+        feedback_params.next_job = class3d_job + 1
+        class3d_dir = f"{class3d_message['class3d_dir']}{class3d_job:03}"
         _db.add(feedback_params)
         _db.commit()
 
-        class3d_grp_uuid = _murfey_id(message["program_id"], _db)[0]
-        class_uuids = _murfey_id(message["program_id"], _db, number=4)
+        class3d_grp_uuid = _murfey_id(program_id, _db)[0]
+        class_uuids = _murfey_id(program_id, _db, number=4)
         class3d_params = db.Class3DParameters(
             pj_id=pj_id,
             murfey_id=class3d_grp_uuid,
@@ -1221,7 +1425,7 @@ def _register_3d_batch(message: dict, _db):
         _murfey_class3ds(
             class_uuids,
             class3d_message["particles_file"],
-            message["program_id"],
+            program_id,
             _db,
         )
 
@@ -1237,13 +1441,16 @@ def _register_3d_batch(message: dict, _db):
         _db.commit()
         _db.close()
     elif not feedback_params.initial_model:
-        # For the first batch, start a container and set the database to wait
-        next_job = feedback_params.next_job
-        class3d_dir = (
-            f"{class3d_message['class3d_dir']}{(feedback_params.next_job + 1):03}"
+        # For the first batch, start a container and set the database to wait.
+        # Reserve the InitialModel (base) + Class3D (base + 1) jobs.
+        initial_model_job = _reserve_pipeline_job_numbers(
+            visit_name, 2, _allocation_floor(feedback_params)
         )
-        class3d_grp_uuid = _murfey_id(message["program_id"], _db)[0]
-        class_uuids = _murfey_id(message["program_id"], _db, number=4)
+        class3d_job = initial_model_job + 1
+        feedback_params.next_job = initial_model_job + 2
+        class3d_dir = f"{class3d_message['class3d_dir']}{(class3d_job):03}"
+        class3d_grp_uuid = _murfey_id(program_id, _db)[0]
+        class_uuids = _murfey_id(program_id, _db, number=4)
         class3d_params = db.Class3DParameters(
             pj_id=pj_id,
             murfey_id=class3d_grp_uuid,
@@ -1254,12 +1461,10 @@ def _register_3d_batch(message: dict, _db):
         _db.add(class3d_params)
         _db.commit()
         _murfey_class3ds(
-            class_uuids, class3d_message["particles_file"], message["program_id"], _db
+            class_uuids, class3d_message["particles_file"], program_id, _db
         )
 
         feedback_params.hold_class3d = True
-        next_job += 2
-        feedback_params.next_job = next_job
         zocalo_message: dict = {
             "parameters": {
                 "particles_file": class3d_message["particles_file"],
@@ -1277,9 +1482,9 @@ def _register_3d_batch(message: dict, _db):
                 "nr_classes": default_spa_parameters.nr_classes_3d,
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
                 "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
-                "session_id": message["session_id"],
+                "session_id": session_id,
                 "autoproc_program_id": _app_id(
-                    _pj_id(message["program_id"], _db, recipe="em-spa-class3d"), _db
+                    _pj_id(program_id, _db, recipe="em-spa-class3d"), _db
                 ),
                 "node_creator_queue": machine_config.node_creator_queue,
             },
@@ -1309,7 +1514,7 @@ def _register_3d_batch(message: dict, _db):
                 "particle_diameter": relion_options["particle_diameter"],
                 "mask_diameter": relion_options["mask_diameter"] or 0,
                 "do_initial_model": False,
-                "initial_model_file": other_options["initial_model"],
+                "initial_model_file": feedback_params.initial_model,
                 "class_uuids": _3d_class_murfey_ids(
                     class3d_params.particles_file, _app_id(pj_id, _db), _db
                 ),
@@ -1320,9 +1525,9 @@ def _register_3d_batch(message: dict, _db):
                 "nr_classes": default_spa_parameters.nr_classes_3d,
                 "do_icebreaker_jobs": default_spa_parameters.do_icebreaker_jobs,
                 "class2d_fraction_of_classes_to_remove": default_spa_parameters.fraction_of_classes_to_remove_2d,
-                "session_id": message["session_id"],
+                "session_id": session_id,
                 "autoproc_program_id": _app_id(
-                    _pj_id(message["program_id"], _db, recipe="em-spa-class3d"), _db
+                    _pj_id(program_id, _db, recipe="em-spa-class3d"), _db
                 ),
                 "node_creator_queue": machine_config.node_creator_queue,
             },
@@ -1343,7 +1548,8 @@ def _register_3d_batch(message: dict, _db):
 
 def _register_initial_model(message: dict, _db):
     """Received initial model from 3d classification service"""
-    pj_id_params = _pj_id(message["program_id"], _db, recipe="em-spa-preprocess")
+    program_id = int(message["program_id"])
+    pj_id_params = _pj_id(program_id, _db, recipe="em-spa-preprocess")
     # Add the initial model file to the database
     feedback_params = _db.exec(
         select(db.ClassificationFeedbackParameters).where(
@@ -1357,7 +1563,7 @@ def _register_initial_model(message: dict, _db):
 
 
 def _flush_tomography_preprocessing(message: dict, _db):
-    session_id = message["session_id"]
+    session_id = int(message["session_id"])
     instrument_name = (
         _db.exec(select(db.Session).where(db.Session.id == session_id))
         .one()
@@ -1408,6 +1614,17 @@ def _flush_tomography_preprocessing(message: dict, _db):
         ).one()
         detached_ids = [c.id for c in collected_ids]
 
+        lamella_angle = None
+        relevant_search_map = _db.exec(
+            select(db.SearchMap)
+            .join(db.TiltSeries, db.TiltSeries.search_map_id == db.SearchMap.id)
+            .where(db.TiltSeries.tag == f.tag)
+            .where(db.TiltSeries.session_id == session_id)
+            .where(db.TiltSeries.rsync_source == message["data_collection_group_tag"])
+        ).one_or_none()
+        if relevant_search_map:
+            lamella_angle = relevant_search_map.angle
+
         murfey_ids = _murfey_id(detached_ids[3], _db, number=1, close=False)
         movie = db.Movie(
             murfey_id=murfey_ids[0],
@@ -1442,6 +1659,7 @@ def _flush_tomography_preprocessing(message: dict, _db):
                     else proc_params.gain_ref
                 ),
                 "fm_int_file": proc_params.eer_fractionation_file or "",
+                "lamella_angle": lamella_angle,
             },
         }
         logger.info(
@@ -1455,17 +1673,7 @@ def _flush_tomography_preprocessing(message: dict, _db):
                 "processing_recipe", zocalo_message, new_connection=True
             )
         else:
-            feedback_callback(
-                {},
-                {
-                    "register": "motion_corrected",
-                    "movie": f.file_path,
-                    "mrc_out": f.mrc_out,
-                    "movie_id": murfey_ids[0],
-                    "program_id": detached_ids[3],
-                },
-                _db,
-            )
+            logger.warning("No TransportManager object was set up")
         _db.delete(f)
         _db.commit()
         _db.close()
@@ -1473,7 +1681,7 @@ def _flush_tomography_preprocessing(message: dict, _db):
 
 def _flush_grid_square_records(message: dict, _db):
     tag = message["tag"]
-    session_id = message["session_id"]
+    session_id = int(message["session_id"])
     gs_ids = []
     for gs in _db.exec(
         select(db.GridSquare)
@@ -1495,16 +1703,18 @@ def _flush_foil_hole_records(grid_square_id: int, _db):
 
 def _register_refinement(message: dict, _db):
     """Received class to refine from 3D classification"""
+    session_id = int(message["session_id"])
     instrument_name = (
-        _db.exec(select(db.Session).where(db.Session.id == message["session_id"]))
+        _db.exec(select(db.Session).where(db.Session.id == session_id))
         .one()
         .instrument_name
     )
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
-    pj_id_params = _pj_id(message["program_id"], _db, recipe="em-spa-preprocess")
-    pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-refine")
+    program_id = int(message["program_id"])
+    pj_id_params = _pj_id(program_id, _db, recipe="em-spa-preprocess")
+    pj_id = _pj_id(program_id, _db, recipe="em-spa-refine")
     relion_params = _db.exec(
         select(db.SPARelionParameters).where(
             db.SPARelionParameters.pj_id == pj_id_params
@@ -1545,12 +1755,27 @@ def _register_refinement(message: dict, _db):
                 .where(db.RefineParameters.tag == "symmetry")
             ).one()
         except SQLAlchemyError:
-            next_job = feedback_params.next_job
-            refine_dir = f"{message['refine_dir']}{(feedback_params.next_job + 2):03}"
-            refined_grp_uuid = _murfey_id(message["program_id"], _db)[0]
-            refined_class_uuid = _murfey_id(message["program_id"], _db)[0]
-            symmetry_refined_grp_uuid = _murfey_id(message["program_id"], _db)[0]
-            symmetry_refined_class_uuid = _murfey_id(message["program_id"], _db)[0]
+            # Reserve the contiguous refinement block: re-extraction
+            # Select (base) + Extract (base + 1), Refine3D (base + 2),
+            # MaskCreate (base + 3) and PostProcess (base + 4). PostProcess is
+            # Refine + 2 rather than Refine + 1 only because this path never
+            # supplies a mask (refine3d_wrapper picks Refine + 1 and skips
+            # MaskCreate when one is given; the only masked path is bfactor,
+            # which runs in its own project directory).
+            visit_name = _visit_name_for_session(session_id, _db)
+            # C1 needs extra Refine, Mask, PostProcess for determined symmetry,
+            # at base + 5, base + 6 and base + 7.
+            refine_block = _refinement_block_size(relion_options["symmetry"])
+            refine_base = _reserve_pipeline_job_numbers(
+                visit_name, refine_block, _allocation_floor(feedback_params)
+            )
+            refine_job = refine_base + 2
+            feedback_params.next_job = refine_base + refine_block
+            refine_dir = f"{message['refine_dir']}{refine_job:03}"
+            refined_grp_uuid = _murfey_id(program_id, _db)[0]
+            refined_class_uuid = _murfey_id(program_id, _db)[0]
+            symmetry_refined_grp_uuid = _murfey_id(program_id, _db)[0]
+            symmetry_refined_class_uuid = _murfey_id(program_id, _db)[0]
 
             refine_params = db.RefineParameters(
                 tag="first",
@@ -1575,24 +1800,16 @@ def _register_refinement(message: dict, _db):
                 murfey_id=refined_class_uuid,
                 refine_dir=refine_dir,
                 tag="first",
-                app_id=message["program_id"],
+                app_id=program_id,
                 _db=_db,
             )
             _murfey_refine(
                 murfey_id=symmetry_refined_class_uuid,
                 refine_dir=refine_dir,
                 tag="symmetry",
-                app_id=message["program_id"],
+                app_id=program_id,
                 _db=_db,
             )
-
-            if relion_options["symmetry"] == "C1":
-                # Extra Refine, Mask, PostProcess beyond for determined symmetry
-                next_job += 8
-            else:
-                # Select and Extract particles, then Refine, Mask, PostProcess
-                next_job += 5
-            feedback_params.next_job = next_job
 
         zocalo_message: dict = {
             "parameters": {
@@ -1622,9 +1839,9 @@ def _register_refinement(message: dict, _db):
                     _db=_db,
                 ),
                 "symmetry_refined_grp_uuid": symmetry_refine_params.murfey_id,
-                "session_id": message["session_id"],
+                "session_id": session_id,
                 "autoproc_program_id": _app_id(
-                    _pj_id(message["program_id"], _db, recipe="em-spa-refine"), _db
+                    _pj_id(program_id, _db, recipe="em-spa-refine"), _db
                 ),
             },
             "recipes": [machine_config.recipes.get("em-spa-refine", "em-spa-refine")],
@@ -1644,16 +1861,19 @@ def _register_refinement(message: dict, _db):
 
 def _register_bfactors(message: dict, _db):
     """Received refined class to calculate b-factor"""
+    session_id = int(message["session_id"])
     instrument_name = (
-        _db.exec(select(db.Session).where(db.Session.id == message["session_id"]))
+        _db.exec(select(db.Session).where(db.Session.id == session_id))
         .one()
         .instrument_name
     )
     machine_config = get_machine_config(instrument_name=instrument_name)[
         instrument_name
     ]
-    pj_id_params = _pj_id(message["program_id"], _db, recipe="em-spa-preprocess")
-    pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-refine")
+
+    program_id = int(message["program_id"])
+    pj_id_params = _pj_id(program_id, _db, recipe="em-spa-preprocess")
+    pj_id = _pj_id(program_id, _db, recipe="em-spa-refine")
     relion_params = _db.exec(
         select(db.SPARelionParameters).where(
             db.SPARelionParameters.pj_id == pj_id_params
@@ -1744,9 +1964,9 @@ def _register_bfactors(message: dict, _db):
                 "node_creator_queue": machine_config.node_creator_queue,
                 "refined_grp_uuid": bfactor_params.refined_grp_uuid,
                 "refined_class_uuid": bfactor_params.refined_class_uuid,
-                "session_id": message["session_id"],
+                "session_id": session_id,
                 "autoproc_program_id": _app_id(
-                    _pj_id(message["program_id"], _db, recipe="em-spa-refine"), _db
+                    _pj_id(program_id, _db, recipe="em-spa-refine"), _db
                 ),
             },
             "recipes": ["em-spa-bfactor"],
@@ -1764,7 +1984,8 @@ def _register_bfactors(message: dict, _db):
 
 def _save_bfactor(message: dict, _db):
     """Received b-factor from refinement run"""
-    pj_id = _pj_id(message["program_id"], _db, recipe="em-spa-refine")
+    program_id = int(message["program_id"])
+    pj_id = _pj_id(program_id, _db, recipe="em-spa-refine")
     bfactor_run = _db.exec(
         select(db.BFactors)
         .where(db.BFactors.pj_id == pj_id)
@@ -1798,7 +2019,7 @@ def _save_bfactor(message: dict, _db):
                     "buffer_command": {
                         "ispyb_command": "insert_particle_classification"
                     },
-                    "program_id": message["program_id"],
+                    "program_id": program_id,
                     "bfactor_fit_intercept": str(float(bfactor_fitting[1])),
                     "bfactor_fit_linear": str(float(bfactor_fitting[0])),
                 },
@@ -1812,7 +2033,10 @@ def _save_bfactor(message: dict, _db):
     _db.close()
 
 
-def feedback_callback(header: dict, message: dict, _db=murfey_db) -> None:
+def feedback_callback(
+    header: dict,
+    message: dict,
+) -> None:
     try:
         if "environment" in message:
             params = message["recipe"][str(message["recipe-pointer"])].get(
@@ -1820,344 +2044,384 @@ def feedback_callback(header: dict, message: dict, _db=murfey_db) -> None:
             )
             message = message["payload"]
             message.update(params)
-        if message["register"] == "motion_corrected":
-            collected_ids = _db.exec(
-                select(
-                    db.DataCollectionGroup,
-                    db.DataCollection,
-                    db.ProcessingJob,
-                    db.AutoProcProgram,
-                )
-                .where(db.DataCollection.dcg_id == db.DataCollectionGroup.id)
-                .where(db.ProcessingJob.dc_id == db.DataCollection.id)
-                .where(db.AutoProcProgram.pj_id == db.ProcessingJob.id)
-                .where(db.AutoProcProgram.id == message["program_id"])
-            ).one()
-            session_id = collected_ids[0].session_id
 
-            # Find the autoprocprogram id for the alignment recipe
-            alignment_ids = _db.exec(
-                select(
-                    db.DataCollection,
-                    db.ProcessingJob,
-                    db.AutoProcProgram,
-                )
-                .where(db.ProcessingJob.dc_id == db.DataCollection.id)
-                .where(db.AutoProcProgram.pj_id == db.ProcessingJob.id)
-                .where(db.DataCollection.id == collected_ids[1].id)
-                .where(db.ProcessingJob.recipe == "em-tomo-align")
-            ).one()
+        # Create a new database session for every message
+        # The context manager will handle session cleanup on error
+        with Session(engine, expire_on_commit=False) as _db:
+            if message["register"] == "motion_corrected":
+                program_id = int(message["program_id"])
 
-            relevant_tilt_and_series = _db.exec(
-                select(db.Tilt, db.TiltSeries)
-                .where(db.Tilt.movie_path == message.get("movie"))
-                .where(db.Tilt.tilt_series_id == db.TiltSeries.id)
-                .where(db.TiltSeries.session_id == session_id)
-            ).one()
-            relevant_tilt = relevant_tilt_and_series[0]
-            relevant_tilt_series = relevant_tilt_and_series[1]
-            relevant_tilt.motion_corrected = True
-            _db.add(relevant_tilt)
-            _db.commit()
-            if (
-                check_tilt_series_mc(relevant_tilt_series.id, _db)
-                and not relevant_tilt_series.processing_requested
-                and relevant_tilt_series.tilt_series_length > 2
-            ):
-                instrument_name = (
-                    _db.exec(select(db.Session).where(db.Session.id == session_id))
-                    .one()
-                    .instrument_name
-                )
-                machine_config = get_machine_config(instrument_name=instrument_name)[
-                    instrument_name
-                ]
-                tilts = get_all_tilts(relevant_tilt_series.id, _db)
-                ids = get_job_ids(relevant_tilt_series.id, alignment_ids[2].id, _db)
-                preproc_params = get_tomo_proc_params(ids.dcgid, _db)
-                stack_file = (
-                    Path(message["mrc_out"]).parents[3]
-                    / "Tomograms"
-                    / "job006"
-                    / "tomograms"
-                    / f"{relevant_tilt_series.tag}_stack.mrc"
-                )
-                tilt_offset = midpoint([float(get_angle(t)) for t in tilts])
-                zocalo_message = {
-                    "recipes": ["em-tomo-align"],
-                    "parameters": {
-                        "input_file_list": str([[t, str(get_angle(t))] for t in tilts]),
-                        "path_pattern": "",  # blank for now so that it works with the tomo_align service changes
-                        "dcid": ids.dcid,
-                        "appid": ids.appid,
-                        "stack_file": str(stack_file),
-                        "dose_per_frame": preproc_params.dose_per_frame,
-                        "frame_count": preproc_params.frame_count,
-                        "kv": preproc_params.voltage,
-                        "tilt_axis": preproc_params.tilt_axis,
-                        "pixel_size": preproc_params.pixel_size,
-                        "manual_tilt_offset": -tilt_offset,
-                        "node_creator_queue": machine_config.node_creator_queue,
-                        "search_map_id": relevant_tilt_series.search_map_id,
-                        "x_location": relevant_tilt_series.x_location,
-                        "y_location": relevant_tilt_series.y_location,
-                    },
-                }
-                if murfey.server._transport_object:
-                    logger.info(
-                        f"Sending Zocalo message for processing: {zocalo_message}"
+                collected_ids = _db.exec(
+                    select(
+                        db.DataCollectionGroup,
+                        db.DataCollection,
+                        db.ProcessingJob,
+                        db.AutoProcProgram,
                     )
-                    murfey.server._transport_object.send(
-                        "processing_recipe", zocalo_message, new_connection=True
-                    )
-                else:
-                    logger.info(
-                        f"No transport object found. Zocalo message would be {zocalo_message}"
-                    )
-                relevant_tilt_series.processing_requested = True
-                _db.add(relevant_tilt_series)
+                    .where(db.DataCollection.dcg_id == db.DataCollectionGroup.id)
+                    .where(db.ProcessingJob.dc_id == db.DataCollection.id)
+                    .where(db.AutoProcProgram.pj_id == db.ProcessingJob.id)
+                    .where(db.AutoProcProgram.id == program_id)
+                ).one()
+                session_id = collected_ids[0].session_id
 
-            prom.preprocessed_movies.labels(processing_job=collected_ids[2].id).inc()
-            _db.commit()
-            _db.close()
-            if murfey.server._transport_object:
-                murfey.server._transport_object.transport.ack(header)
-            return None
-        elif message["register"] == "flush_tomography_preprocess":
-            _flush_tomography_preprocessing(message, _db)
-            if murfey.server._transport_object:
-                murfey.server._transport_object.transport.ack(header)
-            return None
-        elif message["register"] == "spa_processing_parameters":
-            session_id = message["session_id"]
-            collected_ids = _db.exec(
-                select(
-                    db.DataCollectionGroup,
-                    db.DataCollection,
-                    db.ProcessingJob,
-                    db.AutoProcProgram,
-                )
-                .where(db.DataCollectionGroup.session_id == session_id)
-                .where(db.DataCollectionGroup.tag == message["tag"])
-                .where(db.DataCollection.dcg_id == db.DataCollectionGroup.id)
-                .where(db.ProcessingJob.dc_id == db.DataCollection.id)
-                .where(db.AutoProcProgram.pj_id == db.ProcessingJob.id)
-                .where(db.ProcessingJob.recipe == "em-spa-preprocess")
-            ).one()
-            pj_id = collected_ids[2].id
-            if not _db.exec(
-                select(db.SPARelionParameters).where(
-                    db.SPARelionParameters.pj_id == pj_id
-                )
-            ).all():
-                instrument_name = (
-                    _db.exec(select(db.Session).where(db.Session.id == session_id))
-                    .one()
-                    .instrument_name
-                )
-                machine_config = get_machine_config(instrument_name=instrument_name)[
-                    instrument_name
-                ]
-                params = db.SPARelionParameters(
-                    pj_id=collected_ids[2].id,
-                    angpix=float(message["pixel_size_on_image"]) * 1e10,
-                    dose_per_frame=message["dose_per_frame"],
-                    gain_ref=(
-                        str(
-                            (machine_config.rsync_basepath or Path("")).resolve()
-                            / message["gain_ref"]
+                # Update the 'last_active' column for the associated Murfey session
+                murfey_session = _db.exec(
+                    select(db.Session).where(db.Session.id == session_id)
+                ).one()
+                murfey_session.last_active = datetime.now()
+                _db.add(murfey_session)
+
+                # Find the autoprocprogram id for the alignment recipe
+                alignment_ids = _db.exec(
+                    select(
+                        db.DataCollection,
+                        db.ProcessingJob,
+                        db.AutoProcProgram,
+                    )
+                    .where(db.ProcessingJob.dc_id == db.DataCollection.id)
+                    .where(db.AutoProcProgram.pj_id == db.ProcessingJob.id)
+                    .where(db.DataCollection.id == collected_ids[1].id)
+                    .where(db.ProcessingJob.recipe == "em-tomo-align")
+                ).one()
+
+                # Update the tilt series and its corresponding tilts
+                relevant_tilt_and_series = _db.exec(
+                    select(db.Tilt, db.TiltSeries)
+                    .where(db.Tilt.movie_path == message.get("movie"))
+                    .where(db.Tilt.tilt_series_id == db.TiltSeries.id)
+                    .where(db.TiltSeries.session_id == session_id)
+                ).one()
+                relevant_tilt = relevant_tilt_and_series[0]
+                relevant_tilt_series = relevant_tilt_and_series[1]
+                relevant_tilt.motion_corrected = True
+                _db.add(relevant_tilt)
+
+                # Update all related Movie rows and mark as preprocessed
+                relevant_movies = _db.exec(
+                    select(db.Movie).where(db.Movie.path == message["movie"])
+                ).all()
+                for movie in relevant_movies:
+                    movie.preprocessed = True
+                    _db.add(movie)
+
+                _db.commit()
+
+                if (
+                    check_tilt_series_mc(relevant_tilt_series.id, _db)
+                    and not relevant_tilt_series.processing_requested
+                    and relevant_tilt_series.tilt_series_length > 2
+                ):
+                    lamella_angle = None
+                    if relevant_tilt_series.search_map_id:
+                        relevant_search_map = _db.exec(
+                            select(db.SearchMap).where(
+                                db.SearchMap.id == relevant_tilt_series.search_map_id
+                            )
+                        ).one()
+                        lamella_angle = relevant_search_map.angle
+
+                    instrument_name = murfey_session.instrument_name
+                    machine_config = get_machine_config(
+                        instrument_name=instrument_name
+                    )[instrument_name]
+                    tilts = get_all_tilts(relevant_tilt_series.id, _db)
+                    ids = get_job_ids(relevant_tilt_series.id, alignment_ids[2].id, _db)
+                    preproc_params = get_tomo_proc_params(ids.dcgid, _db)
+                    stack_file = (
+                        Path(message["mrc_out"]).parents[3]
+                        / "Tomograms"
+                        / "job006"
+                        / "tomograms"
+                        / f"{relevant_tilt_series.tag}_stack.mrc"
+                    )
+                    tilt_offset = midpoint([float(get_angle(t)) for t in tilts])
+                    zocalo_message = {
+                        "recipes": ["em-tomo-align"],
+                        "parameters": {
+                            "input_file_list": str(
+                                [[t, str(get_angle(t))] for t in tilts]
+                            ),
+                            "path_pattern": "",  # blank for now so that it works with the tomo_align service changes
+                            "dcid": ids.dcid,
+                            "appid": ids.appid,
+                            "stack_file": str(stack_file),
+                            "dose_per_frame": preproc_params.dose_per_frame,
+                            "frame_count": preproc_params.frame_count,
+                            "kv": preproc_params.voltage,
+                            "tilt_axis": preproc_params.tilt_axis,
+                            "pixel_size": preproc_params.pixel_size,
+                            "manual_tilt_offset": -tilt_offset,
+                            "node_creator_queue": machine_config.node_creator_queue,
+                            "search_map_id": relevant_tilt_series.search_map_id,
+                            "x_location": relevant_tilt_series.x_location,
+                            "y_location": relevant_tilt_series.y_location,
+                            "lamella_angle": lamella_angle,
+                        },
+                    }
+                    if murfey.server._transport_object:
+                        logger.info(
+                            f"Sending Zocalo message for processing: {zocalo_message}"
                         )
-                        if message["gain_ref"] and machine_config.data_transfer_enabled
-                        else message["gain_ref"]
-                    ),
-                    voltage=message["voltage"],
-                    motion_corr_binning=message["motion_corr_binning"],
-                    eer_fractionation_file=message["eer_fractionation_file"],
-                    symmetry=message["symmetry"],
-                )
-                feedback_params = db.ClassificationFeedbackParameters(
-                    pj_id=collected_ids[2].id,
-                    estimate_particle_diameter=True,
-                    hold_class2d=False,
-                    hold_class3d=False,
-                    class_selection_score=0,
-                    star_combination_job=0,
-                    initial_model="",
-                    next_job=0,
-                )
-                _db.add(params)
-                _db.add(feedback_params)
-                _db.commit()
-                logger.info(
-                    f"SPA processing parameters registered for processing job {collected_ids[2].id}"
-                )
-                _db.close()
-            else:
-                logger.info(
-                    f"SPA processing parameters already exist for processing job ID {pj_id}"
-                )
-            if murfey.server._transport_object:
-                murfey.server._transport_object.transport.ack(header)
-            return None
-        elif message["register"] == "tomography_processing_parameters":
-            session_id = message["session_id"]
-            collected_ids = _db.exec(
-                select(
-                    db.DataCollectionGroup,
-                    db.DataCollection,
-                    db.ProcessingJob,
-                    db.AutoProcProgram,
-                )
-                .where(db.DataCollectionGroup.session_id == session_id)
-                .where(db.DataCollectionGroup.tag == message["tag"])
-                .where(db.DataCollection.dcg_id == db.DataCollectionGroup.id)
-                .where(db.DataCollection.tag == message["tilt_series_tag"])
-                .where(db.ProcessingJob.dc_id == db.DataCollection.id)
-                .where(db.AutoProcProgram.pj_id == db.ProcessingJob.id)
-                .where(db.ProcessingJob.recipe == "em-tomo-preprocess")
-            ).one()
-            if not _db.exec(
-                select(db.TomographyProcessingParameters.dcg_id).where(
-                    db.TomographyProcessingParameters.dcg_id == collected_ids[0].id
-                )
-            ).all():
-                params = db.TomographyProcessingParameters(
-                    dcg_id=collected_ids[0].id,
-                    pixel_size=float(message["pixel_size_on_image"]) * 10**10,
-                    voltage=message["voltage"],
-                    dose_per_frame=message["dose_per_frame"],
-                    frame_count=message["frame_count"],
-                    tilt_axis=message["tilt_axis"],
-                    motion_corr_binning=message["motion_corr_binning"],
-                    gain_ref=message["gain_ref"],
-                    eer_fractionation_file=message["eer_fractionation_file"],
-                )
-                feedback_params = db.ClassificationFeedbackParameters(
-                    pj_id=collected_ids[2].id,
-                    estimate_particle_diameter=True,
-                    hold_class2d=False,
-                    hold_class3d=False,
-                    class_selection_score=0,
-                    star_combination_job=0,
-                    initial_model="",
-                    next_job=0,
-                )
-                _db.add(params)
-                _db.add(feedback_params)
+                        murfey.server._transport_object.send(
+                            "processing_recipe", zocalo_message, new_connection=True
+                        )
+                    else:
+                        logger.info(
+                            f"No transport object found. Zocalo message would be {zocalo_message}"
+                        )
+                    relevant_tilt_series.processing_requested = True
+                    _db.add(relevant_tilt_series)
+
+                prom.preprocessed_movies.labels(
+                    microscope=instrument_name,
+                    rsync_source=collected_ids[0].tag,
+                    visit=murfey_session.visit,
+                ).inc()
                 _db.commit()
                 _db.close()
-            if murfey.server._transport_object:
-                murfey.server._transport_object.transport.ack(header)
-            return None
-        elif message["register"] == "done_incomplete_2d_batch":
-            _release_2d_hold(message, _db)
-            if murfey.server._transport_object:
-                murfey.server._transport_object.transport.ack(header)
-            return None
-        elif message["register"] == "incomplete_particles_file":
-            _register_incomplete_2d_batch(message, _db)
-            if murfey.server._transport_object:
-                murfey.server._transport_object.transport.ack(header)
-            return None
-        elif message["register"] == "complete_particles_file":
-            _register_complete_2d_batch(message, _db)
-            if murfey.server._transport_object:
-                murfey.server._transport_object.transport.ack(header)
-            return None
-        elif message["register"] == "save_class_selection_score":
-            _register_class_selection(message, _db)
-            if murfey.server._transport_object:
-                murfey.server._transport_object.transport.ack(header)
-            return None
-        elif message["register"] == "done_3d_batch":
-            _release_3d_hold(message, _db)
-            if message.get("do_refinement"):
-                _register_refinement(message, _db)
-            if murfey.server._transport_object:
-                murfey.server._transport_object.transport.ack(header)
-            return None
-        elif message["register"] == "run_class3d":
-            session_processing_parameters = _db.exec(
-                select(db.SessionProcessingParameters).where(
-                    db.SessionProcessingParameters.session_id == message["session_id"]
-                )
-            ).all()
-            if (
-                not session_processing_parameters
-                or session_processing_parameters[0].run_class3d
-            ):
-                _register_3d_batch(message, _db)
-            if murfey.server._transport_object:
-                murfey.server._transport_object.transport.ack(header)
-            return None
-        elif message["register"] == "save_initial_model":
-            _register_initial_model(message, _db)
-            if murfey.server._transport_object:
-                murfey.server._transport_object.transport.ack(header)
-            return None
-        elif message["register"] == "done_particle_selection":
-            if murfey.server._transport_object:
-                murfey.server._transport_object.transport.ack(header)
-            return None
-        elif message["register"] == "done_class_selection":
-            if murfey.server._transport_object:
-                murfey.server._transport_object.transport.ack(header)
-            return None
-        elif message["register"] == "atlas_registered":
-            _flush_grid_square_records(message, _db)
-            if murfey.server._transport_object:
-                murfey.server._transport_object.transport.ack(header)
-            return None
-        elif message["register"] == "done_refinement":
-            bfactors_registered = _register_bfactors(message, _db)
-            if murfey.server._transport_object:
-                if bfactors_registered:
-                    murfey.server._transport_object.transport.ack(header)
-                else:
-                    murfey.server._transport_object.transport.nack(
-                        header, requeue=False
-                    )
-            return None
-        elif message["register"] == "done_bfactor":
-            _save_bfactor(message, _db)
-            if murfey.server._transport_object:
-                murfey.server._transport_object.transport.ack(header)
-            return None
-        elif message["register"] in entry_points(group="murfey.workflows").names:
-            # Search for corresponding workflow
-            workflows: list[EntryPoint] = list(
-                entry_points(group="murfey.workflows", name=message["register"])
-            )  # Returns either 1 item or empty list
-            if not workflows:
-                logger.error(f"No workflow found for {sanitise(message['register'])}")
                 if murfey.server._transport_object:
-                    murfey.server._transport_object.transport.nack(
-                        header, requeue=False
+                    murfey.server._transport_object.transport.ack(header)
+                return None
+            elif message["register"] == "flush_tomography_preprocess":
+                _flush_tomography_preprocessing(message, _db)
+                if murfey.server._transport_object:
+                    murfey.server._transport_object.transport.ack(header)
+                return None
+            elif message["register"] == "spa_processing_parameters":
+                session_id = int(message["session_id"])
+                collected_ids = _db.exec(
+                    select(
+                        db.DataCollectionGroup,
+                        db.DataCollection,
+                        db.ProcessingJob,
+                        db.AutoProcProgram,
+                    )
+                    .where(db.DataCollectionGroup.session_id == session_id)
+                    .where(db.DataCollectionGroup.tag == message["tag"])
+                    .where(db.DataCollection.dcg_id == db.DataCollectionGroup.id)
+                    .where(db.ProcessingJob.dc_id == db.DataCollection.id)
+                    .where(db.AutoProcProgram.pj_id == db.ProcessingJob.id)
+                    .where(db.ProcessingJob.recipe == "em-spa-preprocess")
+                ).one()
+                pj_id = collected_ids[2].id
+                if not _db.exec(
+                    select(db.SPARelionParameters).where(
+                        db.SPARelionParameters.pj_id == pj_id
+                    )
+                ).all():
+                    instrument_name = (
+                        _db.exec(select(db.Session).where(db.Session.id == session_id))
+                        .one()
+                        .instrument_name
+                    )
+                    machine_config = get_machine_config(
+                        instrument_name=instrument_name
+                    )[instrument_name]
+                    params = db.SPARelionParameters(
+                        pj_id=collected_ids[2].id,
+                        angpix=float(message["pixel_size_on_image"]) * 1e10,
+                        dose_per_frame=message["dose_per_frame"],
+                        gain_ref=(
+                            str(
+                                (machine_config.rsync_basepath or Path("")).resolve()
+                                / message["gain_ref"]
+                            )
+                            if message["gain_ref"]
+                            and machine_config.data_transfer_enabled
+                            else message["gain_ref"]
+                        ),
+                        voltage=message["voltage"],
+                        motion_corr_binning=message["motion_corr_binning"],
+                        eer_fractionation_file=message["eer_fractionation_file"],
+                        symmetry=message["symmetry"],
+                    )
+                    feedback_params = db.ClassificationFeedbackParameters(
+                        pj_id=collected_ids[2].id,
+                        estimate_particle_diameter=True,
+                        hold_class2d=False,
+                        hold_class3d=False,
+                        class_selection_score=0,
+                        star_combination_job=0,
+                        initial_model="",
+                        next_job=_first_feedback_job(),
+                    )
+                    _db.add(params)
+                    _db.add(feedback_params)
+                    _db.commit()
+                    logger.info(
+                        f"SPA processing parameters registered for processing job {collected_ids[2].id}"
+                    )
+                    _db.close()
+                else:
+                    logger.info(
+                        f"SPA processing parameters already exist for processing job ID {pj_id}"
+                    )
+                if murfey.server._transport_object:
+                    murfey.server._transport_object.transport.ack(header)
+                return None
+            elif message["register"] == "tomography_processing_parameters":
+                session_id = int(message["session_id"])
+                collected_ids = _db.exec(
+                    select(
+                        db.DataCollectionGroup,
+                        db.DataCollection,
+                        db.ProcessingJob,
+                        db.AutoProcProgram,
+                    )
+                    .where(db.DataCollectionGroup.session_id == session_id)
+                    .where(db.DataCollectionGroup.tag == message["tag"])
+                    .where(db.DataCollection.dcg_id == db.DataCollectionGroup.id)
+                    .where(db.DataCollection.tag == message["tilt_series_tag"])
+                    .where(db.ProcessingJob.dc_id == db.DataCollection.id)
+                    .where(db.AutoProcProgram.pj_id == db.ProcessingJob.id)
+                    .where(db.ProcessingJob.recipe == "em-tomo-preprocess")
+                ).one()
+                if not _db.exec(
+                    select(db.TomographyProcessingParameters.dcg_id).where(
+                        db.TomographyProcessingParameters.dcg_id == collected_ids[0].id
+                    )
+                ).all():
+                    params = db.TomographyProcessingParameters(
+                        dcg_id=collected_ids[0].id,
+                        pixel_size=float(message["pixel_size_on_image"]) * 10**10,
+                        voltage=message["voltage"],
+                        dose_per_frame=message["dose_per_frame"],
+                        frame_count=message["frame_count"],
+                        tilt_axis=message["tilt_axis"],
+                        motion_corr_binning=message["motion_corr_binning"],
+                        gain_ref=message["gain_ref"],
+                        eer_fractionation_file=message["eer_fractionation_file"],
+                    )
+                    feedback_params = db.ClassificationFeedbackParameters(
+                        pj_id=collected_ids[2].id,
+                        estimate_particle_diameter=True,
+                        hold_class2d=False,
+                        hold_class3d=False,
+                        class_selection_score=0,
+                        star_combination_job=0,
+                        initial_model="",
+                        next_job=0,
+                    )
+                    _db.add(params)
+                    _db.add(feedback_params)
+                    _db.commit()
+                    _db.close()
+                if murfey.server._transport_object:
+                    murfey.server._transport_object.transport.ack(header)
+                return None
+            elif message["register"] == "done_incomplete_2d_batch":
+                _release_2d_hold(message, _db)
+                if murfey.server._transport_object:
+                    murfey.server._transport_object.transport.ack(header)
+                return None
+            elif message["register"] == "incomplete_particles_file":
+                _register_incomplete_2d_batch(message, _db)
+                if murfey.server._transport_object:
+                    murfey.server._transport_object.transport.ack(header)
+                return None
+            elif message["register"] == "complete_particles_file":
+                _register_complete_2d_batch(message, _db)
+                if murfey.server._transport_object:
+                    murfey.server._transport_object.transport.ack(header)
+                return None
+            elif message["register"] == "save_class_selection_score":
+                _register_class_selection(message, _db)
+                if murfey.server._transport_object:
+                    murfey.server._transport_object.transport.ack(header)
+                return None
+            elif message["register"] == "done_3d_batch":
+                _release_3d_hold(message, _db)
+                if message.get("do_refinement"):
+                    _register_refinement(message, _db)
+                if murfey.server._transport_object:
+                    murfey.server._transport_object.transport.ack(header)
+                return None
+            elif message["register"] == "run_class3d":
+                session_id = int(message["session_id"])
+                session_processing_parameters = _db.exec(
+                    select(db.SessionProcessingParameters).where(
+                        db.SessionProcessingParameters.session_id == session_id
+                    )
+                ).all()
+                if (
+                    not session_processing_parameters
+                    or session_processing_parameters[0].run_class3d
+                ):
+                    _register_3d_batch(message, _db)
+                if murfey.server._transport_object:
+                    murfey.server._transport_object.transport.ack(header)
+                return None
+            elif message["register"] == "save_initial_model":
+                _register_initial_model(message, _db)
+                if murfey.server._transport_object:
+                    murfey.server._transport_object.transport.ack(header)
+                return None
+            elif message["register"] == "done_particle_selection":
+                if murfey.server._transport_object:
+                    murfey.server._transport_object.transport.ack(header)
+                return None
+            elif message["register"] == "done_class_selection":
+                if murfey.server._transport_object:
+                    murfey.server._transport_object.transport.ack(header)
+                return None
+            elif message["register"] == "atlas_registered":
+                _flush_grid_square_records(message, _db)
+                if murfey.server._transport_object:
+                    murfey.server._transport_object.transport.ack(header)
+                return None
+            elif message["register"] == "done_refinement":
+                bfactors_registered = _register_bfactors(message, _db)
+                if murfey.server._transport_object:
+                    if bfactors_registered:
+                        murfey.server._transport_object.transport.ack(header)
+                    else:
+                        murfey.server._transport_object.transport.nack(
+                            header, requeue=False
+                        )
+                return None
+            elif message["register"] == "done_bfactor":
+                _save_bfactor(message, _db)
+                if murfey.server._transport_object:
+                    murfey.server._transport_object.transport.ack(header)
+                return None
+            elif message["register"] in murfey_entry_points.names:
+                # Search for corresponding workflow
+                workflows: list[EntryPoint] = [
+                    ep for ep in murfey_entry_points if ep.name == message["register"]
+                ]  # Returns either 1 item or empty list
+                if not workflows:
+                    logger.error(
+                        f"No workflow found for {sanitise(message['register'])}"
+                    )
+                    if murfey.server._transport_object:
+                        murfey.server._transport_object.transport.nack(
+                            header, requeue=False
+                        )
+                    return None
+                # Run the workflow if a match is found
+                workflow: EntryPoint = workflows[0]
+                result: dict[str, bool] = workflow.load()(
+                    message=message,
+                    murfey_db=_db,
+                )
+                if murfey.server._transport_object:
+                    if result.get("success"):
+                        murfey.server._transport_object.transport.ack(header)
+                    else:
+                        # Send it directly to DLQ without trying to rerun it
+                        murfey.server._transport_object.transport.nack(
+                            header, requeue=False
+                        )  # should be result.get("requeue", False)
+                if not result:
+                    logger.error(
+                        f"Workflow {sanitise(message['register'])} returned {result}"
                     )
                 return None
-            # Run the workflow if a match is found
-            workflow: EntryPoint = workflows[0]
-            result: dict[str, bool] = workflow.load()(
-                message=message,
-                murfey_db=_db,
-            )
+            logger.error(f"No workflow found for {sanitise(message['register'])}")
             if murfey.server._transport_object:
-                if result.get("success"):
-                    murfey.server._transport_object.transport.ack(header)
-                else:
-                    # Send it directly to DLQ without trying to rerun it
-                    murfey.server._transport_object.transport.nack(
-                        header, requeue=False
-                    )  # should be result.get("requeue", False)
-            if not result:
-                logger.error(
-                    f"Workflow {sanitise(message['register'])} returned {result}"
-                )
+                murfey.server._transport_object.transport.nack(header, requeue=False)
             return None
-        logger.error(f"No workflow found for {sanitise(message['register'])}")
-        if murfey.server._transport_object:
-            murfey.server._transport_object.transport.nack(header, requeue=False)
-        return None
     except PendingRollbackError:
         _db.rollback()
         _db.close()
@@ -2183,7 +2447,9 @@ def feedback_callback(header: dict, message: dict, _db=murfey_db) -> None:
             )  # should be True
     except Exception:
         logger.warning(
-            "Exception encountered in server RabbitMQ callback", exc_info=True
+            "Exception encountered in server-RabbitMQ callback for workflow "
+            f"'{message.get('register')}'",
+            exc_info=True,
         )
         if murfey.server._transport_object:
             murfey.server._transport_object.transport.nack(header, requeue=False)
@@ -2198,14 +2464,33 @@ def feedback_listen():
                     channel_hint="", callback=None, sub_id=None
                 )
             )
-        murfey.server._transport_object._connection_callback = partial(
-            murfey.server._transport_object.transport.subscribe,
-            murfey.server._transport_object.feedback_queue,
-            feedback_callback,
-            acknowledgement=True,
-        )
+
+        # Re-subscription callback invoked by send() after reconnect() replaces
+        # _transport_object.transport. Resolve the transport at call time rather
+        # than capturing it now: a partial() bound to today's transport would
+        # re-subscribe on the old, closed connection and raise
+        # "add_callback_threadsafe() called on closed or closing connection".
+        def _resubscribe_feedback():
+            transport_manager = murfey.server._transport_object
+            transport_manager.transport.subscribe(
+                transport_manager.feedback_queue,
+                feedback_callback,
+                acknowledgement=True,
+            )
+
+        murfey.server._transport_object._connection_callback = _resubscribe_feedback
         murfey.server._transport_object.transport.subscribe(
             murfey.server._transport_object.feedback_queue,
             feedback_callback,
             acknowledgement=True,
         )
+        while True:
+            if not murfey.server._transport_object.transport.is_connected():
+                try:
+                    murfey.server._transport_object.reconnect()
+                    if murfey.server._transport_object._connection_callback:
+                        murfey.server._transport_object._connection_callback()
+                    logger.info("RabbitMQ has been reconnected")
+                except Disconnected:
+                    logger.warning("RabbitMQ is not connected")
+                    time.sleep(30)

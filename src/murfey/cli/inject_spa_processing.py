@@ -13,7 +13,6 @@ from murfey.server.murfey_db import url
 from murfey.util.config import get_machine_config, get_microscope, get_security_config
 from murfey.util.db import (
     AutoProcProgram,
-    ClassificationFeedbackParameters,
     ClientEnvironment,
     DataCollection,
     DataCollectionGroup,
@@ -136,15 +135,11 @@ def run():
             .where(AutoProcProgram.pj_id == ProcessingJob.id)
             .where(ProcessingJob.recipe == "em-spa-preprocess")
         ).one()
-        params = murfey_db.exec(
-            select(SPARelionParameters, ClassificationFeedbackParameters)
-            .where(SPARelionParameters.pj_id == collected_ids[2].id)
-            .where(ClassificationFeedbackParameters.pj_id == SPARelionParameters.pj_id)
+        proc_params = murfey_db.exec(
+            select(SPARelionParameters).where(
+                SPARelionParameters.pj_id == collected_ids[2].id
+            )
         ).one()
-        proc_params: dict | None = dict(params[0])
-        feedback_params = params[1]
-        if feedback_params.picker_murfey_id is None:
-            raise ValueError("No ISPyB picker ID was found")
     except sqlalchemy.exc.NoResultFound:
         proc_params = None
 
@@ -196,7 +191,6 @@ def run():
                     "ft_bin": proc_params["motion_corr_binning"],
                     "fm_dose": proc_params["dose_per_frame"],
                     "gain_ref": proc_params["gain_ref"],
-                    "picker_uuid": feedback_params.picker_murfey_id,
                     "session_id": args.session_id,
                     "particle_diameter": proc_params["particle_diameter"] or 0,
                     "fm_int_file": args.eer_fractionation_file,
