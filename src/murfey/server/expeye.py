@@ -60,6 +60,7 @@ def insert_foil_holes(
         )
     response = post(f"grid-squares/{grid_square_id}/foil-holes", json=foil_holes)
     try:
-        return response.json()
+        result = response.json()
+        return {fh["foilHoleLabel"]: fh["foilHoleId"] for fh in result}
     except json.JSONDecodeError:
         return None

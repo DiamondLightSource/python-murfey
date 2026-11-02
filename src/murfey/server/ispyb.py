@@ -401,15 +401,15 @@ class TransportManager:
         grid_square_id: int,
         scale_factor: Optional[float],
         foil_hole_parameters: list[FoilHoleParameters],
-    ) -> dict:
+    ) -> dict[str, dict | bool | None]:
         if self.ispyb is not None:
-            result = []
+            result: dict[int, int | None] = {}
             successes = []
             for fhp in foil_hole_parameters:
                 insert_response = self.do_insert_foil_hole(
                     grid_square_id, scale_factor, fhp
                 )
-                result.append(insert_response["return_value"])
+                result[fhp.name] = insert_response["return_value"]
                 successes.append(insert_response["success"])
             return {"success": all(successes), "return_value": result}
         expeye_response = expeye.insert_foil_holes(
