@@ -70,6 +70,48 @@ def request_sim_atlas_stitching(
         f"{json.dumps(sim_data.model_dump(), indent=2, default=str)}"
     )
 
+    # Early exit if no TransportManager was set
+    if murfey.server._transport_object is None:
+        logger.error("No TransportManager object was set up")
+        return None
+
+    # Load relevant session information
+    murfey_session = murfey_db.exec(
+        select(MurfeyDB.Session).where(MurfeyDB.Session.id == session_id)
+    ).one()
+    visit_name = murfey_session.visit
+
+    # Construct the output dir to send the movie to
+    visit_idx = sim_data.mosaic_mrc.parts.index(visit_name)
+    raw_dir = Path(*sim_data.mosaic_mrc.parent.parts[: visit_idx + 2])
+    output_dir = (
+        raw_dir.parent / "processed" / sim_data.mosaic_mrc.parent.relative_to(raw_dir)
+    )
+
+    # Construct the recipe to submit to the message queue
+    recipe = {
+        "recipes": ["sim-atlas"],
+        "parameters": {
+            # PySIMRecon parameters
+            "visit_name": visit_name,
+            "output_dir": str(output_dir),
+            "mosaic_mrc_file": sim_data.mosaic_mrc,
+            "mosaic_text_file": sim_data.mosaic_txt,
+            "markers_file": sim_data.markers_txt,
+            # Return message
+            "session_id": session_id,
+            "feedback_queue": murfey.server._transport_object.feedback_queue,
+        },
+    }
+    logger.debug(
+        "Will submit the following message to 'processing_recipe':\n"
+        f"{json.dumps(recipe, indent=2, default=str)}"
+    )
+    # Submit message for processing
+    murfey.server._transport_object.send(
+        queue="processing_recipe", message=recipe, new_connection=True
+    )
+
 
 class SIMReconData(BaseModel):
     file: Path
