@@ -292,16 +292,16 @@ class SPAMetadataContext(Context):
                 )
 
             if gs_name not in self._registered_squares:
-                for fh, fh_data in fh_positions.items():
-                    capture_post(
-                        base_url=str(environment.url.geturl()),
-                        router_name="session_control.spa_router",
-                        function_name="register_foil_hole",
-                        token=self._token,
-                        instrument_name=environment.instrument_name,
-                        session_id=environment.murfey_session,
-                        gs_name=gs_name,
-                        data={
+                capture_post(
+                    base_url=str(environment.url.geturl()),
+                    router_name="session_control.spa_router",
+                    function_name="register_foil_holes",
+                    token=self._token,
+                    instrument_name=environment.instrument_name,
+                    session_id=environment.murfey_session,
+                    gs_name=gs_name,
+                    data={
+                        fh: {
                             "name": fh,
                             "x_location": fh_data.x_location,
                             "y_location": fh_data.y_location,
@@ -315,8 +315,10 @@ class SPAMetadataContext(Context):
                             "diameter": fh_data.diameter,
                             "tag": visitless_source,
                             "image": fh_data.image,
-                        },
-                    )
+                        }
+                        for fh, fh_data in fh_positions.items()
+                    },
+                )
                 if fh_positions:
                     capture_post(
                         base_url=str(environment.url.geturl()),

@@ -70,9 +70,6 @@ from murfey.util.models import (
     Visit,
 )
 from murfey.workflows.spa.atlas import atlas_jpg_from_mrc
-from murfey.workflows.spa.flush_spa_preprocess import (
-    register_foil_hole as _register_foil_hole,
-)
 from murfey.workflows.tomo.tomo_metadata import (
     register_batch_position_in_database,
     register_search_map_in_database,
@@ -479,17 +476,28 @@ def register_grid_square(
         )
 
 
-@spa_router.post("/sessions/{session_id}/grid_square/{gs_name}/foil_hole")
-def register_foil_hole(
+@spa_router.post("/sessions/{session_id}/grid_square/{gs_name}/foil_holes")
+def register_foil_holes(
     session_id: MurfeySessionID,
     gs_name: int,
-    foil_hole_params: FoilHoleParameters,
+    foil_hole_params: dict[int, FoilHoleParameters],
     db=murfey_db,
 ):
     logger.info(
-        f"Registering foil hole {foil_hole_params.name} with position {(foil_hole_params.x_location, foil_hole_params.y_location)}"
+        f"Registering {len(foil_hole_params)} foil holes for grid square {gs_name}"
     )
-    return _register_foil_hole(session_id, gs_name, foil_hole_params, db)
+    if murfey.server._transport_object:
+        murfey.server._transport_object.send(
+            murfey.server._transport_object.feedback_queue,
+            {
+                "register": "spa.register_foil_holes",
+                "session_id": session_id,
+                "gs_name": gs_name,
+                "foil_hole_params": [
+                    fhp.model_dump() for fhp in foil_hole_params.values()
+                ],
+            },
+        )
 
 
 tomo_router = APIRouter(
