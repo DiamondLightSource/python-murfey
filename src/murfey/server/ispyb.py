@@ -339,7 +339,7 @@ class TransportManager:
     def do_insert_foil_hole(
         self,
         grid_square_id: int,
-        scale_factor: Optional[float],
+        scale_factor: float | None,
         foil_hole_parameters: FoilHoleParameters,
     ):
         pixel_size = foil_hole_parameters.pixel_size
@@ -399,10 +399,17 @@ class TransportManager:
     def do_insert_foil_holes(
         self,
         grid_square_id: int,
-        scale_factor: Optional[float],
+        scale_factor: float | None,
         foil_hole_parameters: list[FoilHoleParameters],
     ) -> dict[str, dict | bool | None]:
-        if self.ispyb is not None:
+        if expeye.EXPEYE_TOKEN:
+            expeye_response = expeye.insert_foil_holes(
+                grid_square_id, scale_factor, foil_hole_parameters
+            )
+            if expeye_response is None:
+                return {"success": False, "return_value": None}
+            return {"success": True, "return_value": expeye_response}
+        elif self.ispyb is not None:
             result: dict[int, int | None] = {}
             successes = []
             for fhp in foil_hole_parameters:
@@ -412,12 +419,8 @@ class TransportManager:
                 result[fhp.name] = insert_response["return_value"]
                 successes.append(insert_response["success"])
             return {"success": all(successes), "return_value": result}
-        expeye_response = expeye.insert_foil_holes(
-            grid_square_id, scale_factor, foil_hole_parameters
-        )
-        if expeye_response is None:
+        else:
             return {"success": False, "return_value": None}
-        return {"success": True, "return_value": expeye_response}
 
     def do_update_foil_hole(
         self,
@@ -457,7 +460,7 @@ class TransportManager:
                     )
                 db.add(foil_hole)
                 db.commit()
-                return {"success": True, "return_value": foil_hole.foilHoleId}
+                return {"success": True, "return_value": foil_hole_id}
         except ispyb.ISPyBException as e:
             log.error(
                 "Updating FoilHole entry caused exception '%s'.",
@@ -465,6 +468,31 @@ class TransportManager:
                 exc_info=True,
             )
         return {"success": False, "return_value": None}
+
+    def do_update_foil_holes(
+        self,
+        grid_square_id: int,
+        scale_factor: float,
+        foil_hole_ids: list[int],
+        foil_hole_parameters: list[FoilHoleParameters],
+    ) -> dict[str, dict | bool | None]:
+        if expeye.EXPEYE_TOKEN:
+            expeye_response = expeye.update_foil_holes(
+                grid_square_id, scale_factor, foil_hole_ids, foil_hole_parameters
+            )
+            if expeye_response is None:
+                return {"success": False, "return_value": None}
+            return {"success": True, "return_value": expeye_response}
+        elif self.ispyb is not None:
+            result: dict[int, int | None] = {}
+            successes = []
+            for fhid, fhp in zip(foil_hole_ids, foil_hole_parameters):
+                update_response = self.do_update_foil_hole(fhid, scale_factor, fhp)
+                result[fhp.name] = update_response["return_value"]
+                successes.append(update_response["success"])
+            return {"success": all(successes), "return_value": result}
+        else:
+            return {"success": False, "return_value": None}
 
     def do_insert_search_map(
         self,

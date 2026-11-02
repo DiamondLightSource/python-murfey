@@ -1,4 +1,5 @@
 import json
+import logging
 
 import requests
 
@@ -7,6 +8,8 @@ from murfey.util.models import FoilHoleParameters
 
 EXPEYE_TOKEN = get_security_config().expeye_token
 EXPEYE_URL = get_security_config().expeye_url
+
+logger = logging.getLogger(__name__)
 
 
 def get(url: str) -> requests.Response:
@@ -64,3 +67,13 @@ def insert_foil_holes(
         return {fh["foilHoleLabel"]: fh["foilHoleId"] for fh in result}
     except json.JSONDecodeError:
         return None
+
+
+def update_foil_holes(
+    grid_square_id: int,
+    scale_factor: float | None,
+    foil_hole_ids: list[int],
+    foil_hole_parameters: list[FoilHoleParameters],
+) -> dict | None:
+    logger.error("This doesn't exist yet!")
+    return None
