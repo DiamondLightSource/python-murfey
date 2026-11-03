@@ -480,11 +480,11 @@ def register_grid_square(
 def register_foil_holes(
     session_id: MurfeySessionID,
     gs_name: int,
-    foil_hole_params: dict[int, FoilHoleParameters],
+    foil_hole_group: dict[int, FoilHoleParameters],
     db=murfey_db,
 ):
     logger.info(
-        f"Registering {len(foil_hole_params)} foil holes for grid square {gs_name}"
+        f"Registering {len(foil_hole_group)} foil holes for grid square {gs_name}"
     )
     if murfey.server._transport_object:
         murfey.server._transport_object.send(
@@ -493,11 +493,12 @@ def register_foil_holes(
                 "register": "spa.register_foil_holes",
                 "session_id": session_id,
                 "gs_name": gs_name,
-                "foil_hole_params": [
-                    fhp.model_dump() for fhp in foil_hole_params.values()
-                ],
+                "foil_hole_group": {
+                    k: v.model_dump() for k, v in foil_hole_group.items()
+                },
             },
         )
+    return gs_name
 
 
 tomo_router = APIRouter(

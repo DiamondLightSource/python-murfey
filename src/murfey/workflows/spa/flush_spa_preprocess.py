@@ -126,7 +126,9 @@ def _flush_position_analysis(
             name=foil_hole,
         )
     # Insert or update this foil hole in the database
-    return register_foil_holes(session_id, gs.id, [foil_hole_parameters], murfey_db)
+    return register_foil_holes(
+        session_id, gs.id, {foil_hole: foil_hole_parameters}, murfey_db
+    )
 
 
 def flush_spa_preprocess(message: dict, murfey_db: Session) -> dict[str, bool]:

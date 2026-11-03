@@ -242,20 +242,19 @@ def handle_new_holes(
 def register_foil_holes(
     session_id: int,
     gs_name: int,
-    foil_hole_params: list[FoilHoleParameters],
+    foil_hole_group: dict[int, FoilHoleParameters],
     murfey_db: SQLModelSession,
 ) -> list[int | None] | None:
     """Register a list of foil holes on a grid square"""
-    if not foil_hole_params:
+    if not foil_hole_group:
         return None
     try:
         gs = murfey_db.exec(
             select(GridSquare)
-            .where(GridSquare.tag == foil_hole_params[0].tag)
+            .where(GridSquare.tag == list(foil_hole_group.values())[0].tag)
             .where(GridSquare.session_id == session_id)
             .where(GridSquare.name == gs_name)
         ).one()
-        gsid = gs.id
     except NoResultFound:
         logger.warning(
             f"Foil holes could not be registered as grid square {sanitise(str(gs_name))} was not found"
@@ -265,7 +264,7 @@ def register_foil_holes(
     # Check which holes already exist
     foil_hole_query = murfey_db.exec(
         select(FoilHole)
-        .where(FoilHole.grid_square_id == gsid)
+        .where(FoilHole.grid_square_id == gs.id)
         .where(FoilHole.session_id == session_id)
     ).all()
     existing_hole_names = [fh.name for fh in foil_hole_query]
@@ -273,7 +272,7 @@ def register_foil_holes(
     hole_ids = []
     # Existing holes can be updated in all databases
     existing_holes = [
-        fhp for fhp in foil_hole_params if fhp.name in existing_hole_names
+        fhp for fhid, fhp in foil_hole_group.items() if fhid in existing_hole_names
     ]
     hole_ids.extend(
         handle_existing_holes(
@@ -281,7 +280,9 @@ def register_foil_holes(
         )
     )
     # New holes need to be inserted
-    new_holes = [fhp for fhp in foil_hole_params if fhp.name not in existing_hole_names]
+    new_holes = [
+        fhp for fhid, fhp in foil_hole_group.items() if fhid not in existing_hole_names
+    ]
     hole_ids.extend(handle_new_holes(session_id, gs, new_holes, murfey_db))
     murfey_db.close()
     return hole_ids
@@ -291,6 +292,6 @@ def run(message: dict, murfey_db: SQLModelSession) -> list[int | None] | None:
     return register_foil_holes(
         int(message["session_id"]),
         message["gs_name"],
-        [FoilHoleParameters(**fhp) for fhp in message["foil_square_params"]],
+        {fhid: FoilHoleParameters(**fhp) for fhid, fhp in message["foil_hole_group"]},
         murfey_db,
     )
