@@ -27,6 +27,7 @@ from murfey.server.api.auth import (
     validate_token,
     validate_user_instrument_access,
 )
+from murfey.server.murfey_db import murfey_db_session as partial_murfey_db_session
 from murfey.util.db import Session as MurfeySession
 
 
@@ -420,7 +421,7 @@ def set_up_test_backend_client(
             lambda: session_id
         )
     if mock_db_session:
-        backend_app.dependency_overrides[murfey_db_session] = mock_db_session
+        backend_app.dependency_overrides[partial_murfey_db_session] = mock_db_session
 
     # Attach router, initiate object, and return it
     backend_app.include_router(router)
