@@ -476,7 +476,8 @@ class TransportManager:
         foil_hole_ids: list[int],
         foil_hole_parameters: list[FoilHoleParameters],
     ) -> dict[str, dict | bool | None]:
-        if expeye.EXPEYE_TOKEN:
+        if False and expeye.EXPEYE_TOKEN:
+            # Disabled until endpoint exists on expeye
             expeye_response = expeye.update_foil_holes(
                 grid_square_id, scale_factor, foil_hole_ids, foil_hole_parameters
             )
