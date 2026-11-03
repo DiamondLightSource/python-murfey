@@ -5,7 +5,12 @@ from unittest.mock import MagicMock
 import pytest
 from pytest_mock import MockerFixture
 
-from murfey.server.api.workflow_sim import SIMReconData, request_sim_reconstruction
+from murfey.server.api.workflow_sim import (
+    SIMAtlasData,
+    SIMReconData,
+    request_sim_atlas_stitching,
+    request_sim_reconstruction,
+)
 from murfey.util import sanitise_path
 from murfey.util.config import MachineConfig
 
@@ -20,6 +25,77 @@ def visit_dir(tmp_path: Path):
     visit_dir = tmp_path / "data" / "2020" / visit_name
     visit_dir.mkdir(parents=True, exist_ok=True)
     return visit_dir
+
+
+@pytest.mark.parametrize("has_transport_object", (True, False))
+def test_request_sim_atlas_stitching(
+    mocker: MockerFixture,
+    tmp_path: Path,
+    visit_dir: Path,
+    has_transport_object: bool,
+):
+    # Set up the test file and output directory
+    grid_dir = visit_dir / "raw" / "grid_1"
+    mosaic_mrc = grid_dir / "mosaic.mrc"
+    mosaic_txt = grid_dir / "mosaic.txt"
+    markers_txt = grid_dir / "markers.txt"
+    sim_data = SIMAtlasData(
+        **{
+            "mosaic_mrc": mosaic_mrc,
+            "mosaic_txt": mosaic_txt,
+            "markers_txt": markers_txt,
+        }
+    )
+    output_dir = visit_dir / "processed" / "grid_1"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Mock the logger
+    mock_logger = mocker.patch("murfey.server.api.workflow_sim.logger")
+
+    # Mock the Murfey DB
+    mock_murfey_session = MagicMock(
+        visit=visit_name,
+    )
+    mock_db = MagicMock()
+    mock_db.exec.return_value.one.return_value = mock_murfey_session
+
+    # Mock the transport object
+    if has_transport_object:
+        mock_transport_object = MagicMock()
+        mock_transport_object.feedback_queue = "dummy"
+        mocker.patch("murfey.server._transport_object", mock_transport_object)
+    else:
+        mocker.patch("murfey.server._transport_object", None)
+
+    # Run the function and check that the expected calls were made
+    request_sim_atlas_stitching(
+        session_id=session_id, sim_data=sim_data, murfey_db=mock_db
+    )
+
+    # Check that the expected calls were made
+    # The parameters are toggled 'False' one at a time
+    if not has_transport_object:
+        mock_logger.error.assert_called_with("No TransportManager object was set up")
+    else:
+        recipe = {
+            "recipes": ["sim-atlas"],
+            "parameters": {
+                "visit_name": visit_name,
+                "output_dir": str(output_dir),
+                "mosaic_mrc_file": str(sim_data.mosaic_mrc),
+                "mosaic_text_file": str(sim_data.mosaic_txt),
+                "markers_file": str(sim_data.markers_txt),
+                "session_id": session_id,
+                "feedback_queue": "dummy",
+            },
+        }
+        mock_logger.debug.assert_called_with(
+            "Will submit the following message to 'processing_recipe':\n"
+            f"{json.dumps(recipe, indent=2, default=str)}"
+        )
+        mock_transport_object.send.assert_called_with(
+            queue="processing_recipe", message=recipe, new_connection=True
+        )
 
 
 @pytest.mark.parametrize(
