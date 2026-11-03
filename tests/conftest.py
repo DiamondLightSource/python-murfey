@@ -4,10 +4,12 @@ import json
 import os
 from configparser import ConfigParser
 from pathlib import Path
-from typing import Any, Generator, Type, TypeVar
+from typing import Any, Callable, Generator, Type, TypeVar
 
 import ispyb
 import pytest
+from fastapi import APIRouter, FastAPI
+from fastapi.testclient import TestClient
 from ispyb.sqlalchemy import BLSession, ExperimentType, Person, Proposal, url
 from sqlalchemy import Engine, and_, create_engine, event, select as sa_select
 from sqlalchemy.exc import InterfaceError
@@ -18,6 +20,13 @@ from sqlalchemy.orm import (
 )
 from sqlmodel import Session as SQLModelSession, SQLModel, select as sm_select
 
+from murfey.server.api.auth import (
+    validate_frontend_session_access,
+    validate_instrument_server_session_access,
+    validate_instrument_token,
+    validate_token,
+    validate_user_instrument_access,
+)
 from murfey.util.db import Session as MurfeySession
 
 
@@ -374,3 +383,45 @@ def murfey_db_session(
         session.close()
         transaction.rollback()
         connection.close()
+
+
+"""
+=======================================================================================
+FastAPI server setup helper(s)
+=======================================================================================
+"""
+
+
+def set_up_test_backend_client(
+    router: APIRouter,
+    session_id: int | None = None,
+    instrument_name: str | None = None,
+    mock_db_session: Callable | None = None,
+):
+    """
+    Helper function to set up a FastAPI TestClient object that can be used to test the
+    functionality of a router's API endpoints.
+    """
+    # Set up the backend server
+    backend_app = FastAPI()
+
+    # Override validation and database dependencies as needed
+    backend_app.dependency_overrides[validate_token] = lambda: None
+    backend_app.dependency_overrides[validate_instrument_token] = lambda: None
+    if instrument_name:
+        backend_app.dependency_overrides[validate_user_instrument_access] = (
+            lambda: instrument_name
+        )
+    if session_id:
+        backend_app.dependency_overrides[validate_frontend_session_access] = (
+            lambda: session_id
+        )
+        backend_app.dependency_overrides[validate_instrument_server_session_access] = (
+            lambda: session_id
+        )
+    if mock_db_session:
+        backend_app.dependency_overrides[murfey_db_session] = mock_db_session
+
+    # Attach router, initiate object, and return it
+    backend_app.include_router(router)
+    return TestClient(backend_app)
