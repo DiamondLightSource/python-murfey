@@ -274,16 +274,18 @@ def register_foil_holes(
     existing_holes = [
         fhp for fhid, fhp in foil_hole_group.items() if fhid in existing_hole_names
     ]
-    hole_ids.extend(
-        handle_existing_holes(
-            session_id, gs, foil_hole_query, existing_holes, murfey_db
+    if existing_holes:
+        hole_ids.extend(
+            handle_existing_holes(
+                session_id, gs, foil_hole_query, existing_holes, murfey_db
+            )
         )
-    )
     # New holes need to be inserted
     new_holes = [
         fhp for fhid, fhp in foil_hole_group.items() if fhid not in existing_hole_names
     ]
-    hole_ids.extend(handle_new_holes(session_id, gs, new_holes, murfey_db))
+    if new_holes:
+        hole_ids.extend(handle_new_holes(session_id, gs, new_holes, murfey_db))
     murfey_db.close()
     return hole_ids
 
