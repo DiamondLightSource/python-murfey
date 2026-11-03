@@ -46,7 +46,7 @@ def test_register_foil_hole_add_and_update(mock_transport, murfey_db_session: Se
     murfey_db_session.commit()
 
     foil_hole_group = {
-        i: FoilHoleParameters(
+        i * 1000 + i: FoilHoleParameters(
             tag="session_tag",
             name=i * 1000 + i,
             x_location=0.5,
