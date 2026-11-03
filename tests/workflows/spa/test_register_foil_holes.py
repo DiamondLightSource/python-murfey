@@ -96,7 +96,7 @@ def test_register_foil_hole_add_and_update(mock_transport, murfey_db_session: Se
     foil_hole_final_parameters = murfey_db_session.exec(select(FoilHole)).all()
     assert len(foil_hole_final_parameters) == 4
     for i, final_foil_hole in enumerate(foil_hole_final_parameters):
-        assert final_foil_hole.name == i * 1000 + i
+        assert final_foil_hole.name == (i + 1) * 1000 + i + 1
         assert final_foil_hole.session_id == ExampleVisit.murfey_session_id
         assert final_foil_hole.grid_square_id == 1
         assert final_foil_hole.x_location == 0.5
