@@ -66,7 +66,7 @@ def test_register_foil_hole_add_and_update(mock_transport, murfey_db_session: Se
 
     hole_ids = register_foil_holes.register_foil_holes(
         session_id=ExampleVisit.murfey_session_id,
-        gs_name=1,
+        gs_name=101,
         foil_hole_group=foil_hole_group,
         murfey_db=murfey_db_session,
     )
