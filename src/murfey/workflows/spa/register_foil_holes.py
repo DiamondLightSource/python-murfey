@@ -145,6 +145,7 @@ def handle_existing_holes(
             fhp.thumbnail_size_y or foil_hole.thumbnail_size_y
         ) or jpeg_size[1]
         foil_hole.pixel_size = fhp.pixel_size or foil_hole.pixel_size
+        foil_hole.image = str(secure_path(Path(fhp.image))) or foil_hole.image
         foil_hole.smartem_uuid = fh_smartem_response.get(fhp.name)
         foil_holes.append(foil_hole)
 
