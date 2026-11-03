@@ -1,24 +1,12 @@
 from pathlib import Path
 
 import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
 from pytest_mock import MockerFixture
 
 from murfey.server.api.bootstrap import plugins as plugins_router
 from murfey.util.api import url_path_for
 from murfey.util.config import MachineConfig
-
-
-def set_up_test_backend_client():
-    """
-    Helper function to set up a test backend server whose response can be inspected
-    to check that the endpoint function works as expected
-    """
-    # Set up the backend server
-    backend_app = FastAPI()
-    backend_app.include_router(plugins_router)
-    return TestClient(backend_app)
+from tests.conftest import set_up_test_backend_client
 
 
 @pytest.mark.parametrize("packages", ([], ["package_a"], ["package_a", "package_b"]))
@@ -39,7 +27,7 @@ def test_show_plugin_wheels(
     )
 
     # Set up the test backend client and the URL to poke
-    backend_server = set_up_test_backend_client()
+    backend_server = set_up_test_backend_client(plugins_router)
     backend_url_path = url_path_for(
         "api.bootstrap.plugins",
         "show_plugin_wheels",
@@ -94,7 +82,7 @@ def test_get_plugin_wheel(
     )
 
     # Set up the test backend client and the URL to poke
-    backend_server = set_up_test_backend_client()
+    backend_server = set_up_test_backend_client(plugins_router)
     backend_url_path = url_path_for(
         "api.bootstrap.plugins",
         "get_plugin_wheel",
