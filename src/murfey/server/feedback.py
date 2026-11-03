@@ -762,7 +762,12 @@ def _register_incomplete_2d_batch(message: dict, _db):
     # next batch, reserving it here is what keeps the block contiguous and the
     # positional derivation in select_classes correct.
     visit_name = _visit_name_for_session(session_id, _db)
-    class2d_job = _reserve_2d_classification_jobs(visit_name, feedback_params).class2d
+    if feedback_params.star_combination_job:
+        class2d_job = feedback_params.star_combination_job - 1 - _jobs_per_class2d()
+    else:
+        class2d_job = _reserve_2d_classification_jobs(
+            visit_name, feedback_params
+        ).class2d
     feedback_params.hold_class2d = True
     relion_options = dict(relion_params)
     _db.add(feedback_params)
@@ -916,17 +921,16 @@ def _register_complete_2d_batch(message: dict, _db):
             )
         ).one():
             # This particles file already ran as an incomplete batch and now
-            # reruns complete. Reserve a fresh block rather than trying to
-            # reuse the earlier Class2D number (that number is not recoverable
-            # here). Class2DParameters.class2d_dir stores only the directory
-            # prefix (the number is appended when the message is built) and,
-            # unlike _release_2d_hold, this handler's message carries no
-            # "job_dir". A fresh block costs one unused directory and is
-            # collision-free vs deriving the old number from the live counter
-            # guessed wrong as soon as anything else had allocated since.
-            class2d_job = _reserve_2d_classification_jobs(
-                visit_name, feedback_params
-            ).class2d
+            # reruns complete. Temporary workaround is to use combination job to
+            # work out the 2D class job
+            if feedback_params.star_combination_job:
+                class2d_job = (
+                    feedback_params.star_combination_job - 1 - _jobs_per_class2d()
+                )
+            else:
+                class2d_job = _reserve_2d_classification_jobs(
+                    visit_name, feedback_params
+                ).class2d
             class_uuids = _2d_class_murfey_ids(
                 class2d_message["particles_file"], _app_id(pj_id, _db), _db
             )
