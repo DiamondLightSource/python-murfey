@@ -11,6 +11,9 @@ from tests.conftest import ExampleVisit
 @mock.patch("murfey.server._transport_object")
 def test_register_foil_hole_add_and_update(mock_transport, murfey_db_session: Session):
     """Test inserting and updating foil holes"""
+    mock_transport.do_update_foil_holes.return_value = {"success": False}
+    mock_transport.do_insert_foil_holes.return_value = {"success": False}
+
     # Create a grid square to update
     dcg = DataCollectionGroup(
         id=1,
@@ -25,6 +28,8 @@ def test_register_foil_hole_add_and_update(mock_transport, murfey_db_session: Se
         name=101,
         session_id=ExampleVisit.murfey_session_id,
         tag="session_tag",
+        thumbnail_size_x=10,
+        readout_area_x=5,
     )
     murfey_db_session.add(grid_square)
     foil_hole_1 = FoilHole(
@@ -72,6 +77,14 @@ def test_register_foil_hole_add_and_update(mock_transport, murfey_db_session: Se
     )
 
     assert len(hole_ids) == 4
+
+    # Check this would have updated ispyb
+    mock_transport.do_update_foil_holes.assert_called_once_with(
+        1, 2, [1, 2], [foil_hole_group[1001], foil_hole_group[2002]]
+    )
+    mock_transport.do_insert_foil_holes.assert_called_once_with(
+        1, 2, [foil_hole_group[3003], foil_hole_group[4004]]
+    )
 
     # Confirm the database was updated
     foil_hole_final_parameters = murfey_db_session.exec(select(FoilHole)).all()
