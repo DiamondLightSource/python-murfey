@@ -11,8 +11,14 @@ from tests.conftest import ExampleVisit
 @mock.patch("murfey.server._transport_object")
 def test_register_foil_hole_add_and_update(mock_transport, murfey_db_session: Session):
     """Test inserting and updating foil holes"""
-    mock_transport.do_update_foil_holes.return_value = {"success": False}
-    mock_transport.do_insert_foil_holes.return_value = {"success": False}
+    mock_transport.do_update_foil_holes.return_value = {
+        "success": True,
+        "return_value": {1001: 1, 2002: 2},
+    }
+    mock_transport.do_insert_foil_holes.return_value = {
+        "success": True,
+        "return_value": {3003: 3, 4004: 4},
+    }
 
     # Create a grid square to update
     dcg = DataCollectionGroup(
