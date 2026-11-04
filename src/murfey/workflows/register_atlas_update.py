@@ -22,13 +22,14 @@ def run(
     logger.info(f"Registering updated atlas: \n{message}")
     murfey_session_id = int(message["session_id"])
     murfey.server._transport_object.do_update_atlas(
+        dcg_id=message["dcgid"],
         atlas_id=message["atlas_id"],
         atlas_image=message["atlas"],
         pixel_size=message["atlas_pixel_size"],
         slot=message["sample"],
         # Extract optional parameters
         collection_mode=message.get("collection_mode"),
-        color_flags=message.get("color_flags", {}),
+        colour_flags=message.get("colour_flags", {}),
     )
 
     # Find out how many dcgs we have with this atlas

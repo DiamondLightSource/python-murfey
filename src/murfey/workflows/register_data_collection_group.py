@@ -10,6 +10,7 @@ from sqlmodel.orm.session import Session as SQLModelSession
 import murfey.server
 from murfey.server.ispyb import ISPyBSession, get_session_id
 from murfey.util.db import DataCollectionGroup, ImagingSite
+from murfey.util.models import AtlasParameters
 
 logger = logging.getLogger("murfey.workflows.register_data_collection_group")
 
@@ -49,21 +50,20 @@ def register_dcg(
         if dcgid is None:
             return None
 
-        atlas_record = ISPyBDB.Atlas(
-            dataCollectionGroupId=dcgid,
-            atlasImage=message.get("atlas", ""),
-            pixelSize=message.get("atlas_pixel_size", 0),
-            cassetteSlot=message.get("sample"),
+        atlas_parameters = AtlasParameters(
+            image=message.get("atlas", ""),
+            pixel_size=message.get("atlas_pixel_size", 0),
+            cassette_slot=message.get("sample"),
         )
         # Optionally set the collection mode and color flags
         if collection_mode := message.get("collection_mode"):
-            atlas_record.mode = collection_mode
-        if color_flags := message.get("color_flags", {}):
-            for col_name, value in color_flags.items():
-                setattr(atlas_record, col_name, value)
-        atlas_id = murfey.server._transport_object.do_insert_atlas(atlas_record).get(
-            "return_value", None
-        )
+            atlas_parameters.mode = collection_mode
+        if colour_flags := message.get("colour_flags", {}):
+            for col_name, value in colour_flags.items():
+                setattr(atlas_parameters, f"has_{col_name}", value)
+        atlas_id = murfey.server._transport_object.do_insert_atlas(
+            dcgid, atlas_parameters
+        ).get("return_value", None)
 
         murfey_dcg = DataCollectionGroup(
             id=dcgid,

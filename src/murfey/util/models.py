@@ -322,6 +322,20 @@ Models related to the single-particle analysis workflow.
 """
 
 
+class AtlasParameters(BaseModel):
+    image: str | None = None
+    pixel_size: float | None = None
+    cassette_slot: int | None = None
+    mode: str | None = None
+    has_grey: bool | None = None
+    has_red: bool | None = None
+    has_green: bool | None = None
+    has_blue: bool | None = None
+    has_cyan: bool | None = None
+    has_magenta: bool | None = None
+    has_yellow: bool | None = None
+
+
 class AtlasRegistration(BaseModel):
     name: str
     acquisition_uuid: str | None

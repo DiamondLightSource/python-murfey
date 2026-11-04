@@ -153,3 +153,5 @@ class TomographyParameters(BaseModel):
 
 
 default_tomo_parameters = TomographyParameters()
+
+colour_channels: list = ["gray", "red", "green", "blue", "cyan", "magenta", "yellow"]

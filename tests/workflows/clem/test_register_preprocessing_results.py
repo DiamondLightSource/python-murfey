@@ -12,11 +12,10 @@ from sqlmodel.orm.session import Session as SQLModelSession
 
 import murfey.util.db as MurfeyDB
 from murfey.workflows.clem.register_preprocessing_results import (
-    COLOR_FLAGS_MURFEY_TO_ISPYB,
     CLEMPreprocessingResult,
     _consolidate_atlases,
     _determine_collection_mode,
-    _get_color_flags,
+    _get_colour_flags,
     _register_clem_imaging_site,
     _register_dcg_and_atlas,
     _register_grid_square,
@@ -138,7 +137,7 @@ def test_get_color_flags(test_params: tuple[list[str], dict[str, bool]]):
     )
     for flag, value in positive_flags.items():
         expected_result[flag] = value
-    assert _get_color_flags(colors) == expected_result
+    assert _get_colour_flags(colors) == expected_result
 
 
 def test_register_clem_imaging_site():
@@ -442,15 +441,14 @@ def test_run_with_db(
 
     # Determine the color flags and collection mode
     color_flags = {
-        COLOR_FLAGS_MURFEY_TO_ISPYB[flag]: int(value)
-        for flag, value in _get_color_flags(colors).items()
+        flag: int(value) for flag, value in _get_colour_flags(colors).items()
     }
     collection_mode = _determine_collection_mode(colors)
 
     # Atlas color flags and collection mode should be set correctly
     ispyb_atlas = ispyb_atlas_search[0]
     for flag, value in color_flags.items():
-        assert getattr(ispyb_atlas, flag) == value
+        assert getattr(ispyb_atlas, f"has{flag.capitalize()}") == value
     assert ispyb_atlas.mode == collection_mode
 
     # ISPyB's GridSquare should have half the number of initial entries
@@ -472,7 +470,7 @@ def test_run_with_db(
             assert denoising_suffix in gs.gridSquareImage
         # Check that the GridSquare color flags and collection mode are set correctly
         for flag, value in color_flags.items():
-            assert getattr(gs, flag) == value
+            assert getattr(gs, f"has{flag.capitalize()}") == value
         assert gs.mode == collection_mode
 
     murfey_db_session.close()
