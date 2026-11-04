@@ -32,6 +32,7 @@ from pydantic import BaseModel
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
+import murfey.server.expeye as expeye
 from murfey.util import sanitise
 from murfey.util.config import get_security_config
 from murfey.util.models import (
@@ -338,7 +339,7 @@ class TransportManager:
     def do_insert_foil_hole(
         self,
         grid_square_id: int,
-        scale_factor: Optional[float],
+        scale_factor: float | None,
         foil_hole_parameters: FoilHoleParameters,
     ):
         pixel_size = foil_hole_parameters.pixel_size
@@ -395,52 +396,103 @@ class TransportManager:
             )
         return {"success": False, "return_value": None}
 
-    def do_update_foil_hole(
+    def do_insert_foil_holes(
         self,
+        grid_square_id: int,
+        scale_factor: float | None,
+        foil_hole_parameters: list[FoilHoleParameters],
+    ) -> dict[str, dict | bool | None]:
+        if expeye.EXPEYE_TOKEN:
+            expeye_response = expeye.insert_foil_holes(
+                grid_square_id, scale_factor, foil_hole_parameters
+            )
+            if expeye_response is None:
+                return {"success": False, "return_value": None}
+            return {"success": True, "return_value": expeye_response}
+        elif self.ispyb is not None:
+            result: dict[int, int | None] = {}
+            successes = []
+            for fhp in foil_hole_parameters:
+                insert_response = self.do_insert_foil_hole(
+                    grid_square_id, scale_factor, fhp
+                )
+                result[fhp.name] = insert_response["return_value"]
+                successes.append(insert_response["success"])
+            return {"success": all(successes), "return_value": result}
+        else:
+            return {"success": False, "return_value": None}
+
+    @staticmethod
+    def do_update_foil_hole_entry(
         foil_hole_id: int,
         scale_factor: float,
         foil_hole_parameters: FoilHoleParameters,
-    ):
-        try:
-            with ISPyBSession() as db:
-                foil_hole = (
-                    db.query(FoilHole).filter(FoilHole.foilHoleId == foil_hole_id).one()
-                )
-                if foil_hole_parameters.image:
-                    foil_hole.foilHoleImage = foil_hole_parameters.image
-                if foil_hole_parameters.x_location:
-                    foil_hole.pixelLocationX = int(
-                        foil_hole_parameters.x_location * scale_factor
-                    )
-                if foil_hole_parameters.y_location:
-                    foil_hole.pixelLocationY = int(
-                        foil_hole_parameters.y_location * scale_factor
-                    )
-                if foil_hole_parameters.diameter is not None:
-                    foil_hole.diameter = foil_hole_parameters.diameter * scale_factor
-                if foil_hole_parameters.x_stage_position:
-                    foil_hole.stageLocationX = foil_hole_parameters.x_stage_position
-                if foil_hole_parameters.y_stage_position:
-                    foil_hole.stageLocationY = foil_hole_parameters.y_stage_position
-                if (
-                    foil_hole_parameters.readout_area_x is not None
-                    and foil_hole_parameters.thumbnail_size_x is not None
-                    and foil_hole_parameters.pixel_size is not None
-                ):
-                    foil_hole.pixelSize = foil_hole_parameters.pixel_size * (
-                        foil_hole_parameters.readout_area_x
-                        / foil_hole_parameters.thumbnail_size_x
-                    )
-                db.add(foil_hole)
-                db.commit()
-                return {"success": True, "return_value": foil_hole.foilHoleId}
-        except ispyb.ISPyBException as e:
-            log.error(
-                "Updating FoilHole entry caused exception '%s'.",
-                e,
-                exc_info=True,
+        db: Session,
+    ) -> FoilHole:
+        foil_hole = db.query(FoilHole).filter(FoilHole.foilHoleId == foil_hole_id).one()
+        if foil_hole_parameters.image:
+            foil_hole.foilHoleImage = foil_hole_parameters.image
+        if foil_hole_parameters.x_location:
+            foil_hole.pixelLocationX = int(
+                foil_hole_parameters.x_location * scale_factor
             )
-        return {"success": False, "return_value": None}
+        if foil_hole_parameters.y_location:
+            foil_hole.pixelLocationY = int(
+                foil_hole_parameters.y_location * scale_factor
+            )
+        if foil_hole_parameters.diameter is not None:
+            foil_hole.diameter = foil_hole_parameters.diameter * scale_factor
+        if foil_hole_parameters.x_stage_position:
+            foil_hole.stageLocationX = foil_hole_parameters.x_stage_position
+        if foil_hole_parameters.y_stage_position:
+            foil_hole.stageLocationY = foil_hole_parameters.y_stage_position
+        if (
+            foil_hole_parameters.readout_area_x is not None
+            and foil_hole_parameters.thumbnail_size_x is not None
+            and foil_hole_parameters.pixel_size is not None
+        ):
+            foil_hole.pixelSize = foil_hole_parameters.pixel_size * (
+                foil_hole_parameters.readout_area_x
+                / foil_hole_parameters.thumbnail_size_x
+            )
+        return FoilHole
+
+    def do_update_foil_holes(
+        self,
+        grid_square_id: int,
+        scale_factor: float,
+        foil_hole_ids: list[int],
+        foil_hole_parameters: list[FoilHoleParameters],
+    ) -> dict[str, dict | bool | None]:
+        if False and expeye.EXPEYE_TOKEN:
+            # Disabled until endpoint exists on expeye
+            expeye_response = expeye.update_foil_holes(
+                grid_square_id, scale_factor, foil_hole_ids, foil_hole_parameters
+            )
+            if expeye_response is None:
+                return {"success": False, "return_value": None}
+            return {"success": True, "return_value": expeye_response}
+        elif self.ispyb is not None:
+            result: dict[int, int | None] = {}
+            try:
+                with ISPyBSession() as db:
+                    for fhid, fhp in zip(foil_hole_ids, foil_hole_parameters):
+                        update_response = self.do_update_foil_hole_entry(
+                            fhid, scale_factor, fhp, db
+                        )
+                        result[fhp.name] = fhid
+                        db.add(update_response)
+                    db.commit()
+                    return {"success": True, "return_value": result}
+            except ispyb.ISPyBException as e:
+                log.error(
+                    "Updating FoilHole entry caused exception '%s'.",
+                    e,
+                    exc_info=True,
+                )
+                return {"success": False, "return_value": None}
+        else:
+            return {"success": False, "return_value": None}
 
     def do_insert_search_map(
         self,
