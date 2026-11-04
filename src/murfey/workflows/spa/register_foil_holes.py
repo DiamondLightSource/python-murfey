@@ -271,10 +271,14 @@ def register_foil_holes(
     existing_hole_names = [fh.name for fh in foil_hole_query]
 
     hole_ids = []
+    existing_holes = []
+    new_holes = []
+    for fhid, fhp in foil_hole_group.items():
+        if fhid in existing_hole_names:
+            existing_holes.append(fhp)
+        else:
+            new_holes.append(fhp)
     # Existing holes can be updated in all databases
-    existing_holes = [
-        fhp for fhid, fhp in foil_hole_group.items() if fhid in existing_hole_names
-    ]
     if existing_holes:
         hole_ids.extend(
             handle_existing_holes(
@@ -282,9 +286,6 @@ def register_foil_holes(
             )
         )
     # New holes need to be inserted
-    new_holes = [
-        fhp for fhid, fhp in foil_hole_group.items() if fhid not in existing_hole_names
-    ]
     if new_holes:
         hole_ids.extend(handle_new_holes(session_id, gs, new_holes, murfey_db))
     murfey_db.close()

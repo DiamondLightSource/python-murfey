@@ -19,10 +19,9 @@ def get(url: str) -> requests.Response:
 
 
 def post(url: str, json: dict | list | None = None) -> requests.Response:
-    json = json or {}
     return requests.post(
         f"{EXPEYE_URL}/{url}",
-        json=json,
+        json=json or {},
         headers={"Authorization": f"access_token {EXPEYE_TOKEN}"},
     )
 
