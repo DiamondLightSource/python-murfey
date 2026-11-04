@@ -21,6 +21,7 @@ import murfey.server
 import murfey.util.db as MurfeyDB
 from murfey.util.models import GridSquareParameters
 from murfey.util.processing_params import (
+    colour_channels,
     default_clem_processing_parameters as processing_params,
 )
 from murfey.workflows.register_data_collection_group import register_dcg
@@ -33,7 +34,6 @@ logger = logging.getLogger("murfey.workflows.clem.register_preprocessing_results
 ColorChannels: TypeAlias = Literal[
     "gray", "red", "green", "blue", "cyan", "magenta", "yellow"
 ]
-
 CC_MODES = ("_ICC", "_Lng_LVCC", "_Lng_SVCC")
 
 
@@ -107,25 +107,15 @@ class CLEMPreprocessingResult(BaseModel):
         )
 
 
-COLOR_FLAGS_MURFEY = {
-    "gray": "has_grey",
-    "red": "has_red",
-    "green": "has_green",
-    "blue": "has_blue",
-    "cyan": "has_cyan",
-    "magenta": "has_magenta",
-    "yellow": "has_yellow",
-}
-
-
-def _get_color_flags(
-    colors: Collection[str] | None = None,
-):
+def _get_colour_flags(colors: list[str]):
     colors = colors or []
-    color_flags = dict.fromkeys(COLOR_FLAGS_MURFEY.values(), False)
-    for color in colors:
-        color_flags[COLOR_FLAGS_MURFEY[color]] = True
-    return color_flags
+    colour_flags = {}
+    for color in colour_channels:
+        if color in colors:
+            colour_flags[f"has_{color}"] = True
+        else:
+            colour_flags[f"has_{color}"] = False
+    return colour_flags
 
 
 def _register_clem_imaging_site(
@@ -168,7 +158,9 @@ def _register_clem_imaging_site(
 
         # Iteratively add colour channel information
         entry.number_of_members = result.number_of_members
-        for col_name, value in _get_color_flags(result.output_files.keys()).items():
+        for col_name, value in _get_colour_flags(
+            list(result.output_files.keys())
+        ).items():
             setattr(entry, col_name, value)
         entry.collection_mode = _determine_collection_mode(result.output_files.keys())
 
@@ -297,11 +289,6 @@ def _snake_to_camel_case(string: str):
     return parts[0] + "".join(part.capitalize() for part in parts[1:])
 
 
-COLOR_FLAGS_MURFEY_TO_ISPYB = {
-    value: _snake_to_camel_case(value) for value in COLOR_FLAGS_MURFEY.values()
-}
-
-
 def _register_dcg_and_atlas(
     session_id: int,
     instrument_name: str,
@@ -345,15 +332,12 @@ def _register_dcg_and_atlas(
         atlas_pixel_size = imaging_site.thumbnail_pixel_size
 
         # Translate colour flags into ISPyB convention
-        color_flags = {
-            COLOR_FLAGS_MURFEY_TO_ISPYB[key]: getattr(imaging_site, key, 0)
-            for key in COLOR_FLAGS_MURFEY_TO_ISPYB.keys()
-        }
+        colour_flags = {key: getattr(imaging_site, key, 0) for key in colour_channels}
         collection_mode = imaging_site.collection_mode
     else:
         atlas_path = ""
         atlas_pixel_size = 0.0
-        color_flags = None
+        colour_flags = None
         collection_mode = None
 
     if dcg_search := murfey_db.exec(
@@ -366,13 +350,14 @@ def _register_dcg_and_atlas(
         # Update if current dataset is atlas and data collection group exists
         if is_atlas:
             transport_object.do_update_atlas(
+                dcg_id=dcg_entry.id,
                 atlas_id=dcg_entry.atlas_id,
                 atlas_image=atlas_path,
                 pixel_size=atlas_pixel_size,
                 slot=dcg_entry.sample,
                 # Extract optional parameters
                 collection_mode=collection_mode,
-                color_flags=color_flags,
+                colour_flags=colour_flags,
             )
             # Update atlas path on Murfey DataCollectionGroup record as well
             dcg_entry.atlas = atlas_path
@@ -391,7 +376,7 @@ def _register_dcg_and_atlas(
             "atlas": atlas_path,
             "atlas_pixel_size": atlas_pixel_size,
             "sample": None,
-            "color_flags": color_flags,
+            "colour_flags": colour_flags,
             "collection_mode": collection_mode,
         }
         dcg_entry = register_dcg(
@@ -520,9 +505,9 @@ def _register_single_grid_square(
         collection_mode=imaging_site.collection_mode,
     )
     # Construct colour flags for ISPyB
-    color_flags = {
-        ispyb_color_flags: int(getattr(imaging_site, murfey_color_flags, 0))
-        for murfey_color_flags, ispyb_color_flags in COLOR_FLAGS_MURFEY_TO_ISPYB.items()
+    colour_flags = {
+        color: int(getattr(imaging_site, f"has_{color}", 0))
+        for color in colour_channels
     }
     # Register or update the grid square entry as required
     if grid_square_entry := murfey_db.exec(
@@ -547,7 +532,7 @@ def _register_single_grid_square(
         transport_object.do_update_grid_square(
             grid_square_id=grid_square_entry.id,
             grid_square_parameters=grid_square_params,
-            color_flags=color_flags,
+            colour_flags=colour_flags,
         )
     else:
         # Look up data collection group for current series
@@ -561,7 +546,7 @@ def _register_single_grid_square(
             atlas_id=dcg_entry.atlas_id,
             grid_square_id=imaging_site.id,
             grid_square_parameters=grid_square_params,
-            color_flags=color_flags,
+            colour_flags=colour_flags,
         )
         # Register to Murfey
         grid_square_entry = MurfeyDB.GridSquare(

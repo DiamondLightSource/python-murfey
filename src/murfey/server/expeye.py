@@ -4,7 +4,7 @@ import logging
 import requests
 
 from murfey.util.config import get_security_config
-from murfey.util.models import FoilHoleParameters
+from murfey.util.models import AtlasParameters, FoilHoleParameters
 
 EXPEYE_TOKEN = get_security_config().expeye_token
 EXPEYE_URL = get_security_config().expeye_url
@@ -24,6 +24,24 @@ def post(url: str, json: dict | list | None = None) -> requests.Response:
         json=json or {},
         headers={"Authorization": f"access_token {EXPEYE_TOKEN}"},
     )
+
+
+def insert_atlas(dcgid: int, atlas_parameters: AtlasParameters):
+    response = post(f"data-groups/{dcgid}/atlas", json=atlas_parameters)
+    try:
+        result = response.json()
+        return result["atlasId"]
+    except json.JSONDecodeError:
+        return None
+
+
+def update_atlas(dcgid: int, atlas_id: int, atlas_parameters: AtlasParameters):
+    response = post(f"data-groups/{dcgid}/atlas.{atlas_id}", json=atlas_parameters)
+    try:
+        result = response.json()
+        return result["atlasId"]
+    except json.JSONDecodeError:
+        return None
 
 
 def insert_foil_holes(
