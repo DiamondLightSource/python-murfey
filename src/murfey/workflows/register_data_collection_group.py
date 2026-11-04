@@ -60,7 +60,7 @@ def register_dcg(
             atlas_parameters.mode = collection_mode
         if colour_flags := message.get("colour_flags", {}):
             for col_name, value in colour_flags.items():
-                setattr(atlas_parameters, col_name, value)
+                setattr(atlas_parameters, f"has_{col_name}", value)
         atlas_id = murfey.server._transport_object.do_insert_atlas(
             dcgid, atlas_parameters
         ).get("return_value", None)

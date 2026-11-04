@@ -21,31 +21,33 @@ def run(
 
     logger.info(f"Registering updated atlas: \n{message}")
     murfey_session_id = int(message["session_id"])
-    if message.get("atlas") and message.get("sample") is not None:
+    murfey.server._transport_object.do_update_atlas(
+        dcg_id=message["dcgid"],
+        atlas_id=message["atlas_id"],
+        atlas_image=message["atlas"],
+        pixel_size=message["atlas_pixel_size"],
+        slot=message["sample"],
+        # Extract optional parameters
+        collection_mode=message.get("collection_mode"),
+        colour_flags=message.get("colour_flags", {}),
+    )
+
+    # Find out how many dcgs we have with this atlas
+    if (
+        message.get("atlas")
+        and message.get("sample") is not None
+        and "atlas" in Path(message.get("tag", "/")).parts
+    ):
         dcgs_atlas = murfey_db.exec(
             select(DataCollectionGroup)
             .where(DataCollectionGroup.session_id == murfey_session_id)
             .where(DataCollectionGroup.atlas == message["atlas"])
             .where(DataCollectionGroup.sample == message["sample"])
         ).all()
-        for dcg in dcgs_atlas:
-            murfey.server._transport_object.do_update_atlas(
-                dcg_id=dcg.id,
-                atlas_id=message["atlas_id"],
-                atlas_image=message["atlas"],
-                pixel_size=message["atlas_pixel_size"],
-                slot=message["sample"],
-                # Extract optional parameters
-                collection_mode=message.get("collection_mode"),
-                colour_flags=message.get("colour_flags", {}),
-            )
-
-        if "atlas" in Path(message.get("tag", "/")).parts and len(dcgs_atlas) > 1:
+        if len(dcgs_atlas) > 1:
             # Skip hooks if this is an atlas and there is a processing dcg present
             logger.info(f"Skipping data collection group hooks for {message['tag']}")
             return {"success": True}
-    else:
-        logger.warning("Cannot update atlas without image and sample")
 
     # Only send Scaup sample registration if we didn't have a sample before
     if not message.get("sample_registered") and (
