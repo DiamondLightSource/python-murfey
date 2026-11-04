@@ -107,14 +107,14 @@ class CLEMPreprocessingResult(BaseModel):
         )
 
 
-def _get_colour_flags(colors: list[str]):
-    colors = colors or []
+def _get_colour_flags(colours: list[str]):
+    colours = colours or []
     colour_flags = {}
-    for color in colour_channels:
-        if color in colors:
-            colour_flags[f"has_{color}"] = True
+    for colour in colour_channels:
+        if colour in colours:
+            colour_flags[f"has_{colour}"] = True
         else:
-            colour_flags[f"has_{color}"] = False
+            colour_flags[f"has_{colour}"] = False
     return colour_flags
 
 
@@ -506,8 +506,8 @@ def _register_single_grid_square(
     )
     # Construct colour flags for ISPyB
     colour_flags = {
-        color: int(getattr(imaging_site, f"has_{color}", 0))
-        for color in colour_channels
+        colour: int(getattr(imaging_site, f"has_{colour}", 0))
+        for colour in colour_channels
     }
     # Register or update the grid square entry as required
     if grid_square_entry := murfey_db.exec(
