@@ -422,52 +422,40 @@ class TransportManager:
         else:
             return {"success": False, "return_value": None}
 
-    def do_update_foil_hole(
-        self,
+    @staticmethod
+    def do_update_foil_hole_entry(
         foil_hole_id: int,
         scale_factor: float,
         foil_hole_parameters: FoilHoleParameters,
-    ):
-        try:
-            with ISPyBSession() as db:
-                foil_hole = (
-                    db.query(FoilHole).filter(FoilHole.foilHoleId == foil_hole_id).one()
-                )
-                if foil_hole_parameters.image:
-                    foil_hole.foilHoleImage = foil_hole_parameters.image
-                if foil_hole_parameters.x_location:
-                    foil_hole.pixelLocationX = int(
-                        foil_hole_parameters.x_location * scale_factor
-                    )
-                if foil_hole_parameters.y_location:
-                    foil_hole.pixelLocationY = int(
-                        foil_hole_parameters.y_location * scale_factor
-                    )
-                if foil_hole_parameters.diameter is not None:
-                    foil_hole.diameter = foil_hole_parameters.diameter * scale_factor
-                if foil_hole_parameters.x_stage_position:
-                    foil_hole.stageLocationX = foil_hole_parameters.x_stage_position
-                if foil_hole_parameters.y_stage_position:
-                    foil_hole.stageLocationY = foil_hole_parameters.y_stage_position
-                if (
-                    foil_hole_parameters.readout_area_x is not None
-                    and foil_hole_parameters.thumbnail_size_x is not None
-                    and foil_hole_parameters.pixel_size is not None
-                ):
-                    foil_hole.pixelSize = foil_hole_parameters.pixel_size * (
-                        foil_hole_parameters.readout_area_x
-                        / foil_hole_parameters.thumbnail_size_x
-                    )
-                db.add(foil_hole)
-                db.commit()
-                return {"success": True, "return_value": foil_hole_id}
-        except ispyb.ISPyBException as e:
-            log.error(
-                "Updating FoilHole entry caused exception '%s'.",
-                e,
-                exc_info=True,
+        db: Session,
+    ) -> FoilHole:
+        foil_hole = db.query(FoilHole).filter(FoilHole.foilHoleId == foil_hole_id).one()
+        if foil_hole_parameters.image:
+            foil_hole.foilHoleImage = foil_hole_parameters.image
+        if foil_hole_parameters.x_location:
+            foil_hole.pixelLocationX = int(
+                foil_hole_parameters.x_location * scale_factor
             )
-        return {"success": False, "return_value": None}
+        if foil_hole_parameters.y_location:
+            foil_hole.pixelLocationY = int(
+                foil_hole_parameters.y_location * scale_factor
+            )
+        if foil_hole_parameters.diameter is not None:
+            foil_hole.diameter = foil_hole_parameters.diameter * scale_factor
+        if foil_hole_parameters.x_stage_position:
+            foil_hole.stageLocationX = foil_hole_parameters.x_stage_position
+        if foil_hole_parameters.y_stage_position:
+            foil_hole.stageLocationY = foil_hole_parameters.y_stage_position
+        if (
+            foil_hole_parameters.readout_area_x is not None
+            and foil_hole_parameters.thumbnail_size_x is not None
+            and foil_hole_parameters.pixel_size is not None
+        ):
+            foil_hole.pixelSize = foil_hole_parameters.pixel_size * (
+                foil_hole_parameters.readout_area_x
+                / foil_hole_parameters.thumbnail_size_x
+            )
+        return FoilHole
 
     def do_update_foil_holes(
         self,
@@ -486,12 +474,23 @@ class TransportManager:
             return {"success": True, "return_value": expeye_response}
         elif self.ispyb is not None:
             result: dict[int, int | None] = {}
-            successes = []
-            for fhid, fhp in zip(foil_hole_ids, foil_hole_parameters):
-                update_response = self.do_update_foil_hole(fhid, scale_factor, fhp)
-                result[fhp.name] = update_response["return_value"]
-                successes.append(update_response["success"])
-            return {"success": all(successes), "return_value": result}
+            try:
+                with ISPyBSession() as db:
+                    for fhid, fhp in zip(foil_hole_ids, foil_hole_parameters):
+                        update_response = self.do_update_foil_hole_entry(
+                            fhid, scale_factor, fhp, db
+                        )
+                        result[fhp.name] = fhid
+                        db.add(update_response)
+                    db.commit()
+                    return {"success": True, "return_value": result}
+            except ispyb.ISPyBException as e:
+                log.error(
+                    "Updating FoilHole entry caused exception '%s'.",
+                    e,
+                    exc_info=True,
+                )
+                return {"success": False, "return_value": None}
         else:
             return {"success": False, "return_value": None}
 
