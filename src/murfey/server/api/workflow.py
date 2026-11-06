@@ -994,7 +994,7 @@ async def request_tomography_preprocessing(
             .join(TiltSeries, TiltSeries.search_map_id == SearchMap.id)
             .where(TiltSeries.tag == proc_file.tag)
             .where(TiltSeries.session_id == session_id)
-            .where(TiltSeries.rsync_source == proc_file.rsync_source)
+            .where(TiltSeries.rsync_source == proc_file.group_tag)
         ).one_or_none()
         if relevant_search_map:
             lamella_angle = relevant_search_map.angle
