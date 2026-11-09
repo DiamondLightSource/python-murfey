@@ -1,7 +1,7 @@
 [build-system]
 build-backend = "setuptools.build_meta"
 requires = [
-    "setuptools >= 40.6.0",
+    "setuptools>=40.6",
     "wheel",
 ]
 
@@ -13,7 +13,7 @@ readme = "README.md"
 keywords = [
     "",
 ]
-license = {file = "LICENSE"}
+license = { file = "LICENSE" }
 maintainers = []
 authors = []
 requires-python = ">=3.11"
@@ -31,8 +31,8 @@ classifiers = [
 ]
 dependencies = [
     "aiohttp",
-    "defusedxml", # For safely parsing XML files
-    "fastapi[standard-no-fastapi-cloud-cli]>=0.116.0",
+    "defusedxml",                                    # For safely parsing XML files
+    "fastapi[standard-no-fastapi-cloud-cli]>=0.116",
     "pydantic>=2",
     "pydantic-settings",
     "python-jose",
@@ -41,33 +41,34 @@ dependencies = [
     "werkzeug",
     "xmltodict",
 ]
+
 [project.optional-dependencies]
 cicd = [
     "pytest-cov", # Used for generating PyTest coverage reports
 ]
 developer = [
     "bump-my-version", # Version control
-    "ipykernel", # Enable interactive coding with VS Code and Jupyter Notebook
-    "pre-commit", # Formatting, linting, type checking, etc.
-    "pytest", # Test code functionality
-    "pytest-asyncio", # For testing async functions
-    "pytest-mock", # Additional mocking tools for unit tests
+    "ipykernel",       # Enable interactive coding with VS Code and Jupyter Notebook
+    "pre-commit",      # Formatting, linting, type checking, etc.
+    "pytest",          # Test code functionality
+    "pytest-asyncio",  # For testing async functions
+    "pytest-mock",     # Additional mocking tools for unit tests
 ]
 server = [
     "ccpem-pipeliner",
     "cryptography",
     "graypy",
-    "ispyb>=12.1.0", # Responsible for setting requirements for SQLAlchemy and mysql-connector-python;
+    "ispyb>=12.1",                 # Responsible for setting requirements for SQLAlchemy and mysql-connector-python;
     "jinja2",
     "mrcfile",
     "numpy<3",
     "packaging",
     "passlib",
     "pillow",
-    "prometheus_client",
-    "sqlalchemy[postgresql]>=2.1.0",
+    "prometheus-client",
+    "sqlalchemy[postgresql]>=2.1",
     "sqlmodel",
-    "stomp-py>8.1.1", # 8.1.1 (released 2024-04-06) doesn't work with our project
+    "stomp-py>8.1.1",              # 8.1.1 (released 2024-04-06) doesn't work with our project
     "zocalo>=1",
 ]
 smartem = [
@@ -77,10 +78,12 @@ sxt = [
     "numpy<3",
     "olefile",
 ]
+
 [project.urls]
 Bug-Tracker = "https://github.com/DiamondLightSource/python-murfey/issues"
 Documentation = "https://github.com/DiamondLightSource/python-murfey"
 GitHub = "https://github.com/DiamondLightSource/python-murfey"
+
 [project.scripts]
 "murfey.add_user" = "murfey.cli.add_user:run"
 "murfey.check_pipeliner_jobs" = "murfey.cli.check_pipeliner_jobs:run"
@@ -98,85 +101,96 @@ GitHub = "https://github.com/DiamondLightSource/python-murfey"
 "murfey.simulate" = "murfey.cli.dummy:run"
 "murfey.spa_inject" = "murfey.cli.inject_spa_processing:run"
 "murfey.transfer" = "murfey.cli.transfer:run"
-[project.entry-points."murfey.config.extraction"]
-"murfey_machine" = "murfey.util.config:get_extended_machine_config"
-[project.entry-points."murfey.contexts"]
-AtlasContext = "murfey.client.contexts.atlas:AtlasContext"
-CLEMContext = "murfey.client.contexts.clem:CLEMContext"
-FIBContext = "murfey.client.contexts.fib:FIBContext"
-SIMContext = "murfey.client.contexts.sim:SIMContext"
-SPAContext = "murfey.client.contexts.spa:SPAContext"
-SPAMetadataContext = "murfey.client.contexts.spa_metadata:SPAMetadataContext"
-SXTContext = "murfey.client.contexts.sxt:SXTContext"
-TomographyContext = "murfey.client.contexts.tomo:TomographyContext"
-TomographyMetadataContext = "murfey.client.contexts.tomo_metadata:TomographyMetadataContext"
-[project.entry-points."murfey.workflows"]
-"atlas_update" = "murfey.workflows.register_atlas_update:run"
-"clem.register_align_and_merge_result" = "murfey.workflows.clem.register_align_and_merge_results:run"
-"clem.register_preprocessing_result" = "murfey.workflows.clem.register_preprocessing_results:run"
-"data_collection" = "murfey.workflows.register_data_collection:run"
-"data_collection_group" = "murfey.workflows.register_data_collection_group:run"
-"experiment_type_update" = "murfey.workflows.register_experiment_type_update:run"
-"fib.make_milling_gif" = "murfey.workflows.fib.make_milling_gif:run"
-"fib.register_atlas" = "murfey.workflows.fib.register_atlas:run"
-"fib.register_lamella_evaluation_image" = "murfey.workflows.fib.register_lamella_evaluation_image:run"
-"fib.register_milling_progress" = "murfey.workflows.fib.register_milling_progress:run"
-"pato" = "murfey.workflows.notifications:notification_setup"
-"picked_particles" = "murfey.workflows.spa.picking:particles_picked"
-"picked_tomogram" = "murfey.workflows.tomo.picking:picked_tomogram"
-"processing_job" = "murfey.workflows.register_processing_job:run"
-"spa.ctf_estimated" = "murfey.workflows.spa.ctf_estimation:ctf_estimated"
-"spa.flush_spa_preprocess" = "murfey.workflows.spa.flush_spa_preprocess:flush_spa_preprocess"
-"spa.motion_corrected" = "murfey.workflows.spa.motion_correction:motion_corrected"
-"spa.register_grid_square" = "murfey.workflows.spa.register_grid_square:run"
-"spa.smartem_atlas" = "murfey.workflows.spa.smartem_atlas:smartem_atlas"
-"sxt.process_tilt_series" = "murfey.workflows.sxt.process_sxt_tilt_series:run"
-"sxt.register_roi" = "murfey.workflows.sxt.sxt_metadata:run"
+
+[project.entry-points]
+"murfey.config.extraction".murfey_machine = "murfey.util.config:get_extended_machine_config"
+"murfey.contexts".AtlasContext = "murfey.client.contexts.atlas:AtlasContext"
+"murfey.contexts".CLEMContext = "murfey.client.contexts.clem:CLEMContext"
+"murfey.contexts".FIBContext = "murfey.client.contexts.fib:FIBContext"
+"murfey.contexts".SIMContext = "murfey.client.contexts.sim:SIMContext"
+"murfey.contexts".SPAContext = "murfey.client.contexts.spa:SPAContext"
+"murfey.contexts".SPAMetadataContext = "murfey.client.contexts.spa_metadata:SPAMetadataContext"
+"murfey.contexts".SXTContext = "murfey.client.contexts.sxt:SXTContext"
+"murfey.contexts".TomographyContext = "murfey.client.contexts.tomo:TomographyContext"
+"murfey.contexts".TomographyMetadataContext = "murfey.client.contexts.tomo_metadata:TomographyMetadataContext"
+"murfey.workflows"."clem.register_align_and_merge_result" = "murfey.workflows.clem.register_align_and_merge_results:run"
+"murfey.workflows"."clem.register_preprocessing_result" = "murfey.workflows.clem.register_preprocessing_results:run"
+"murfey.workflows"."fib.make_milling_gif" = "murfey.workflows.fib.make_milling_gif:run"
+"murfey.workflows"."fib.register_atlas" = "murfey.workflows.fib.register_atlas:run"
+"murfey.workflows"."fib.register_lamella_evaluation_image" = "murfey.workflows.fib.register_lamella_evaluation_image:run"
+"murfey.workflows"."fib.register_milling_progress" = "murfey.workflows.fib.register_milling_progress:run"
+"murfey.workflows"."spa.ctf_estimated" = "murfey.workflows.spa.ctf_estimation:ctf_estimated"
+"murfey.workflows"."spa.flush_spa_preprocess" = "murfey.workflows.spa.flush_spa_preprocess:flush_spa_preprocess"
+"murfey.workflows"."spa.motion_corrected" = "murfey.workflows.spa.motion_correction:motion_corrected"
+"murfey.workflows"."spa.register_grid_square" = "murfey.workflows.spa.register_grid_square:run"
+"murfey.workflows"."spa.smartem_atlas" = "murfey.workflows.spa.smartem_atlas:smartem_atlas"
+"murfey.workflows"."sxt.process_tilt_series" = "murfey.workflows.sxt.process_sxt_tilt_series:run"
+"murfey.workflows"."sxt.register_roi" = "murfey.workflows.sxt.sxt_metadata:run"
+"murfey.workflows".atlas_update = "murfey.workflows.register_atlas_update:run"
+"murfey.workflows".data_collection = "murfey.workflows.register_data_collection:run"
+"murfey.workflows".data_collection_group = "murfey.workflows.register_data_collection_group:run"
+"murfey.workflows".experiment_type_update = "murfey.workflows.register_experiment_type_update:run"
+"murfey.workflows".pato = "murfey.workflows.notifications:notification_setup"
+"murfey.workflows".picked_particles = "murfey.workflows.spa.picking:particles_picked"
+"murfey.workflows".picked_tomogram = "murfey.workflows.tomo.picking:picked_tomogram"
+"murfey.workflows".processing_job = "murfey.workflows.register_processing_job:run"
 
 [tool.setuptools]
-package-dir = {"" = "src"}
+package-dir = { "" = "src" }
 include-package-data = true
 zip-safe = false
 
-[tool.setuptools.package-data]
-"murfey.util" = ["route_manifest.yaml"]
+[tool.setuptools.packages]
+find.where = [ "src", "tests" ]
 
-[tool.setuptools.packages.find]
-where = ["src", "tests"]
+[tool.setuptools.package-data]
+"murfey.util" = [ "route_manifest.yaml" ]
 
 [tool.ruff]
 line-length = 88
-lint.extend-ignore = ["E203", "E266", "E501", "E731", "E741"]
-lint.select = [
+fix = true
+
+[tool.ruff.format]
+indent-style = "space"
+quote-style = "double"
+line-ending = "auto"
+
+[tool.ruff.lint.isort]
+known-first-party = [ "murfey" ]
+combine-as-imports = true
+
+[tool.ruff.lint]
+select = [
     "C4",
-    "E4", "E7", "E9",
+    "E4",
+    "E7",
+    "E9",
     "F",
     "I",
     "W6",
 ]
-fix = true
-
-[tool.ruff.lint.isort]
-known-first-party = ["murfey"]
-combine-as-imports = true
-
-[tool.ruff.format]
-quote-style="double"
-indent-style="space"
-line-ending="auto"
+extend-ignore = [ "E203", "E266", "E501", "E731", "E741" ]
 
 [tool.pyproject-fmt]
-inputs = "pyproject.toml"
-check = false
+column_width = 160
 indent = 4
-keep_full_version = true
+keep_full_version = false
+generate_python_version_classifiers = true
 max_supported_python = "3.14"
-
-[tool.pytest.ini_options]
-addopts = "-ra"
+table_format = "long"
+sub_table_spacing = "\n"
+separate_root_table = "\n"
+expand_tables = []
+collapse_tables = []
+skip_wrap_for_keys = []
 
 [tool.mypy]
 disable_error_code = [
-    "annotation-unchecked",  # Notification that the bodies of untyped functions aren't checked. Not critical
-    "import-untyped",  # Error for missing library stubs. Not critical
+    "annotation-unchecked", # Notification that the bodies of untyped functions aren't checked. Not critical
+    "import-untyped",       # Error for missing library stubs. Not critical
 ]
+
+[tool.pytest]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
