@@ -104,36 +104,40 @@ GitHub = "https://github.com/DiamondLightSource/python-murfey"
 
 [project.entry-points]
 "murfey.config.extraction".murfey_machine = "murfey.util.config:get_extended_machine_config"
-"murfey.contexts".AtlasContext = "murfey.client.contexts.atlas:AtlasContext"
-"murfey.contexts".CLEMContext = "murfey.client.contexts.clem:CLEMContext"
-"murfey.contexts".FIBContext = "murfey.client.contexts.fib:FIBContext"
-"murfey.contexts".SIMContext = "murfey.client.contexts.sim:SIMContext"
-"murfey.contexts".SPAContext = "murfey.client.contexts.spa:SPAContext"
-"murfey.contexts".SPAMetadataContext = "murfey.client.contexts.spa_metadata:SPAMetadataContext"
-"murfey.contexts".SXTContext = "murfey.client.contexts.sxt:SXTContext"
-"murfey.contexts".TomographyContext = "murfey.client.contexts.tomo:TomographyContext"
-"murfey.contexts".TomographyMetadataContext = "murfey.client.contexts.tomo_metadata:TomographyMetadataContext"
-"murfey.workflows"."clem.register_align_and_merge_result" = "murfey.workflows.clem.register_align_and_merge_results:run"
-"murfey.workflows"."clem.register_preprocessing_result" = "murfey.workflows.clem.register_preprocessing_results:run"
-"murfey.workflows"."fib.make_milling_gif" = "murfey.workflows.fib.make_milling_gif:run"
-"murfey.workflows"."fib.register_atlas" = "murfey.workflows.fib.register_atlas:run"
-"murfey.workflows"."fib.register_lamella_evaluation_image" = "murfey.workflows.fib.register_lamella_evaluation_image:run"
-"murfey.workflows"."fib.register_milling_progress" = "murfey.workflows.fib.register_milling_progress:run"
-"murfey.workflows"."spa.ctf_estimated" = "murfey.workflows.spa.ctf_estimation:ctf_estimated"
-"murfey.workflows"."spa.flush_spa_preprocess" = "murfey.workflows.spa.flush_spa_preprocess:flush_spa_preprocess"
-"murfey.workflows"."spa.motion_corrected" = "murfey.workflows.spa.motion_correction:motion_corrected"
-"murfey.workflows"."spa.register_grid_square" = "murfey.workflows.spa.register_grid_square:run"
-"murfey.workflows"."spa.smartem_atlas" = "murfey.workflows.spa.smartem_atlas:smartem_atlas"
-"murfey.workflows"."sxt.process_tilt_series" = "murfey.workflows.sxt.process_sxt_tilt_series:run"
-"murfey.workflows"."sxt.register_roi" = "murfey.workflows.sxt.sxt_metadata:run"
-"murfey.workflows".atlas_update = "murfey.workflows.register_atlas_update:run"
-"murfey.workflows".data_collection = "murfey.workflows.register_data_collection:run"
-"murfey.workflows".data_collection_group = "murfey.workflows.register_data_collection_group:run"
-"murfey.workflows".experiment_type_update = "murfey.workflows.register_experiment_type_update:run"
-"murfey.workflows".pato = "murfey.workflows.notifications:notification_setup"
-"murfey.workflows".picked_particles = "murfey.workflows.spa.picking:particles_picked"
-"murfey.workflows".picked_tomogram = "murfey.workflows.tomo.picking:picked_tomogram"
-"murfey.workflows".processing_job = "murfey.workflows.register_processing_job:run"
+
+[project.entry-points."murfey.contexts"]
+AtlasContext = "murfey.client.contexts.atlas:AtlasContext"
+CLEMContext = "murfey.client.contexts.clem:CLEMContext"
+FIBContext = "murfey.client.contexts.fib:FIBContext"
+SIMContext = "murfey.client.contexts.sim:SIMContext"
+SPAContext = "murfey.client.contexts.spa:SPAContext"
+SPAMetadataContext = "murfey.client.contexts.spa_metadata:SPAMetadataContext"
+SXTContext = "murfey.client.contexts.sxt:SXTContext"
+TomographyContext = "murfey.client.contexts.tomo:TomographyContext"
+TomographyMetadataContext = "murfey.client.contexts.tomo_metadata:TomographyMetadataContext"
+
+[project.entry-points."murfey.workflows"]
+"clem.register_align_and_merge_result" = "murfey.workflows.clem.register_align_and_merge_results:run"
+"clem.register_preprocessing_result" = "murfey.workflows.clem.register_preprocessing_results:run"
+"fib.make_milling_gif" = "murfey.workflows.fib.make_milling_gif:run"
+"fib.register_atlas" = "murfey.workflows.fib.register_atlas:run"
+"fib.register_lamella_evaluation_image" = "murfey.workflows.fib.register_lamella_evaluation_image:run"
+"fib.register_milling_progress" = "murfey.workflows.fib.register_milling_progress:run"
+"spa.ctf_estimated" = "murfey.workflows.spa.ctf_estimation:ctf_estimated"
+"spa.flush_spa_preprocess" = "murfey.workflows.spa.flush_spa_preprocess:flush_spa_preprocess"
+"spa.motion_corrected" = "murfey.workflows.spa.motion_correction:motion_corrected"
+"spa.register_grid_square" = "murfey.workflows.spa.register_grid_square:run"
+"spa.smartem_atlas" = "murfey.workflows.spa.smartem_atlas:smartem_atlas"
+"sxt.process_tilt_series" = "murfey.workflows.sxt.process_sxt_tilt_series:run"
+"sxt.register_roi" = "murfey.workflows.sxt.sxt_metadata:run"
+atlas_update = "murfey.workflows.register_atlas_update:run"
+data_collection = "murfey.workflows.register_data_collection:run"
+data_collection_group = "murfey.workflows.register_data_collection_group:run"
+experiment_type_update = "murfey.workflows.register_experiment_type_update:run"
+pato = "murfey.workflows.notifications:notification_setup"
+picked_particles = "murfey.workflows.spa.picking:particles_picked"
+picked_tomogram = "murfey.workflows.tomo.picking:picked_tomogram"
+processing_job = "murfey.workflows.register_processing_job:run"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
@@ -156,8 +160,8 @@ quote-style = "double"
 line-ending = "auto"
 
 [tool.ruff.lint.isort]
-known-first-party = [ "murfey" ]
 combine-as-imports = true
+known-first-party = [ "murfey" ]
 
 [tool.ruff.lint]
 select = [
