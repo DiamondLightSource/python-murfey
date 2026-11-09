@@ -327,13 +327,13 @@ class AtlasParameters(BaseModel):
     pixel_size: float | None = None
     cassette_slot: int | None = None
     mode: str | None = None
-    has_grey: bool | None = None
-    has_red: bool | None = None
-    has_green: bool | None = None
-    has_blue: bool | None = None
-    has_cyan: bool | None = None
-    has_magenta: bool | None = None
-    has_yellow: bool | None = None
+    hasGrey: bool | None = None
+    hasRed: bool | None = None
+    hasGreen: bool | None = None
+    hasBlue: bool | None = None
+    hasCyan: bool | None = None
+    hasMagenta: bool | None = None
+    hasYellow: bool | None = None
 
 
 class AtlasRegistration(BaseModel):

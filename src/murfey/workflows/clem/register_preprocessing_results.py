@@ -22,6 +22,7 @@ import murfey.util.db as MurfeyDB
 from murfey.util.models import GridSquareParameters
 from murfey.util.processing_params import (
     colour_channels,
+    colour_to_column,
     default_clem_processing_parameters as processing_params,
 )
 from murfey.workflows.register_data_collection_group import register_dcg
@@ -108,13 +109,12 @@ class CLEMPreprocessingResult(BaseModel):
 
 
 def _get_colour_flags(colours: list[str]):
-    colours = colours or []
     colour_flags = {}
     for colour in colour_channels:
         if colour in colours:
-            colour_flags[f"has_{colour}"] = True
+            colour_flags[colour_to_column(colour)] = True
         else:
-            colour_flags[f"has_{colour}"] = False
+            colour_flags[colour_to_column(colour)] = False
     return colour_flags
 
 
@@ -332,7 +332,10 @@ def _register_dcg_and_atlas(
         atlas_pixel_size = imaging_site.thumbnail_pixel_size
 
         # Translate colour flags into ISPyB convention
-        colour_flags = {key: getattr(imaging_site, key, 0) for key in colour_channels}
+        colour_flags = {
+            key: getattr(imaging_site, colour_to_column(key), 0)
+            for key in colour_channels
+        }
         collection_mode = imaging_site.collection_mode
     else:
         atlas_path = ""
@@ -506,7 +509,7 @@ def _register_single_grid_square(
     )
     # Construct colour flags for ISPyB
     colour_flags = {
-        colour: int(getattr(imaging_site, f"has_{colour}", 0))
+        colour: int(getattr(imaging_site, colour_to_column(colour), 0))
         for colour in colour_channels
     }
     # Register or update the grid square entry as required

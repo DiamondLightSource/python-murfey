@@ -41,7 +41,7 @@ from murfey.util.models import (
     GridSquareParameters,
     SearchMapParameters,
 )
-from murfey.util.processing_params import colour_channels
+from murfey.util.processing_params import colour_channels, colour_to_column
 
 log = logging.getLogger("murfey.server.ispyb")
 security_config = get_security_config()
@@ -190,12 +190,11 @@ class TransportManager:
                     cassetteSlot=atlas_parameters.cassette_slot,
                     mode=atlas_parameters.mode,
                 )
-                for col_name, value in colour_channels:
-                    setattr(
-                        record,
-                        f"has{col_name.capitalize()}",
-                        getattr(atlas_parameters, f"has_{col_name}"),
-                    )
+                for colour in colour_channels:
+                    if column_name := colour_to_column(colour):
+                        setattr(
+                            record, column_name, getattr(atlas_parameters, column_name)
+                        )
                 with ISPyBSession() as db:
                     db.add(record)
                     db.commit()
@@ -229,8 +228,9 @@ class TransportManager:
                 mode=collection_mode,
             )
             if colour_flags:
-                for col_name, value in colour_flags.items():
-                    setattr(atlas_parameters, f"has_{col_name}", value)
+                for colour, value in colour_flags.items():
+                    if column_name := colour_to_column(colour):
+                        setattr(atlas_parameters, column_name, value)
             expeye_response = expeye.update_atlas(dcg_id, atlas_id, atlas_parameters)
             if expeye_response is None:
                 return {"success": False, "return_value": None}
@@ -245,8 +245,9 @@ class TransportManager:
                     atlas.mode = collection_mode or atlas.mode
                     # Optionally insert colour flags if present
                     if colour_flags:
-                        for col_name, value in colour_flags.items():
-                            setattr(atlas, f"has{col_name.capitalize()}", value)
+                        for colour, value in colour_flags.items():
+                            if column_name := colour_to_column(colour):
+                                setattr(atlas, column_name, value)
                     db.add(atlas)
                     db.commit()
                     return {"success": True, "return_value": atlas.atlasId}
@@ -296,8 +297,9 @@ class TransportManager:
         )
         # Optionally insert colour flags
         if colour_flags:
-            for col_name, value in colour_flags.items():
-                setattr(record, f"has{col_name}", value)
+            for colour, value in colour_flags.items():
+                if column_name := colour_to_column(colour):
+                    setattr(record, column_name, value)
         try:
             with ISPyBSession() as db:
                 db.add(record)
@@ -361,8 +363,9 @@ class TransportManager:
                     grid_square.mode = grid_square_parameters.collection_mode
                 # Optionally insert colour flags
                 if colour_flags:
-                    for col_name, value in colour_flags.items():
-                        setattr(grid_square, f"has{col_name.capitalize()}", value)
+                    for colour, value in colour_flags.items():
+                        if column_name := colour_to_column(colour):
+                            setattr(grid_square, column_name, value)
                 db.add(grid_square)
                 db.commit()
                 return {"success": True, "return_value": grid_square.gridSquareId}

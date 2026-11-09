@@ -11,6 +11,7 @@ import murfey.server
 from murfey.server.ispyb import ISPyBSession, get_session_id
 from murfey.util.db import DataCollectionGroup, ImagingSite
 from murfey.util.models import AtlasParameters
+from murfey.util.processing_params import colour_to_column
 
 logger = logging.getLogger("murfey.workflows.register_data_collection_group")
 
@@ -59,8 +60,9 @@ def register_dcg(
         if collection_mode := message.get("collection_mode"):
             atlas_parameters.mode = collection_mode
         if colour_flags := message.get("colour_flags", {}):
-            for col_name, value in colour_flags.items():
-                setattr(atlas_parameters, f"has_{col_name}", value)
+            for colour, value in colour_flags.items():
+                if column_name := colour_to_column(colour):
+                    setattr(atlas_parameters, column_name, value)
         atlas_id = murfey.server._transport_object.do_insert_atlas(
             dcgid, atlas_parameters
         ).get("return_value", None)

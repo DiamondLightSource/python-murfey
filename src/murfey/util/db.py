@@ -152,13 +152,27 @@ class ImagingSite(SQLModel, table=True):  # type: ignore
 
     # Colour channel-related fields
     number_of_members: Optional[int] = Field(default=None)
-    has_grey: Optional[bool] = Field(default=None)
-    has_red: Optional[bool] = Field(default=None)
-    has_green: Optional[bool] = Field(default=None)
-    has_blue: Optional[bool] = Field(default=None)
-    has_cyan: Optional[bool] = Field(default=None)
-    has_magenta: Optional[bool] = Field(default=None)
-    has_yellow: Optional[bool] = Field(default=None)
+    has_grey: Optional[bool] = Field(
+        default=None, alias="hasGrey", sa_column_kwargs={"name": "hasGrey"}
+    )
+    has_red: Optional[bool] = Field(
+        default=None, alias="hasRed", sa_column_kwargs={"name": "hasRed"}
+    )
+    has_green: Optional[bool] = Field(
+        default=None, alias="hasGreen", sa_column_kwargs={"name": "hasGreen"}
+    )
+    has_blue: Optional[bool] = Field(
+        default=None, alias="hasBlue", sa_column_kwargs={"name": "hasBlue"}
+    )
+    has_cyan: Optional[bool] = Field(
+        default=None, alias="hasCyan", sa_column_kwargs={"name": "hasCyan"}
+    )
+    has_magenta: Optional[bool] = Field(
+        default=None, alias="hasMagenta", sa_column_kwargs={"name": "hasMagenta"}
+    )
+    has_yellow: Optional[bool] = Field(
+        default=None, alias="hasYellow", sa_column_kwargs={"name": "hasYellow"}
+    )
     collection_mode: Optional[str] = Field(default=None)
     composite_created: bool = False  # Has a composite image been created?
 
