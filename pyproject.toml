@@ -1,7 +1,7 @@
 [build-system]
 build-backend = "setuptools.build_meta"
 requires = [
-    "setuptools>=40.6",
+    "setuptools>=40.6.0",
     "wheel",
 ]
 
@@ -31,8 +31,8 @@ classifiers = [
 ]
 dependencies = [
     "aiohttp",
-    "defusedxml",                                    # For safely parsing XML files
-    "fastapi[standard-no-fastapi-cloud-cli]>=0.116",
+    "defusedxml",                                      # For safely parsing XML files
+    "fastapi[standard-no-fastapi-cloud-cli]>=0.116.0",
     "pydantic>=2",
     "pydantic-settings",
     "python-jose",
@@ -58,7 +58,7 @@ server = [
     "ccpem-pipeliner",
     "cryptography",
     "graypy",
-    "ispyb>=12.1",                 # Responsible for setting requirements for SQLAlchemy and mysql-connector-python;
+    "ispyb>=12.1.0",                 # Responsible for setting requirements for SQLAlchemy and mysql-connector-python;
     "jinja2",
     "mrcfile",
     "numpy<3",
@@ -66,9 +66,9 @@ server = [
     "passlib",
     "pillow",
     "prometheus-client",
-    "sqlalchemy[postgresql]>=2.1",
+    "sqlalchemy[postgresql]>=2.1.0",
     "sqlmodel",
-    "stomp-py>8.1.1",              # 8.1.1 (released 2024-04-06) doesn't work with our project
+    "stomp-py>8.1.1",                # 8.1.1 (released 2024-04-06) doesn't work with our project
     "zocalo>=1",
 ]
 smartem = [
@@ -178,7 +178,7 @@ extend-ignore = [ "E203", "E266", "E501", "E731", "E741" ]
 [tool.pyproject-fmt]
 column_width = 160
 indent = 4
-keep_full_version = false
+keep_full_version = true
 generate_python_version_classifiers = true
 max_supported_python = "3.14"
 table_format = "long"
