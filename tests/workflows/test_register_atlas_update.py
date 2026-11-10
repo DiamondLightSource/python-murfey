@@ -31,6 +31,6 @@ def test_run(
         pixel_size=message["atlas_pixel_size"],
         slot=message["sample"],
         collection_mode=message.get("collection_mode"),
-        color_flags=message.get("color_flags", {}),
+        colour_flags=message.get("colour_flags", {}),
     )
     assert result == {"success": True}

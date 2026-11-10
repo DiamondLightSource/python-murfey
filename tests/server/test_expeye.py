@@ -57,3 +57,5 @@ def test_insert_foil_holes(mock_post):
         ],
         headers={"Authorization": "access_token expeye"},
     )
+
+    expeye.EXPEYE_TOKEN = ""

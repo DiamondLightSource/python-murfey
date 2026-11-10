@@ -120,7 +120,7 @@ def generate_preprocessing_messages(
         ),
     ),
 )
-def test_get_color_flags(test_params: tuple[list[str], dict[str, bool]]):
+def test_get_colour_flags(test_params: tuple[list[str], dict[str, bool]]):
     colors, positive_flags = test_params
     expected_result = dict.fromkeys(
         (
@@ -420,14 +420,14 @@ def test_run_with_db(
     assert len(ispyb_atlas_search) == 1
 
     # Determine the color flags and collection mode
-    color_flags = {
+    colour_flags = {
         flag: int(value) for flag, value in _get_colour_flags(colors).items()
     }
     collection_mode = _determine_collection_mode(colors)
 
     # Atlas color flags and collection mode should be set correctly
     ispyb_atlas = ispyb_atlas_search[0]
-    for flag, value in color_flags.items():
+    for flag, value in colour_flags.items():
         assert getattr(ispyb_atlas, f"has{flag.capitalize()}") == value
     assert ispyb_atlas.mode == collection_mode
 
@@ -449,7 +449,7 @@ def test_run_with_db(
         if "TileScan_2" in gs.gridSquareImage:
             assert denoising_suffix in gs.gridSquareImage
         # Check that the GridSquare color flags and collection mode are set correctly
-        for flag, value in color_flags.items():
+        for flag, value in colour_flags.items():
             assert getattr(gs, f"has{flag.capitalize()}") == value
         assert gs.mode == collection_mode
 
