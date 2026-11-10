@@ -5,6 +5,7 @@ import requests
 
 from murfey.util.config import get_security_config
 from murfey.util.models import AtlasParameters, FoilHoleParameters
+from murfey.util.processing_params import colour_channels, colour_to_column
 
 EXPEYE_TOKEN = get_security_config().expeye_token
 EXPEYE_URL = get_security_config().expeye_url
@@ -27,7 +28,17 @@ def post(url: str, json: dict | list | None = None) -> requests.Response:
 
 
 def insert_atlas(dcgid: int, atlas_parameters: AtlasParameters):
-    response = post(f"data-groups/{dcgid}/atlas", json=atlas_parameters)
+    atlas_json = {
+        "image": atlas_parameters.image,
+        "pixelSize": atlas_parameters.pixel_size,
+        "cassetteSlot": atlas_parameters.cassette_slot,
+        "mode": atlas_parameters.mode,
+    }
+    for colour in colour_channels:
+        atlas_json[colour_to_column(colour)] = getattr(
+            atlas_parameters, colour_to_column(colour)
+        )
+    response = post(f"data-groups/{dcgid}/atlas", json=atlas_json)
     try:
         result = response.json()
         return result["atlasId"]
@@ -36,7 +47,17 @@ def insert_atlas(dcgid: int, atlas_parameters: AtlasParameters):
 
 
 def update_atlas(dcgid: int, atlas_id: int, atlas_parameters: AtlasParameters):
-    response = post(f"data-groups/{dcgid}/atlas.{atlas_id}", json=atlas_parameters)
+    atlas_json = {
+        "image": atlas_parameters.image,
+        "pixelSize": atlas_parameters.pixel_size,
+        "cassetteSlot": atlas_parameters.cassette_slot,
+        "mode": atlas_parameters.mode,
+    }
+    for colour in colour_channels:
+        atlas_json[colour_to_column(colour)] = getattr(
+            atlas_parameters, colour_to_column(colour)
+        )
+    response = post(f"data-groups/{dcgid}/atlas.{atlas_id}", json=atlas_json)
     try:
         result = response.json()
         return result["atlasId"]

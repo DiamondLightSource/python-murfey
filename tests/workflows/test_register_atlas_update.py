@@ -13,6 +13,7 @@ def test_run(
     mock_transport_object = mocker.patch("murfey.server._transport_object")
     mock_murfey_db = MagicMock()
     message = {
+        "dcgid": 1,
         "register": "atlas_update",
         "session_id": 1,
         "atlas_id": mock.sentinel,
@@ -24,6 +25,7 @@ def test_run(
     # Run the function and check the results and calls made
     result = run(message, mock_murfey_db)
     mock_transport_object.do_update_atlas.assert_called_once_with(
+        dcg_id=1,
         atlas_id=message["atlas_id"],
         atlas_image=message["atlas"],
         pixel_size=message["atlas_pixel_size"],
