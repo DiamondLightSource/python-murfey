@@ -18,9 +18,11 @@ from importlib.metadata import (
 )
 from pathlib import Path
 from typing import NamedTuple
+from urllib.parse import urlparse
 
 import mrcfile
 import numpy as np
+import requests
 from pipeliner.project_graph import ProjectGraph
 from sqlalchemy import func
 from sqlalchemy.exc import (
@@ -35,10 +37,10 @@ from sqlmodel import Session, create_engine, select
 from workflows import Disconnected
 
 import murfey.server
-import murfey.server.prometheus as prom
 import murfey.util.db as db
 from murfey.server.murfey_db import url  # murfey_db
 from murfey.util import sanitise
+from murfey.util.api import url_path_for
 from murfey.util.config import (
     MachineConfig,
     get_machine_config,
@@ -2174,11 +2176,26 @@ def feedback_callback(
                     relevant_tilt_series.processing_requested = True
                     _db.add(relevant_tilt_series)
 
-                prom.preprocessed_movies.labels(
-                    microscope=instrument_name,
-                    rsync_source=collected_ids[0].tag,
-                    visit=murfey_session.visit,
-                ).inc()
+                # Update Prometheus counter for preprocessed movies
+                url_path = url_path_for(
+                    "prometheus.feedback_router",
+                    "increment_preprocessed_movies_prometheus",
+                    session_id=murfey_session.id,
+                )
+                murfey_url = urlparse(machine_config.murfey_url).geturl()
+                response = requests.post(
+                    url=f"{murfey_url}{url_path}",
+                    json={
+                        "instrument_name": instrument_name,
+                        "visit_name": murfey_session.visit,
+                        "rsync_source": collected_ids[0].tag,
+                    },
+                )
+                if response.status_code != 200:
+                    raise RuntimeError(
+                        f"Preprocessed movies update request failed with status code {response.status_code}"
+                    )
+
                 _db.commit()
                 _db.close()
                 if murfey.server._transport_object:

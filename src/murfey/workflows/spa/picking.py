@@ -2,17 +2,19 @@ import asyncio
 from datetime import datetime
 from logging import getLogger
 from typing import List
+from urllib.parse import urlparse
 
 import numpy as np
+import requests
 from sqlalchemy import func
 from sqlmodel import Session, select
 
 import murfey.server
-import murfey.server.prometheus as prom
 from murfey.server.feedback import (
     _app_id,
     _pj_id,
 )
+from murfey.util.api import url_path_for
 from murfey.util.config import get_machine_config, get_rabbitmq_url
 from murfey.util.db import (
     AutoProcProgram,
@@ -409,11 +411,14 @@ def particles_picked(message: dict, murfey_db: Session) -> dict[str, bool]:
     movie.preprocessed = True
     murfey_db.add(movie)
     murfey_db.commit()
+
+    # Load machine config
+    machine_config = get_machine_config(instrument_name=session.instrument_name)[
+        session.instrument_name
+    ]
+
     if SMARTEM_ACTIVE and movie.smartem_uuid:
         try:
-            machine_config = get_machine_config(
-                instrument_name=session.instrument_name
-            )[session.instrument_name]
             if machine_config.smartem_api_url:
                 smartem_client = SmartEMAPIClient(
                     base_url=machine_config.smartem_api_url,
@@ -491,8 +496,27 @@ def particles_picked(message: dict, murfey_db: Session) -> dict[str, bool]:
         .join(AutoProcProgram, AutoProcProgram.pj_id == ProcessingJob.id)
         .where(AutoProcProgram.id == program_id)
     ).one()
-    prom.preprocessed_movies.labels(
-        microscope=session.instrument_name, rsync_source=dcg.tag, visit=session.visit
-    ).inc()
+
+    # Update Prometheus counter for preprocessed movies
+    url_path = url_path_for(
+        "prometheus.feedback_router",
+        "increment_preprocessed_movies_prometheus",
+        session_id=session.id,
+    )
+    murfey_url = urlparse(machine_config.murfey_url).geturl()
+    response = requests.post(
+        url=f"{murfey_url}{url_path}",
+        json={
+            "instrument_name": session.instrument_name,
+            "visit_name": session.visit,
+            "rsync_source": dcg.tag,
+        },
+    )
+    if response.status_code != 200:
+        raise RuntimeError(
+            f"Preprocessed movies update request failed with status code {response.status_code}"
+        )
+
+    # Check if an email notification should be sent
     _check_notifications(message, murfey_db)
     return {"success": True}
