@@ -198,8 +198,8 @@ class TransportManager:
                 with ISPyBSession() as db:
                     db.add(record)
                     db.commit()
-                    log.info(f"Created Atlas {record.atlasId}")
-                    return {"success": True, "return_value": record.atlasId}
+                log.info(f"Created Atlas {record.atlasId}")
+                return {"success": True, "return_value": record.atlasId}
             except ispyb.ISPyBException as e:
                 log.error(
                     "Inserting Atlas entry caused exception '%s'.",
@@ -208,6 +208,7 @@ class TransportManager:
                 )
             return {"success": False, "return_value": None}
         else:
+            log.error("No ispyb database connection")
             return {"success": False, "return_value": None}
 
     def do_update_atlas(
@@ -259,6 +260,7 @@ class TransportManager:
                 )
             return {"success": False, "return_value": None}
         else:
+            log.error("No ispyb database connection")
             return {"success": False, "return_value": None}
 
     def do_insert_grid_square(
@@ -461,6 +463,7 @@ class TransportManager:
                 successes.append(insert_response["success"])
             return {"success": all(successes), "return_value": result}
         else:
+            log.error("No ispyb database connection")
             return {"success": False, "return_value": None}
 
     @staticmethod
@@ -533,6 +536,7 @@ class TransportManager:
                 )
                 return {"success": False, "return_value": None}
         else:
+            log.error("No ispyb database connection")
             return {"success": False, "return_value": None}
 
     def do_insert_search_map(
