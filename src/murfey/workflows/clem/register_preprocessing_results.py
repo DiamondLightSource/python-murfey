@@ -284,11 +284,6 @@ def _consolidate_atlases(
     ).one()
 
 
-def _snake_to_camel_case(string: str):
-    parts = string.split("_")
-    return parts[0] + "".join(part.capitalize() for part in parts[1:])
-
-
 def _register_dcg_and_atlas(
     session_id: int,
     instrument_name: str,
