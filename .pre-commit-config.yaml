@@ -42,7 +42,6 @@ repos:
     hooks:
       - id: pyproject-fmt
         name: Formatting the pyproject.toml file
-        additional_dependencies: ["tox>=4.9"]
 
   # Format and lint using Ruff
   - repo: https://github.com/astral-sh/ruff-pre-commit
