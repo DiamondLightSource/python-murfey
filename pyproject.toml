@@ -102,8 +102,8 @@ GitHub = "https://github.com/DiamondLightSource/python-murfey"
 "murfey.spa_inject" = "murfey.cli.inject_spa_processing:run"
 "murfey.transfer" = "murfey.cli.transfer:run"
 
-[project.entry-points]
-"murfey.config.extraction".murfey_machine = "murfey.util.config:get_extended_machine_config"
+[project.entry-points."murfey.config.extraction"]
+murfey_machine = "murfey.util.config:get_extended_machine_config"
 
 [project.entry-points."murfey.contexts"]
 AtlasContext = "murfey.client.contexts.atlas:AtlasContext"
