@@ -2111,6 +2111,9 @@ def feedback_callback(
 
                 # Load instrument name from session for next step
                 instrument_name = murfey_session.instrument_name
+                machine_config = get_machine_config(instrument_name=instrument_name)[
+                    instrument_name
+                ]
                 if (
                     check_tilt_series_mc(relevant_tilt_series.id, _db)
                     and not relevant_tilt_series.processing_requested
@@ -2125,9 +2128,6 @@ def feedback_callback(
                         ).one()
                         lamella_angle = relevant_search_map.angle
 
-                    machine_config = get_machine_config(
-                        instrument_name=instrument_name
-                    )[instrument_name]
                     tilts = get_all_tilts(relevant_tilt_series.id, _db)
                     ids = get_job_ids(relevant_tilt_series.id, alignment_ids[2].id, _db)
                     preproc_params = get_tomo_proc_params(ids.dcgid, _db)
