@@ -2107,6 +2107,8 @@ def feedback_callback(
 
                 _db.commit()
 
+                # Load instrument name from session for next step
+                instrument_name = murfey_session.instrument_name
                 if (
                     check_tilt_series_mc(relevant_tilt_series.id, _db)
                     and not relevant_tilt_series.processing_requested
@@ -2121,7 +2123,6 @@ def feedback_callback(
                         ).one()
                         lamella_angle = relevant_search_map.angle
 
-                    instrument_name = murfey_session.instrument_name
                     machine_config = get_machine_config(
                         instrument_name=instrument_name
                     )[instrument_name]
