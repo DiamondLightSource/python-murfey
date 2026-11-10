@@ -56,13 +56,16 @@ if security_config.ispyb_credentials:
             )
         )
         log.info("Loaded ISPyB database session")
+        ISPYB_ACTIVE = True
     # Catch all errors associated with loading ISPyB database
     except Exception:
         log.error("Error loading ISPyB session", exc_info=True)
         ISPyBSession = lambda: None
+        ISPYB_ACTIVE = False
 else:
     log.info("No ISPyB credentials set, using local database")
     ISPyBSession = lambda: None
+    ISPYB_ACTIVE = False
 
 
 class Visit(BaseModel):
@@ -181,7 +184,7 @@ class TransportManager:
             if expeye_response is None:
                 return {"success": False, "return_value": None}
             return {"success": True, "return_value": expeye_response}
-        elif self.ispyb is not None:
+        elif ISPYB_ACTIVE:
             try:
                 record = Atlas(
                     dataCollectionGroupId=dcg_id,
@@ -236,7 +239,7 @@ class TransportManager:
             if expeye_response is None:
                 return {"success": False, "return_value": None}
             return {"success": True, "return_value": expeye_response}
-        elif self.ispyb is not None:
+        elif ISPYB_ACTIVE:
             try:
                 with ISPyBSession() as db:
                     atlas = db.query(Atlas).filter(Atlas.atlasId == atlas_id).one()
@@ -452,7 +455,7 @@ class TransportManager:
             if expeye_response is None:
                 return {"success": False, "return_value": None}
             return {"success": True, "return_value": expeye_response}
-        elif self.ispyb is not None:
+        elif ISPYB_ACTIVE:
             result: dict[int, int | None] = {}
             successes = []
             for fhp in foil_hole_parameters:
@@ -516,7 +519,7 @@ class TransportManager:
             if expeye_response is None:
                 return {"success": False, "return_value": None}
             return {"success": True, "return_value": expeye_response}
-        elif self.ispyb is not None:
+        elif ISPYB_ACTIVE:
             result: dict[int, int | None] = {}
             try:
                 with ISPyBSession() as db:
