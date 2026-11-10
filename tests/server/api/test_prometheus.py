@@ -4,7 +4,7 @@ import pytest
 from sqlmodel import Session as SQLModelSession, select
 
 import murfey.util.db as MurfeyDB
-from murfey.server.api.prometheus import router
+from murfey.server.api.prometheus import instrument_router
 from murfey.util.api import url_path_for
 from tests.conftest import ExampleVisit, set_up_test_backend_client
 
@@ -45,13 +45,13 @@ def test_increment_rsync_file_count(
         yield murfey_db_session
 
     backend_client = set_up_test_backend_client(
-        router=router,
+        router=instrument_router,
         mock_db_session=mock_get_db_session,
     )
 
     # Submit posts to the endpoint
     backend_url_path = url_path_for(
-        "api.prometheus.router",
+        "api.prometheus.instrument_router",
         "increment_rsync_file_count",
         session_id=session_id,
     )
@@ -144,13 +144,13 @@ def test_increment_rsync_transferred_files(
         yield murfey_db_session
 
     backend_client = set_up_test_backend_client(
-        router=router,
+        router=instrument_router,
         mock_db_session=mock_get_db_session,
     )
 
     # Submit posts to the endpoint
     backend_url_path = url_path_for(
-        "api.prometheus.router",
+        "api.prometheus.instrument_router",
         "increment_rsync_transferred_files",
         session_id=session_id,
     )
@@ -202,13 +202,13 @@ def test_increment_rsync_transferred_files_prometheus(
         yield murfey_db_session
 
     backend_client = set_up_test_backend_client(
-        router=router,
+        router=instrument_router,
         mock_db_session=mock_get_db_session,
     )
 
     # Submit posts to the endpoint
     backend_url_path = url_path_for(
-        "api.prometheus.router",
+        "api.prometheus.instrument_router",
         "increment_rsync_transferred_files_prometheus",
         session_id=session_id,
     )
@@ -309,13 +309,13 @@ def test_increment_rsync_skipped_files_prometheus(
         yield murfey_db_session
 
     backend_client = set_up_test_backend_client(
-        router=router,
+        router=instrument_router,
         mock_db_session=mock_get_db_session,
     )
 
     # Submit posts to the endpoint
     backend_url_path = url_path_for(
-        "api.prometheus.router",
+        "api.prometheus.instrument_router",
         "increment_rsync_skipped_files_prometheus",
         session_id=session_id,
     )
