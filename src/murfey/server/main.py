@@ -104,7 +104,8 @@ app.include_router(murfey.server.api.workflow_fib.router)
 app.include_router(murfey.server.api.workflow_sim.router)
 app.include_router(murfey.server.api.workflow_sxt.router)
 
-app.include_router(murfey.server.api.prometheus.router)
+app.include_router(murfey.server.api.prometheus.feedback_router)
+app.include_router(murfey.server.api.prometheus.instrument_router)
 
 app.include_router(murfey.server.api.websocket.ws)
 

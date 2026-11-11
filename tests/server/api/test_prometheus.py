@@ -4,7 +4,7 @@ import pytest
 from sqlmodel import Session as SQLModelSession, select
 
 import murfey.util.db as MurfeyDB
-from murfey.server.api.prometheus import router
+from murfey.server.api.prometheus import feedback_router, instrument_router
 from murfey.util.api import url_path_for
 from tests.conftest import ExampleVisit, set_up_test_backend_client
 
@@ -45,13 +45,13 @@ def test_increment_rsync_file_count(
         yield murfey_db_session
 
     backend_client = set_up_test_backend_client(
-        router=router,
+        router=instrument_router,
         mock_db_session=mock_get_db_session,
     )
 
     # Submit posts to the endpoint
     backend_url_path = url_path_for(
-        "api.prometheus.router",
+        "api.prometheus.instrument_router",
         "increment_rsync_file_count",
         session_id=session_id,
     )
@@ -144,13 +144,13 @@ def test_increment_rsync_transferred_files(
         yield murfey_db_session
 
     backend_client = set_up_test_backend_client(
-        router=router,
+        router=instrument_router,
         mock_db_session=mock_get_db_session,
     )
 
     # Submit posts to the endpoint
     backend_url_path = url_path_for(
-        "api.prometheus.router",
+        "api.prometheus.instrument_router",
         "increment_rsync_transferred_files",
         session_id=session_id,
     )
@@ -202,13 +202,13 @@ def test_increment_rsync_transferred_files_prometheus(
         yield murfey_db_session
 
     backend_client = set_up_test_backend_client(
-        router=router,
+        router=instrument_router,
         mock_db_session=mock_get_db_session,
     )
 
     # Submit posts to the endpoint
     backend_url_path = url_path_for(
-        "api.prometheus.router",
+        "api.prometheus.instrument_router",
         "increment_rsync_transferred_files_prometheus",
         session_id=session_id,
     )
@@ -309,13 +309,13 @@ def test_increment_rsync_skipped_files_prometheus(
         yield murfey_db_session
 
     backend_client = set_up_test_backend_client(
-        router=router,
+        router=instrument_router,
         mock_db_session=mock_get_db_session,
     )
 
     # Submit posts to the endpoint
     backend_url_path = url_path_for(
-        "api.prometheus.router",
+        "api.prometheus.instrument_router",
         "increment_rsync_skipped_files_prometheus",
         session_id=session_id,
     )
@@ -345,3 +345,51 @@ def test_increment_rsync_skipped_files_prometheus(
         }
     )
     assert skipped_files_sample.value == file_count * iterations
+
+
+@pytest.mark.parametrize("iterations", (1, 3, 5))
+def test_increment_preprocessed_movies_prometheus(
+    iterations: int,
+    tmp_path: Path,
+):
+    # Set up test parameters
+    rsync_source = str(tmp_path / "dummy")
+
+    # Set up the backend test client
+    backend_client = set_up_test_backend_client(
+        router=feedback_router,
+    )
+
+    # Submit posts to the endpoint
+    backend_url_path = url_path_for(
+        "api.prometheus.feedback_router",
+        "increment_preprocessed_movies_prometheus",
+        session_id=session_id,
+    )
+    for _ in range(iterations):
+        response = backend_client.post(
+            backend_url_path,
+            json={
+                "instrument_name": instrument_name,
+                "visit_name": visit_name,
+                "rsync_source": rsync_source,
+            },
+        )
+        assert response.status_code == 200
+
+    # Check that the Prometheus objects were updated correctly
+    import murfey.server.prometheus as prom
+
+    # Check 'skipped_files'
+    preprocessed_movies_samples = prom.preprocessed_movies.collect()[0].samples
+    preprocessed_movies_sample = next(
+        p
+        for p in preprocessed_movies_samples
+        if p.labels
+        == {
+            "microscope": instrument_name,
+            "rsync_source": rsync_source,
+            "visit": visit_name,
+        }
+    )
+    assert preprocessed_movies_sample.value == iterations

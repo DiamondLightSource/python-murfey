@@ -724,7 +724,15 @@ murfey.server.api.processing_parameters.router:
         type: int
     methods:
       - POST
-murfey.server.api.prometheus.router:
+murfey.server.api.prometheus.feedback_router:
+  - path: /prometheus/sessions/{session_id}/increment_preprocessed_movies_prometheus
+    function: increment_preprocessed_movies_prometheus
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
+murfey.server.api.prometheus.instrument_router:
   - path: /prometheus/sessions/{session_id}/increment_rsync_file_count
     function: increment_rsync_file_count
     path_params:
