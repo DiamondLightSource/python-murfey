@@ -280,6 +280,7 @@ def test_run_with_db(
         "murfey.server.ispyb.ISPyBSession",
         return_value=ispyb_db_session,
     )
+    mocker.patch("murfey.server.ispyb.ISPYB_ACTIVE", True)
 
     # Mock the ISPYB connection when registering data collection group
     mocker.patch(
