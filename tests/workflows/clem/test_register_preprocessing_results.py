@@ -451,7 +451,7 @@ def test_run_with_db(
             assert denoising_suffix in gs.gridSquareImage
         # Check that the GridSquare color flags and collection mode are set correctly
         for flag, value in colour_flags.items():
-            assert getattr(gs, f"has{flag.capitalize()}") == value
+            assert getattr(gs, flag) == value
         assert gs.mode == collection_mode
 
     murfey_db_session.close()
