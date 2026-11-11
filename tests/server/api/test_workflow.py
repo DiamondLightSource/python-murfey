@@ -325,7 +325,7 @@ def test_register_dc_group_new_atlas(mock_transport, murfey_db_session: Session)
     assert atlas_args[0][0][0] == 1
     assert atlas_args[0][0][1].image == "/path/to/Sample10/Atlas/Atlas_2.jpg"
     assert atlas_args[0][0][1].pixel_size == 1e-4
-    assert atlas_args[0][0][1].cassette_splot == 10
+    assert atlas_args[0][0][1].cassette_slot == 10
 
     # Check the data collection group atlas was updated
     new_dcg = murfey_db_session.exec(

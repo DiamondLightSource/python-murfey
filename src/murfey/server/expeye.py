@@ -27,6 +27,14 @@ def post(url: str, json: dict | list | None = None) -> requests.Response:
     )
 
 
+def patch(url: str, json: dict | list | None = None) -> requests.Response:
+    return requests.patch(
+        f"{EXPEYE_URL}/{url}",
+        json=json or {},
+        headers={"Authorization": f"access_token {EXPEYE_TOKEN}"},
+    )
+
+
 def insert_atlas(dcgid: int, atlas_parameters: AtlasParameters):
     atlas_json = {
         "image": atlas_parameters.image,
@@ -57,7 +65,7 @@ def update_atlas(dcgid: int, atlas_id: int, atlas_parameters: AtlasParameters):
         atlas_json[colour_to_column(colour)] = getattr(
             atlas_parameters, colour_to_column(colour)
         )
-    response = post(f"data-groups/{dcgid}/atlas.{atlas_id}", json=atlas_json)
+    response = patch(f"atlas/{atlas_id}", json=atlas_json)
     try:
         result = response.json()
         return result["atlasId"]
