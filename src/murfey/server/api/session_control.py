@@ -411,7 +411,7 @@ def register_square(
         else:
             gs = db.exec(
                 select(GridSquare)
-                .where(GridSquare.name == gsid)
+                .where(GridSquare.name == int(gsid))
                 .where(GridSquare.tag == square_registration_data.tag)
                 .where(GridSquare.session_id == session_id)
             ).one_or_none()
