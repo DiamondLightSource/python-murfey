@@ -399,17 +399,18 @@ class GridSquareParameters(BaseModel):
 class FoilHoleParameters(BaseModel):
     tag: str
     name: int
-    x_location: Optional[float] = None
-    y_location: Optional[float] = None
-    x_stage_position: Optional[float] = None
-    y_stage_position: Optional[float] = None
-    readout_area_x: Optional[int] = None
-    readout_area_y: Optional[int] = None
-    thumbnail_size_x: Optional[int] = None
-    thumbnail_size_y: Optional[int] = None
-    pixel_size: Optional[float] = None
+    x_location: float | None = None
+    y_location: float | None = None
+    x_stage_position: float | None = None
+    y_stage_position: float | None = None
+    readout_area_x: int | None = None
+    readout_area_y: int | None = None
+    thumbnail_size_x: int | None = None
+    thumbnail_size_y: int | None = None
+    pixel_size: float | None = None
     image: str = ""
-    diameter: Optional[float] = None
+    quality_indicator: float | None = None
+    diameter: float | None = None
 
 
 class SearchMapParameters(BaseModel):
