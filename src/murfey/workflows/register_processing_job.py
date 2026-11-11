@@ -1,31 +1,36 @@
 import logging
 from datetime import datetime
+from urllib.parse import urlparse
 
 import ispyb.sqlalchemy._auto_db_schema as ISPyBDB
+import requests
 from sqlmodel import select
 from sqlmodel.orm.session import Session as SQLModelSession
 
 import murfey.server
-import murfey.server.prometheus as prom
 import murfey.util.db as MurfeyDB
 from murfey.server.ispyb import ISPyBSession
 from murfey.util import sanitise
+from murfey.util.api import url_path_for
+from murfey.util.config import get_machine_config
 
 logger = logging.getLogger("murfey.workflows.register_processing_job")
 
 
 def run(message: dict, murfey_db: SQLModelSession):
-    # Faill immediately if not transport manager is set
+    # Fail immediately if not transport manager is set
     if murfey.server._transport_object is None:
         logger.error("Unable to find transport manager")
         return {"success": False, "requeue": False}
 
     logger.info(f"Registering the following processing job: \n{message}")
 
+    # Load Murfey session entry and relevant variables
     murfey_session_id = int(message["session_id"])
     session = murfey_db.exec(
         select(MurfeyDB.Session).where(MurfeyDB.Session.id == murfey_session_id)
     ).one()
+
     dc = murfey_db.exec(
         select(MurfeyDB.DataCollection, MurfeyDB.DataCollectionGroup)
         .where(MurfeyDB.DataCollection.dcg_id == MurfeyDB.DataCollectionGroup.id)
@@ -77,11 +82,27 @@ def run(message: dict, murfey_db: SQLModelSession):
         murfey_db.close()
 
     # Update Prometheus counter for preprocessed movies
-    prom.preprocessed_movies.labels(
-        microscope=session.instrument_name,
-        rsync_source=message["tag"],
-        visit=session.visit,
+    machine_config = get_machine_config(instrument_name=session.instrument_name)[
+        session.instrument_name
+    ]
+    url_path = url_path_for(
+        "prometheus.feedback_router",
+        "increment_preprocessed_movies_prometheus",
+        session_id=murfey_session_id,
     )
+    murfey_url = urlparse(machine_config.murfey_url).geturl()
+    response = requests.post(
+        url=f"{murfey_url}{url_path}",
+        json={
+            "instrument_name": session.instrument_name,
+            "visit_name": session.visit,
+            "rsync_source": message["tag"],
+        },
+    )
+    if response.status_code != 200:
+        raise RuntimeError(
+            f"Preprocessed movies update request failed with status code {response.status_code}"
+        )
 
     # Register AutoProcProgram database entry if it doesn't already exist
     if not murfey_db.exec(

@@ -683,7 +683,7 @@ class MultigridController:
         }
         capture_post(
             base_url=str(self._environment.url.geturl()),
-            router_name="prometheus.router",
+            router_name="prometheus.instrument_router",
             function_name="increment_rsync_file_count",
             token=self.token,
             instrument_name=self._environment.instrument_name,
@@ -717,7 +717,7 @@ class MultigridController:
             }
             capture_post(
                 base_url=str(self._environment.url.geturl()),
-                router_name="prometheus.router",
+                router_name="prometheus.instrument_router",
                 function_name="increment_rsync_transferred_files_prometheus",
                 token=self.token,
                 instrument_name=self._environment.instrument_name,
@@ -734,7 +734,7 @@ class MultigridController:
     ):
         capture_post(
             base_url=str(self._environment.url.geturl()),
-            router_name="prometheus.router",
+            router_name="prometheus.instrument_router",
             function_name="increment_rsync_skipped_files_prometheus",
             token=self.token,
             instrument_name=self._environment.instrument_name,
@@ -770,7 +770,7 @@ class MultigridController:
         }
         capture_post(
             base_url=str(self._environment.url.geturl()),
-            router_name="prometheus.router",
+            router_name="prometheus.instrument_router",
             function_name="increment_rsync_transferred_files",
             token=self.token,
             instrument_name=self._environment.instrument_name,
