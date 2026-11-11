@@ -103,7 +103,7 @@ def insert_foil_holes(
                 "diameter": diameter,
                 "stageLocationX": fhp.x_stage_position,
                 "stageLocationY": fhp.y_stage_position,
-                "qualityIndicator": 0,
+                "qualityIndicator": fhp.quality_indicator,
                 "pixelSize": pixel_size,
             }
         )
@@ -117,9 +117,39 @@ def insert_foil_holes(
 
 def update_foil_holes(
     grid_square_id: int,
-    scale_factor: float | None,
+    scale_factor: float,
     foil_hole_ids: list[int],
     foil_hole_parameters: list[FoilHoleParameters],
 ) -> dict | None:
-    logger.error("This doesn't exist yet!")
-    return None
+    foil_holes = []
+    for fhid, fhp in zip(foil_hole_ids, foil_hole_parameters):
+        foil_hole_dict: dict = {"foilHoleId": fhid}
+        if fhp.image:
+            foil_hole_dict["foilHoleImage"] = fhp.image
+        if fhp.x_location:
+            foil_hole_dict["pixelLocationX"] = int(fhp.x_location * scale_factor)
+        if fhp.y_location:
+            foil_hole_dict["pixelLocationY"] = int(fhp.y_location * scale_factor)
+        if fhp.diameter is not None:
+            foil_hole_dict["diameter"] = fhp.diameter * scale_factor
+        if fhp.x_stage_position:
+            foil_hole_dict["stageLocationX"] = fhp.x_stage_position
+        if fhp.y_stage_position:
+            foil_hole_dict["stageLocationY"] = fhp.y_stage_position
+        if fhp.quality_indicator:
+            foil_hole_dict["qualityIndicator"] = fhp.quality_indicator
+        if (
+            fhp.readout_area_x is not None
+            and fhp.thumbnail_size_x is not None
+            and fhp.pixel_size is not None
+        ):
+            foil_hole_dict["pixelSize"] = fhp.pixel_size * (
+                fhp.readout_area_x / fhp.thumbnail_size_x
+            )
+        foil_holes.append(foil_hole_dict)
+    response = patch(f"grid-squares/{grid_square_id}/foil-holes", json=foil_holes)
+    try:
+        result = response.json()
+        return {fh["foilHoleLabel"]: fh["foilHoleId"] for fh in result}
+    except json.JSONDecodeError:
+        return None

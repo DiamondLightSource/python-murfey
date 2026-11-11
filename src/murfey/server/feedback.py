@@ -18,9 +18,11 @@ from importlib.metadata import (
 )
 from pathlib import Path
 from typing import NamedTuple
+from urllib.parse import urlparse
 
 import mrcfile
 import numpy as np
+import requests
 from pipeliner.project_graph import ProjectGraph
 from sqlalchemy import func
 from sqlalchemy.exc import (
@@ -35,10 +37,10 @@ from sqlmodel import Session, create_engine, select
 from workflows import Disconnected
 
 import murfey.server
-import murfey.server.prometheus as prom
 import murfey.util.db as db
 from murfey.server.murfey_db import url  # murfey_db
 from murfey.util import sanitise
+from murfey.util.api import url_path_for
 from murfey.util.config import (
     MachineConfig,
     get_machine_config,
@@ -762,7 +764,12 @@ def _register_incomplete_2d_batch(message: dict, _db):
     # next batch, reserving it here is what keeps the block contiguous and the
     # positional derivation in select_classes correct.
     visit_name = _visit_name_for_session(session_id, _db)
-    class2d_job = _reserve_2d_classification_jobs(visit_name, feedback_params).class2d
+    if feedback_params.star_combination_job:
+        class2d_job = feedback_params.star_combination_job - 1 - _jobs_per_class2d()
+    else:
+        class2d_job = _reserve_2d_classification_jobs(
+            visit_name, feedback_params
+        ).class2d
     feedback_params.hold_class2d = True
     relion_options = dict(relion_params)
     _db.add(feedback_params)
@@ -916,17 +923,16 @@ def _register_complete_2d_batch(message: dict, _db):
             )
         ).one():
             # This particles file already ran as an incomplete batch and now
-            # reruns complete. Reserve a fresh block rather than trying to
-            # reuse the earlier Class2D number (that number is not recoverable
-            # here). Class2DParameters.class2d_dir stores only the directory
-            # prefix (the number is appended when the message is built) and,
-            # unlike _release_2d_hold, this handler's message carries no
-            # "job_dir". A fresh block costs one unused directory and is
-            # collision-free vs deriving the old number from the live counter
-            # guessed wrong as soon as anything else had allocated since.
-            class2d_job = _reserve_2d_classification_jobs(
-                visit_name, feedback_params
-            ).class2d
+            # reruns complete. Temporary workaround is to use combination job to
+            # work out the 2D class job
+            if feedback_params.star_combination_job:
+                class2d_job = (
+                    feedback_params.star_combination_job - 1 - _jobs_per_class2d()
+                )
+            else:
+                class2d_job = _reserve_2d_classification_jobs(
+                    visit_name, feedback_params
+                ).class2d
             class_uuids = _2d_class_murfey_ids(
                 class2d_message["particles_file"], _app_id(pj_id, _db), _db
             )
@@ -2107,6 +2113,11 @@ def feedback_callback(
 
                 _db.commit()
 
+                # Load instrument name from session for next step
+                instrument_name = murfey_session.instrument_name
+                machine_config = get_machine_config(instrument_name=instrument_name)[
+                    instrument_name
+                ]
                 if (
                     check_tilt_series_mc(relevant_tilt_series.id, _db)
                     and not relevant_tilt_series.processing_requested
@@ -2121,10 +2132,6 @@ def feedback_callback(
                         ).one()
                         lamella_angle = relevant_search_map.angle
 
-                    instrument_name = murfey_session.instrument_name
-                    machine_config = get_machine_config(
-                        instrument_name=instrument_name
-                    )[instrument_name]
                     tilts = get_all_tilts(relevant_tilt_series.id, _db)
                     ids = get_job_ids(relevant_tilt_series.id, alignment_ids[2].id, _db)
                     preproc_params = get_tomo_proc_params(ids.dcgid, _db)
@@ -2173,11 +2180,26 @@ def feedback_callback(
                     relevant_tilt_series.processing_requested = True
                     _db.add(relevant_tilt_series)
 
-                prom.preprocessed_movies.labels(
-                    microscope=instrument_name,
-                    rsync_source=collected_ids[0].tag,
-                    visit=murfey_session.visit,
-                ).inc()
+                # Update Prometheus counter for preprocessed movies
+                url_path = url_path_for(
+                    "prometheus.feedback_router",
+                    "increment_preprocessed_movies_prometheus",
+                    session_id=murfey_session.id,
+                )
+                murfey_url = urlparse(machine_config.murfey_url).geturl()
+                response = requests.post(
+                    url=f"{murfey_url}{url_path}",
+                    json={
+                        "instrument_name": instrument_name,
+                        "visit_name": murfey_session.visit,
+                        "rsync_source": collected_ids[0].tag,
+                    },
+                )
+                if response.status_code != 200:
+                    raise RuntimeError(
+                        f"Preprocessed movies update request failed with status code {response.status_code}"
+                    )
+
                 _db.commit()
                 _db.close()
                 if murfey.server._transport_object:

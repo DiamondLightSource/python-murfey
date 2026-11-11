@@ -4,6 +4,7 @@ from logging import getLogger
 
 from fastapi import APIRouter, Depends
 from prometheus_client import Counter, Gauge
+from pydantic import BaseModel
 from sqlmodel import select
 
 import murfey.server.prometheus as prom
@@ -15,14 +16,15 @@ from murfey.util.models import RsyncerInfo, RsyncerSkippedFiles
 
 logger = getLogger("murfey.server.api.prometheus")
 
-router = APIRouter(
+# Router for requests coming from the instrument server
+instrument_router = APIRouter(
     prefix="/prometheus",
     dependencies=[Depends(validate_instrument_token)],
     tags=["Prometheus"],
 )
 
 
-@router.post("/sessions/{session_id}/increment_rsync_file_count")
+@instrument_router.post("/sessions/{session_id}/increment_rsync_file_count")
 def increment_rsync_file_count(
     session_id: int, rsyncer_info: RsyncerInfo, db=murfey_db
 ):
@@ -57,7 +59,7 @@ def increment_rsync_file_count(
     ).inc(rsyncer_info.increment_data_count)
 
 
-@router.post("/sessions/{session_id}/increment_rsync_transferred_files")
+@instrument_router.post("/sessions/{session_id}/increment_rsync_transferred_files")
 def increment_rsync_transferred_files(
     session_id: int, rsyncer_info: RsyncerInfo, db=murfey_db
 ):
@@ -74,7 +76,9 @@ def increment_rsync_transferred_files(
     db.close()
 
 
-@router.post("/sessions/{session_id}/increment_rsync_transferred_files_prometheus")
+@instrument_router.post(
+    "/sessions/{session_id}/increment_rsync_transferred_files_prometheus"
+)
 def increment_rsync_transferred_files_prometheus(
     session_id: int, rsyncer_info: RsyncerInfo, db=murfey_db
 ):
@@ -95,7 +99,9 @@ def increment_rsync_transferred_files_prometheus(
     ).inc(rsyncer_info.data_bytes)
 
 
-@router.post("/sessions/{session_id}/increment_rsync_skipped_files_prometheus")
+@instrument_router.post(
+    "/sessions/{session_id}/increment_rsync_skipped_files_prometheus"
+)
 def increment_rsync_skipped_files_prometheus(
     session_id: int, rsyncer_skipped_files: RsyncerSkippedFiles, db=murfey_db
 ):
@@ -109,7 +115,7 @@ def increment_rsync_skipped_files_prometheus(
     ).inc(rsyncer_skipped_files.increment_count)
 
 
-@router.get("/metrics/{metric_name}")
+@instrument_router.get("/metrics/{metric_name}")
 def inspect_prometheus_metrics(
     metric_name: str,
 ):
@@ -134,3 +140,30 @@ def inspect_prometheus_metrics(
     else:
         value = metric._value.get()
         return {"value": value}
+
+
+# Router for requests coming from the feedback consumer
+# Currently unauthenticated
+feedback_router = APIRouter(
+    prefix="/prometheus",
+    tags=["Prometheus (Feedback)"],
+)
+
+
+class PreprocessedMoviesMetrics(BaseModel):
+    instrument_name: str
+    visit_name: str
+    rsync_source: str
+
+
+@feedback_router.post("/sessions/{session_id}/increment_preprocessed_movies_prometheus")
+def increment_preprocessed_movies_prometheus(
+    session_id: int,
+    metrics: PreprocessedMoviesMetrics,
+):
+    prom.preprocessed_movies.labels(
+        microscope=metrics.instrument_name,
+        rsync_source=metrics.rsync_source,
+        visit=metrics.visit_name,
+    ).inc()
+    return {"success": True}

@@ -1,22 +1,15 @@
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Literal
+from typing import Literal
 from unittest import mock
 from unittest.mock import AsyncMock, MagicMock
 
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
 from pytest_mock import MockerFixture
 
-from murfey.server.api.auth import (
-    validate_frontend_session_access,
-    validate_token,
-    validate_user_instrument_access,
-)
-from murfey.server.api.instrument import router as backend_router
-from murfey.server.murfey_db import murfey_db_session
+from murfey.server.api.instrument import router
 from murfey.util.api import url_path_for
 from murfey.util.config import MachineConfig
+from tests.conftest import set_up_test_backend_client
 
 
 def mock_aiohttp_clientsession(
@@ -59,29 +52,6 @@ def mock_aiohttp_clientsession(
     )
 
     return mock_clientsession, mock_response
-
-
-def set_up_test_backend_client(
-    session_id: int, instrument_name: str, mock_db_session: Callable
-):
-    """
-    Helper function to set up a test backend server whose response can be inspected
-    to check that the endpoint function works as expected
-    """
-    # Set up the backend server
-    backend_app = FastAPI()
-
-    # Override validation and database dependencies
-    backend_app.dependency_overrides[validate_token] = lambda: None
-    backend_app.dependency_overrides[validate_user_instrument_access] = (
-        lambda: instrument_name
-    )
-    backend_app.dependency_overrides[validate_frontend_session_access] = (
-        lambda: session_id
-    )
-    backend_app.dependency_overrides[murfey_db_session] = mock_db_session
-    backend_app.include_router(backend_router)
-    return TestClient(backend_app)
 
 
 def test_check_multigrid_controller_status(mocker: MockerFixture):
@@ -127,6 +97,7 @@ def test_check_multigrid_controller_status(mocker: MockerFixture):
 
     # Set up the backend server
     backend_server = set_up_test_backend_client(
+        router,
         session_id=session_id,
         instrument_name=instrument_name,
         mock_db_session=mock_get_db_session,
@@ -197,9 +168,10 @@ def test_get_possible_otf_dirs(
 
     # Set up the backend server
     backend_server = set_up_test_backend_client(
+        router,
         session_id=session_id,
         instrument_name=instrument_name,
-        mock_db_session=lambda: None,
+        mock_db_session=None,
     )
 
     # Construct the URL paths for poking and sending to
@@ -292,6 +264,7 @@ def test_request_otf_dir_upload(
 
     # Set up the backend server
     backend_server = set_up_test_backend_client(
+        router,
         session_id=session_id,
         instrument_name=instrument_name,
         mock_db_session=mock_get_db_session,

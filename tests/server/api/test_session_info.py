@@ -1,58 +1,19 @@
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
-from fastapi import APIRouter, FastAPI
-from fastapi.testclient import TestClient
 from pytest_mock import MockerFixture
 from sqlmodel import Session as SQLModelSession, select
 
 import murfey.util.db as MurfeyDB
-from murfey.server.api.auth import (
-    validate_frontend_session_access,
-    validate_token,
-    validate_user_instrument_access,
-)
 from murfey.server.api.session_info import gather_upstream_files, router
-from murfey.server.murfey_db import murfey_db_session
 from murfey.util.api import url_path_for
 from murfey.util.models import UpstreamFileRequestInfo
-from tests.conftest import ExampleVisit
+from tests.conftest import ExampleVisit, set_up_test_backend_client
 
 instrument_name = ExampleVisit.instrument_name
-
-
-def set_up_test_backend_client(
-    router: APIRouter,
-    session_id: int | None = None,
-    instrument_name: str | None = None,
-    mock_db_session: Callable | None = None,
-):
-    """
-    Helper function to set up a test backend server whose response can be inspected
-    to check that the endpoint function works as expected
-    """
-    # Set up the backend server
-    backend_app = FastAPI()
-
-    # Override validation and database dependencies as needed
-    backend_app.dependency_overrides[validate_token] = lambda: None
-    if instrument_name:
-        backend_app.dependency_overrides[validate_user_instrument_access] = (
-            lambda: instrument_name
-        )
-    if session_id:
-        backend_app.dependency_overrides[validate_frontend_session_access] = (
-            lambda: session_id
-        )
-    if mock_db_session:
-        backend_app.dependency_overrides[murfey_db_session] = mock_db_session
-
-    # Attach router, initiate object, and return it
-    backend_app.include_router(router)
-    return TestClient(backend_app)
 
 
 @pytest.mark.parametrize(

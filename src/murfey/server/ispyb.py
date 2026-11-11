@@ -830,6 +830,9 @@ class TransportManager:
         rw=None,
         **kwargs,
     ):
+        if self.ispyb is None:
+            log.error("No ISPyB connector object was configured")
+            return {"success": False, "return_value": None}
         params = params or []
         dcid = record.dataCollectionId
         if not dcid:
@@ -862,6 +865,9 @@ class TransportManager:
             return {"success": False, "return_value": None}
 
     def do_update_processing_status(self, record: AutoProcProgram, **kwargs):
+        if self.ispyb is None:
+            log.error("No ISPyB connector object was configured")
+            return {"success": False, "return_value": None}
         ppid = record.autoProcProgramId
         message = record.processingMessage
         status = (
