@@ -429,7 +429,7 @@ def test_run_with_db(
     # Atlas color flags and collection mode should be set correctly
     ispyb_atlas = ispyb_atlas_search[0]
     for flag, value in colour_flags.items():
-        assert getattr(ispyb_atlas, f"has{flag.capitalize()}") == value
+        assert getattr(ispyb_atlas, flag) == value
     assert ispyb_atlas.mode == collection_mode
 
     # ISPyB's GridSquare should have half the number of initial entries
