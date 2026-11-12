@@ -32,14 +32,19 @@ RUN \
         git \
         net-tools && \
     busybox --install && \
+    python -m venv /venv && \
     echo "Installing Murfey..." && \
     cp -r /mnt/python-murfey /tmp/python-murfey && \
-    python -m venv /venv && \
     /venv/bin/python -m pip install --upgrade \
         pip \
         build \
         && \
     /venv/bin/python -m pip install /tmp/python-murfey[server] && \
+    echo "Installing SmartEM..." && \
+    git clone https://github.com/DiamondLightSource/smartem-decisions.git /tmp/smartem-decisions && \
+    /venv/bin/python -m pip install \
+        /tmp/smartem-decisions[backend,core,agent] \
+        &&\
     echo "Installing IMOD..." && \
     mkdir /imod && \
     if [ -f /mnt/python-murfey/installers/${IMOD_INSTALLER} ]; then \
