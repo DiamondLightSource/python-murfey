@@ -366,6 +366,7 @@ def get_extended_machine_config(
     return model(**data)
 
 
+@lru_cache(maxsize=1)
 def get_smartem_keycloak_client():
     keycloak_client = None
     if SMARTEM_ACTIVE:
