@@ -9,7 +9,7 @@ from sqlmodel.orm.session import Session as SQLModelSession
 
 import murfey.server
 from murfey.server.ispyb import ISPyBSession, get_session_id
-from murfey.util.db import DataCollectionGroup, ImagingSite
+from murfey.util.db import Atlas, DataCollectionGroup, ImagingSite
 from murfey.util.models import AtlasParameters
 
 logger = logging.getLogger("murfey.workflows.register_data_collection_group")
@@ -33,11 +33,21 @@ def register_dcg(
     )
     if ispyb_session_id is None:
         murfey_dcg = DataCollectionGroup(
+            atlas=message.get("atlas", ""),
+            atlas_pixel_size=message.get("atlas_pixel_size"),
+            sample=message.get("sample"),
             session_id=murfey_session_id,
             tag=message.get("tag"),
             smartem_grid_uuid=message.get("smartem_grid_uuid"),
         )
         dcgid = murfey_dcg.id
+        murfey_atlas = Atlas(
+            dcg_id=dcgid,
+            atlas_type=message.get("atlas_type", "ROI"),
+            atlas_image=message.get("atlas", ""),
+            cassette_slot=message.get("sample"),
+            pixel_size=message.get("atlas_pixel_size"),
+        )
     else:
         record = ISPyBDB.DataCollectionGroup(
             sessionId=ispyb_session_id,
@@ -51,6 +61,7 @@ def register_dcg(
             return None
 
         atlas_parameters = AtlasParameters(
+            atlas_type=message.get("atlas_type", "ROI"),
             image=message.get("atlas", ""),
             pixel_size=message.get("atlas_pixel_size", 0),
             cassette_slot=message.get("sample"),
@@ -67,7 +78,6 @@ def register_dcg(
 
         murfey_dcg = DataCollectionGroup(
             id=dcgid,
-            atlas_id=atlas_id,
             atlas=message.get("atlas", ""),
             atlas_pixel_size=message.get("atlas_pixel_size"),
             sample=message.get("sample"),
@@ -75,7 +85,16 @@ def register_dcg(
             tag=message.get("tag"),
             smartem_grid_uuid=message.get("smartem_grid_uuid"),
         )
+        murfey_atlas = Atlas(
+            id=atlas_id,
+            dcg_id=dcgid,
+            atlas_type=message.get("atlas_type", "ROI"),
+            atlas_image=message.get("atlas", ""),
+            cassette_slot=message.get("sample"),
+            pixel_size=message.get("atlas_pixel_size"),
+        )
     murfey_db.add(murfey_dcg)
+    murfey_db.add(murfey_atlas)
     if dcgid is not None and message.get("atlas_x_stage_position"):
         atlas_site = ImagingSite(
             dcg_id=dcgid,

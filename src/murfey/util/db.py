@@ -210,16 +210,19 @@ class DataCollectionGroup(SQLModel, table=True):  # type: ignore
     )
     session_id: int = Field(foreign_key="session.id", primary_key=True)
     tag: str = Field(primary_key=True)
-    atlas_id: Optional[int] = None
-    atlas_pixel_size: Optional[float] = None
+    atlas_pixel_size: float | None = None
     atlas: str = ""
-    sample: Optional[int] = None
+    sample: int | None = None
     smartem_grid_uuid: Optional[str] = None
 
     # -------------
     # Relationships
     # -------------
     session: Optional["Session"] = Relationship(back_populates="data_collection_groups")
+    atlases: List["Atlas"] = Relationship(
+        back_populates="data_collection_group",
+        sa_relationship_kwargs={"cascade": "delete"},
+    )
     data_collections: List["DataCollection"] = Relationship(
         back_populates="data_collection_group",
         sa_relationship_kwargs={"cascade": "delete"},
@@ -238,6 +241,21 @@ class DataCollectionGroup(SQLModel, table=True):  # type: ignore
             sa_relationship_kwargs={"cascade": "delete"},
         )
     )
+
+
+class Atlas(SQLModel, table=True):  # type: ignore
+    id: int = Field(
+        primary_key=True,
+        unique=True,
+        alias="atlasId",
+        sa_column_kwargs={"name": "atlasId"},
+    )
+    dcg_id: int = Field(foreign_key="datacollectiongroup.dataCollectionGroupId")
+    atlas_type: str
+    pixel_size: float | None = None
+    atlas_image: str = ""
+    cassette_slot: int | None = None
+
     grid_squares: Optional[List["GridSquare"]] = Relationship(
         back_populates="data_collection_group",
         sa_relationship_kwargs={"cascade": "delete"},
@@ -245,6 +263,9 @@ class DataCollectionGroup(SQLModel, table=True):  # type: ignore
     search_maps: Optional[List["SearchMap"]] = Relationship(
         back_populates="data_collection_group",
         sa_relationship_kwargs={"cascade": "delete"},
+    )
+    data_collection_group: Optional["DataCollectionGroup"] = Relationship(
+        back_populates="atlases"
     )
 
 
@@ -263,9 +284,7 @@ class GridSquare(SQLModel, table=True):  # type: ignore
     thumbnail_size_y: Optional[int]
     pixel_size: Optional[float] = None
     image: str = ""
-    atlas_id: Optional[int] = Field(
-        foreign_key="datacollectiongroup.dataCollectionGroupId"
-    )
+    atlas_id: Optional[int] = Field(foreign_key="atlas.atlasId")
     scaled_pixel_size: Optional[float] = None
     pixel_location_x: Optional[int] = None
     pixel_location_y: Optional[int] = None
@@ -288,7 +307,7 @@ class GridSquare(SQLModel, table=True):  # type: ignore
     foil_holes: List["FoilHole"] = Relationship(
         back_populates="grid_square", sa_relationship_kwargs={"cascade": "delete"}
     )
-    data_collection_group: Optional["DataCollectionGroup"] = Relationship(
+    data_collection_group: Optional["Atlas"] = Relationship(
         back_populates="grid_squares"
     )
 
@@ -662,9 +681,7 @@ class SearchMap(SQLModel, table=True):  # type: ignore
     tilt_series: List["TiltSeries"] = Relationship(
         back_populates="search_map", sa_relationship_kwargs={"cascade": "delete"}
     )
-    atlas_id: int | None = Field(
-        foreign_key="datacollectiongroup.dataCollectionGroupId"
-    )
+    atlas_id: int | None = Field(foreign_key="atlas.atlasId")
     scaled_pixel_size: float | None = None
     pixel_location_x: int | None = None
     pixel_location_y: int | None = None
@@ -672,7 +689,7 @@ class SearchMap(SQLModel, table=True):  # type: ignore
     scaled_width: int | None = None
     angle: float | None = None
     quality_indicator: float | None = None
-    data_collection_group: Optional["DataCollectionGroup"] = Relationship(
+    data_collection_group: Optional["Atlas"] = Relationship(
         back_populates="search_maps"
     )
     tomogram: Optional[List["Tomogram"]] = Relationship(back_populates="search_map")
