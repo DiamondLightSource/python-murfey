@@ -58,6 +58,7 @@ def test_insert_foil_holes(mock_post):
         ],
         headers={"Authorization": "access_token expeye"},
     )
+    expeye.EXPEYE_TOKEN = ""
 
 
 @mock.patch("murfey.server.expeye.requests.patch")
@@ -114,3 +115,4 @@ def test_update_foil_holes(mock_patch):
         ],
         headers={"Authorization": "access_token expeye"},
     )
+    expeye.EXPEYE_TOKEN = ""

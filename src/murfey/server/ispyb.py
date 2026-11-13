@@ -35,7 +35,9 @@ from sqlalchemy.orm import Session, sessionmaker
 import murfey.server.expeye as expeye
 from murfey.util import sanitise
 from murfey.util.config import get_security_config
+from murfey.util.db import colour_columns
 from murfey.util.models import (
+    AtlasParameters,
     FoilHoleParameters,
     GridSquareParameters,
     SearchMapParameters,
@@ -54,13 +56,16 @@ if security_config.ispyb_credentials:
             )
         )
         log.info("Loaded ISPyB database session")
+        ISPYB_ACTIVE = True
     # Catch all errors associated with loading ISPyB database
     except Exception:
         log.error("Error loading ISPyB session", exc_info=True)
         ISPyBSession = lambda: None
+        ISPYB_ACTIVE = False
 else:
     log.info("No ISPyB credentials set, using local database")
     ISPyBSession = lambda: None
+    ISPYB_ACTIVE = False
 
 
 class Visit(BaseModel):
@@ -173,61 +178,98 @@ class TransportManager:
             )
         return {"success": False, "return_value": None}
 
-    def do_insert_atlas(self, record: Atlas):
-        try:
-            with ISPyBSession() as db:
-                db.add(record)
-                db.commit()
+    def do_insert_atlas(self, dcg_id: int, atlas_parameters: AtlasParameters):
+        if expeye.EXPEYE_TOKEN:
+            expeye_response = expeye.insert_atlas(dcg_id, atlas_parameters)
+            if expeye_response is None:
+                return {"success": False, "return_value": None}
+            return {"success": True, "return_value": expeye_response}
+        elif ISPYB_ACTIVE:
+            try:
+                record = Atlas(
+                    dataCollectionGroupId=dcg_id,
+                    atlasImage=atlas_parameters.image,
+                    pixelSize=atlas_parameters.pixel_size,
+                    cassetteSlot=atlas_parameters.cassette_slot,
+                    mode=atlas_parameters.mode,
+                )
+                for column_name in colour_columns:
+                    setattr(record, column_name, getattr(atlas_parameters, column_name))
+                with ISPyBSession() as db:
+                    db.add(record)
+                    db.commit()
                 log.info(f"Created Atlas {record.atlasId}")
                 return {"success": True, "return_value": record.atlasId}
-        except ispyb.ISPyBException as e:
-            log.error(
-                "Inserting Atlas entry caused exception '%s'.",
-                e,
-                exc_info=True,
-            )
-        return {"success": False, "return_value": None}
+            except ispyb.ISPyBException as e:
+                log.error(
+                    "Inserting Atlas entry caused exception '%s'.",
+                    e,
+                    exc_info=True,
+                )
+            return {"success": False, "return_value": None}
+        else:
+            log.error("No ispyb database connection")
+            return {"success": False, "return_value": None}
 
     def do_update_atlas(
         self,
+        dcg_id: int,
         atlas_id: int,
         atlas_image: str,
         pixel_size: float,
         slot: int | None,
         collection_mode: str | None = None,
-        color_flags: dict[str, str | int] | None = None,
+        colour_flags: dict[str, str | int] | None = None,
     ):
-        color_flags = color_flags or {}
-        try:
-            with ISPyBSession() as db:
-                atlas = db.query(Atlas).filter(Atlas.atlasId == atlas_id).one()
-                atlas.atlasImage = atlas_image or atlas.atlasImage
-                atlas.pixelSize = pixel_size or atlas.pixelSize
-                atlas.cassetteSlot = slot or atlas.cassetteSlot
-                atlas.mode = collection_mode or atlas.mode
-                # Optionally insert colour flags if present
-                if color_flags:
-                    for col_name, value in color_flags.items():
-                        setattr(atlas, col_name, value)
-                db.add(atlas)
-                db.commit()
-                return {"success": True, "return_value": atlas.atlasId}
-        except ispyb.ISPyBException as e:
-            log.error(
-                "Updating Atlas entry caused exception '%s'.",
-                e,
-                exc_info=True,
+        if expeye.EXPEYE_TOKEN:
+            atlas_parameters = AtlasParameters(
+                image=atlas_image,
+                pixel_size=pixel_size,
+                cassette_slot=slot,
+                mode=collection_mode,
             )
-        return {"success": False, "return_value": None}
+            if colour_flags:
+                for column_name, value in colour_flags.items():
+                    if column_name in colour_columns:
+                        setattr(atlas_parameters, column_name, value)
+            expeye_response = expeye.update_atlas(dcg_id, atlas_id, atlas_parameters)
+            if expeye_response is None:
+                return {"success": False, "return_value": None}
+            return {"success": True, "return_value": expeye_response}
+        elif ISPYB_ACTIVE:
+            try:
+                with ISPyBSession() as db:
+                    atlas = db.query(Atlas).filter(Atlas.atlasId == atlas_id).one()
+                    atlas.atlasImage = atlas_image or atlas.atlasImage
+                    atlas.pixelSize = pixel_size or atlas.pixelSize
+                    atlas.cassetteSlot = slot or atlas.cassetteSlot
+                    atlas.mode = collection_mode or atlas.mode
+                    # Optionally insert colour flags if present
+                    if colour_flags:
+                        for column_name, value in colour_flags.items():
+                            if column_name in colour_columns:
+                                setattr(atlas, column_name, value)
+                    db.add(atlas)
+                    db.commit()
+                    return {"success": True, "return_value": atlas.atlasId}
+            except ispyb.ISPyBException as e:
+                log.error(
+                    "Updating Atlas entry caused exception '%s'.",
+                    e,
+                    exc_info=True,
+                )
+            return {"success": False, "return_value": None}
+        else:
+            log.error("No ispyb database connection")
+            return {"success": False, "return_value": None}
 
     def do_insert_grid_square(
         self,
         atlas_id: int,
         grid_square_id: int,
         grid_square_parameters: GridSquareParameters,
-        color_flags: dict[str, int] | None = None,
+        colour_flags: dict[str, int] | None = None,
     ):
-        color_flags = color_flags or {}
         # most of this is for mypy
         pixel_size = grid_square_parameters.pixel_size
         if (
@@ -256,9 +298,10 @@ class TransportManager:
             mode=grid_square_parameters.collection_mode,
         )
         # Optionally insert colour flags
-        if color_flags:
-            for col_name, value in color_flags.items():
-                setattr(record, col_name, value)
+        if colour_flags:
+            for column_name, value in colour_flags.items():
+                if column_name in colour_columns:
+                    setattr(record, column_name, value)
         try:
             with ISPyBSession() as db:
                 db.add(record)
@@ -277,9 +320,8 @@ class TransportManager:
         self,
         grid_square_id: int,
         grid_square_parameters: GridSquareParameters,
-        color_flags: dict[str, int] | None = None,
+        colour_flags: dict[str, int] | None = None,
     ):
-        color_flags = color_flags or {}
         try:
             with ISPyBSession() as db:
                 grid_square: GridSquare = (
@@ -322,9 +364,10 @@ class TransportManager:
                 if grid_square_parameters.collection_mode:
                     grid_square.mode = grid_square_parameters.collection_mode
                 # Optionally insert colour flags
-                if color_flags:
-                    for col_name, value in color_flags.items():
-                        setattr(grid_square, col_name, value)
+                if colour_flags:
+                    for column_name, value in colour_flags.items():
+                        if column_name in colour_columns:
+                            setattr(grid_square, column_name, value)
                 db.add(grid_square)
                 db.commit()
                 return {"success": True, "return_value": grid_square.gridSquareId}
@@ -409,7 +452,7 @@ class TransportManager:
             if expeye_response is None:
                 return {"success": False, "return_value": None}
             return {"success": True, "return_value": expeye_response}
-        elif self.ispyb is not None:
+        elif ISPYB_ACTIVE:
             result: dict[int, int | None] = {}
             successes = []
             for fhp in foil_hole_parameters:
@@ -420,6 +463,7 @@ class TransportManager:
                 successes.append(insert_response["success"])
             return {"success": all(successes), "return_value": result}
         else:
+            log.error("No ispyb database connection")
             return {"success": False, "return_value": None}
 
     @staticmethod
@@ -472,7 +516,7 @@ class TransportManager:
             if expeye_response is None:
                 return {"success": False, "return_value": None}
             return {"success": True, "return_value": expeye_response}
-        elif self.ispyb is not None:
+        elif ISPYB_ACTIVE:
             result: dict[int, int | None] = {}
             try:
                 with ISPyBSession() as db:
@@ -492,6 +536,7 @@ class TransportManager:
                 )
                 return {"success": False, "return_value": None}
         else:
+            log.error("No ispyb database connection")
             return {"success": False, "return_value": None}
 
     def do_insert_search_map(

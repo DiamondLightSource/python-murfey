@@ -104,6 +104,17 @@ class Session(SQLModel, table=True):  # type: ignore
     )
 
 
+colour_columns = [
+    "hasGrey",
+    "hasRed",
+    "hasGreen",
+    "hasBlue",
+    "hasCyan",
+    "hasMagenta",
+    "hasYellow",
+]
+
+
 class ImagingSite(SQLModel, table=True):  # type: ignore
     """
     Table for recording unique imaging sites in the session. These can then be linked
@@ -152,13 +163,13 @@ class ImagingSite(SQLModel, table=True):  # type: ignore
 
     # Colour channel-related fields
     number_of_members: Optional[int] = Field(default=None)
-    has_grey: Optional[bool] = Field(default=None)
-    has_red: Optional[bool] = Field(default=None)
-    has_green: Optional[bool] = Field(default=None)
-    has_blue: Optional[bool] = Field(default=None)
-    has_cyan: Optional[bool] = Field(default=None)
-    has_magenta: Optional[bool] = Field(default=None)
-    has_yellow: Optional[bool] = Field(default=None)
+    hasGrey: Optional[bool] = Field(default=None)
+    hasRed: Optional[bool] = Field(default=None)
+    hasGreen: Optional[bool] = Field(default=None)
+    hasBlue: Optional[bool] = Field(default=None)
+    hasCyan: Optional[bool] = Field(default=None)
+    hasMagenta: Optional[bool] = Field(default=None)
+    hasYellow: Optional[bool] = Field(default=None)
     collection_mode: Optional[str] = Field(default=None)
     composite_created: bool = False  # Has a composite image been created?
 
