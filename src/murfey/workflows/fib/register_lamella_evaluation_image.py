@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
 
+import numpy as np
 import PIL.Image
 from pydantic import BaseModel
 from sqlmodel import Session as SQLModelSession, select
@@ -73,8 +74,16 @@ def _make_thumbnail(file: Path, metadata: FIBImageMetadata, visit_name: str):
 
     # Save the thumbnail image
     with PIL.Image.open(file) as img:
-        img.thumbnail((512, 512))  # Shrink to fit within 512 x 512
-        img.save(save_path)
+        # Normalise and convert to 8-bit grayscale
+        arr = np.array(img, dtype=np.float32)
+        vmin, vmax = np.percentile(arr, (0.5, 99.5))
+        scale = 255 / ((vmax - vmin) or 1)
+        np.clip(arr, a_min=vmin, a_max=vmax, out=arr)
+        np.subtract(arr, vmin, out=arr)
+        np.multiply(arr, scale, out=arr)
+        img_new = PIL.Image.fromarray(arr.astype(np.uint8), mode="L")
+        img_new.thumbnail((512, 512))  # Shrink to fit within 512 x 512
+        img_new.save(save_path)
     return save_path
 
 
