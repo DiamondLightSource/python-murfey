@@ -104,6 +104,17 @@ class Session(SQLModel, table=True):  # type: ignore
     )
 
 
+colour_columns = [
+    "hasGrey",
+    "hasRed",
+    "hasGreen",
+    "hasBlue",
+    "hasCyan",
+    "hasMagenta",
+    "hasYellow",
+]
+
+
 class ImagingSite(SQLModel, table=True):  # type: ignore
     """
     Table for recording unique imaging sites in the session. These can then be linked

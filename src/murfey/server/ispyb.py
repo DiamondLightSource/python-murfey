@@ -35,13 +35,13 @@ from sqlalchemy.orm import Session, sessionmaker
 import murfey.server.expeye as expeye
 from murfey.util import sanitise
 from murfey.util.config import get_security_config
+from murfey.util.db import colour_columns
 from murfey.util.models import (
     AtlasParameters,
     FoilHoleParameters,
     GridSquareParameters,
     SearchMapParameters,
 )
-from murfey.util.processing_params import colour_channels, colour_to_column
 
 log = logging.getLogger("murfey.server.ispyb")
 security_config = get_security_config()
@@ -193,11 +193,8 @@ class TransportManager:
                     cassetteSlot=atlas_parameters.cassette_slot,
                     mode=atlas_parameters.mode,
                 )
-                for colour in colour_channels:
-                    if column_name := colour_to_column(colour):
-                        setattr(
-                            record, column_name, getattr(atlas_parameters, column_name)
-                        )
+                for column_name in colour_columns:
+                    setattr(record, column_name, getattr(atlas_parameters, column_name))
                 with ISPyBSession() as db:
                     db.add(record)
                     db.commit()
@@ -232,8 +229,8 @@ class TransportManager:
                 mode=collection_mode,
             )
             if colour_flags:
-                for colour, value in colour_flags.items():
-                    if column_name := colour_to_column(colour):
+                for column_name, value in colour_flags.items():
+                    if column_name in colour_columns:
                         setattr(atlas_parameters, column_name, value)
             expeye_response = expeye.update_atlas(dcg_id, atlas_id, atlas_parameters)
             if expeye_response is None:
@@ -249,8 +246,8 @@ class TransportManager:
                     atlas.mode = collection_mode or atlas.mode
                     # Optionally insert colour flags if present
                     if colour_flags:
-                        for colour, value in colour_flags.items():
-                            if column_name := colour_to_column(colour):
+                        for column_name, value in colour_flags.items():
+                            if column_name in colour_columns:
                                 setattr(atlas, column_name, value)
                     db.add(atlas)
                     db.commit()
@@ -302,8 +299,8 @@ class TransportManager:
         )
         # Optionally insert colour flags
         if colour_flags:
-            for colour, value in colour_flags.items():
-                if column_name := colour_to_column(colour):
+            for column_name, value in colour_flags.items():
+                if column_name in colour_columns:
                     setattr(record, column_name, value)
         try:
             with ISPyBSession() as db:
@@ -368,8 +365,8 @@ class TransportManager:
                     grid_square.mode = grid_square_parameters.collection_mode
                 # Optionally insert colour flags
                 if colour_flags:
-                    for colour, value in colour_flags.items():
-                        if column_name := colour_to_column(colour):
+                    for column_name, value in colour_flags.items():
+                        if column_name in colour_columns:
                             setattr(grid_square, column_name, value)
                 db.add(grid_square)
                 db.commit()

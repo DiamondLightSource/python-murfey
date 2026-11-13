@@ -4,8 +4,8 @@ import logging
 import requests
 
 from murfey.util.config import get_security_config
+from murfey.util.db import colour_columns
 from murfey.util.models import AtlasParameters, FoilHoleParameters
-from murfey.util.processing_params import colour_channels, colour_to_column
 
 EXPEYE_TOKEN = get_security_config().expeye_token
 EXPEYE_URL = get_security_config().expeye_url
@@ -42,10 +42,8 @@ def insert_atlas(dcgid: int, atlas_parameters: AtlasParameters):
         "cassetteSlot": atlas_parameters.cassette_slot,
         "mode": atlas_parameters.mode,
     }
-    for colour in colour_channels:
-        atlas_json[colour_to_column(colour)] = getattr(
-            atlas_parameters, colour_to_column(colour)
-        )
+    for column_name in colour_columns:
+        atlas_json[column_name] = getattr(atlas_parameters, column_name)
     response = post(f"data-groups/{dcgid}/atlas", json=atlas_json)
     try:
         result = response.json()
@@ -61,10 +59,8 @@ def update_atlas(dcgid: int, atlas_id: int, atlas_parameters: AtlasParameters):
         "cassetteSlot": atlas_parameters.cassette_slot,
         "mode": atlas_parameters.mode,
     }
-    for colour in colour_channels:
-        atlas_json[colour_to_column(colour)] = getattr(
-            atlas_parameters, colour_to_column(colour)
-        )
+    for column_name in colour_columns:
+        atlas_json[column_name] = getattr(atlas_parameters, column_name)
     response = patch(f"atlas/{atlas_id}", json=atlas_json)
     try:
         result = response.json()

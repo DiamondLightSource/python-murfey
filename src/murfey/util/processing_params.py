@@ -153,14 +153,3 @@ class TomographyParameters(BaseModel):
 
 
 default_tomo_parameters = TomographyParameters()
-
-colour_channels: list = ["gray", "red", "green", "blue", "cyan", "magenta", "yellow"]
-
-
-def colour_to_column(colour_name):
-    if colour_name in colour_channels:
-        if colour_name == "gray":
-            return "hasGrey"
-        else:
-            return f"has{colour_name.capitalize()}"
-    return ""

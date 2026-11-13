@@ -12,7 +12,7 @@ import logging
 from collections.abc import Collection
 from functools import cached_property
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, Optional, TypeAlias
+from typing import TYPE_CHECKING, Optional
 
 from pydantic import BaseModel, computed_field
 from sqlmodel import Session, select
@@ -21,8 +21,6 @@ import murfey.server
 import murfey.util.db as MurfeyDB
 from murfey.util.models import GridSquareParameters
 from murfey.util.processing_params import (
-    colour_channels,
-    colour_to_column,
     default_clem_processing_parameters as processing_params,
 )
 from murfey.workflows.register_data_collection_group import register_dcg
@@ -32,8 +30,14 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger("murfey.workflows.clem.register_preprocessing_results")
 
-ColorChannels: TypeAlias = Literal[
-    "gray", "red", "green", "blue", "cyan", "magenta", "yellow"
+colour_channels: list[str] = [
+    "gray",
+    "red",
+    "green",
+    "blue",
+    "cyan",
+    "magenta",
+    "yellow",
 ]
 CC_MODES = ("_ICC", "_Lng_LVCC", "_Lng_SVCC")
 
@@ -43,12 +47,12 @@ class CLEMPreprocessingResult(BaseModel):
     number_of_members: int
     is_stack: bool
     is_montage: bool
-    output_files: dict[ColorChannels, Path]
-    thumbnails: dict[ColorChannels, Path] = {}
+    output_files: dict[str, Path]
+    thumbnails: dict[str, Path] = {}
     thumbnail_size: Optional[tuple[int, int]] = None  # height, width
     metadata: Path
     parent_lif: Optional[Path] = None
-    parent_tiffs: dict[ColorChannels, list[Path]] = {}
+    parent_tiffs: dict[str, list[Path]] = {}
     pixels_x: int
     pixels_y: int
     units: str
@@ -111,10 +115,17 @@ class CLEMPreprocessingResult(BaseModel):
 def _get_colour_flags(colours: list[str]):
     colour_flags = {}
     for colour in colour_channels:
-        if colour in colours:
-            colour_flags[colour_to_column(colour)] = True
+        if colour == "gray":
+            column_name = "hasGrey"
         else:
-            colour_flags[colour_to_column(colour)] = False
+            column_name = f"has{colour.capitalize()}"
+        if column_name in MurfeyDB.colour_columns:
+            if colour in colours:
+                colour_flags[column_name] = True
+            else:
+                colour_flags[column_name] = False
+        else:
+            logger.error(f"Unknown colour {colour}")
     return colour_flags
 
 
@@ -328,8 +339,7 @@ def _register_dcg_and_atlas(
 
         # Translate colour flags into ISPyB convention
         colour_flags = {
-            key: getattr(imaging_site, colour_to_column(key), 0)
-            for key in colour_channels
+            key: getattr(imaging_site, key, 0) for key in MurfeyDB.colour_columns
         }
         collection_mode = imaging_site.collection_mode
     else:
@@ -504,8 +514,8 @@ def _register_single_grid_square(
     )
     # Construct colour flags for ISPyB
     colour_flags = {
-        colour: int(getattr(imaging_site, colour_to_column(colour), 0))
-        for colour in colour_channels
+        column_name: int(getattr(imaging_site, column_name, 0))
+        for column_name in MurfeyDB.colour_columns
     }
     # Register or update the grid square entry as required
     if grid_square_entry := murfey_db.exec(
