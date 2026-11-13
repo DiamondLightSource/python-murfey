@@ -60,6 +60,7 @@ class AtlasContext(Context):
                 dcg_data = {
                     "experiment_type_id": 44,  # Atlas
                     "tag": str(transferred_file.parent / transferred_file.stem),
+                    "atlas_type": "ROI",
                     "atlas": str(transferred_atlas_jpg).replace("//", "/"),
                     "sample": sample,
                     "create_smartem_grid": False,
@@ -171,6 +172,7 @@ class AtlasContext(Context):
                 dcg_data = {
                     "experiment_type_id": 44,  # Atlas
                     "tag": str(transferred_file.parent),
+                    "atlas_type": "ROI",
                     "atlas": str(transferred_atlas_jpg).replace("//", "/"),
                     "sample": sample,
                     "atlas_pixel_size": atlas_pixel_size,
@@ -230,6 +232,7 @@ class AtlasContext(Context):
                     data={
                         "experiment_type_id": 44,  # Atlas
                         "tag": str(transferred_file.parent),
+                        "atlas_type": "ROI",
                         "atlas": str(transferred_atlas).replace("//", "/"),
                         "sample": sample,
                         "create_smartem_grid": bool(environment.acquisition_uuid),

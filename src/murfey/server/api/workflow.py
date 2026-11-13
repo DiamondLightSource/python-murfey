@@ -2,7 +2,7 @@ import asyncio
 from datetime import datetime
 from logging import getLogger
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 import sqlalchemy
 from fastapi import APIRouter, Depends
@@ -74,7 +74,6 @@ from murfey.util.db import (
     TiltSeries,
 )
 from murfey.util.models import (
-    AtlasParameters,
     ProcessingParametersSPA,
     ProcessingParametersTomo,
     SearchMapParameters,
@@ -101,6 +100,7 @@ class DCGroupParameters(BaseModel):
     # DC = Data collection
     experiment_type_id: int
     tag: str
+    atlas_type: Literal["ROI", "Tilescan"]
     atlas: str = ""
     sample: Optional[int] = None
     atlas_pixel_size: float = 0
@@ -256,31 +256,20 @@ def register_dc_group(
                 db.add(atlas_instance)
 
             if murfey.server._transport_object:
-                if dcg_instance.atlas_id is not None:
-                    murfey.server._transport_object.send(
-                        murfey.server._transport_object.feedback_queue,
-                        {
-                            "register": "atlas_update",
-                            "tag": dcg_instance.tag,
-                            "atlas_id": dcg_instance.atlas_id,
-                            "atlas": dcg_params.atlas,
-                            "sample": dcg_params.sample,
-                            "sample_registered": sample_registered,
-                            "atlas_pixel_size": dcg_params.atlas_pixel_size,
-                            "dcgid": dcg_instance.id,
-                            "session_id": session_id,
-                        },
-                    )
-                else:
-                    atlas_id_response = murfey.server._transport_object.do_insert_atlas(
-                        dcg_instance.id,
-                        AtlasParameters(
-                            image=dcg_params.atlas,
-                            pixel_size=dcg_params.atlas_pixel_size,
-                            cassette_slot=dcg_params.sample,
-                        ),
-                    )
-                    dcg_instance.atlas_id = atlas_id_response["return_value"]
+                murfey.server._transport_object.send(
+                    murfey.server._transport_object.feedback_queue,
+                    {
+                        "register": "atlas_update",
+                        "tag": dcg_instance.tag,
+                        "atlas_type": dcg_params.atlas_type,
+                        "atlas": dcg_params.atlas,
+                        "sample": dcg_params.sample,
+                        "sample_registered": sample_registered,
+                        "atlas_pixel_size": dcg_params.atlas_pixel_size,
+                        "dcgid": dcg_instance.id,
+                        "session_id": session_id,
+                    },
+                )
             db.add(dcg_instance)
         db.commit()
 
@@ -349,6 +338,7 @@ def register_dc_group(
             "experiment_type_id": dcg_params.experiment_type_id,
             "tag": dcg_params.tag,
             "session_id": session_id,
+            "atlas_type": dcg_params.atlas_type,
             "atlas": dcg_params.atlas,
             "sample": dcg_params.sample,
             "atlas_pixel_size": dcg_params.atlas_pixel_size,
