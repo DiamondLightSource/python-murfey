@@ -128,7 +128,9 @@ def run(message: dict, murfey_db: Session) -> dict[str, bool]:
                     # Raw dataset result should only be considered
                     # If the current entry is also a raw dataset
                     not result.is_denoised
-                    and "_Lng_LVCC" not in clem_img_site.image_path
+                    and not any(
+                        cc_mode in clem_img_site.image_path for cc_mode in CC_MODES
+                    )
                 )
             ):
                 clem_img_site.composite_created = True
