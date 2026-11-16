@@ -7,7 +7,6 @@ from typing import Any, Dict, List, Optional
 import sqlalchemy
 from fastapi import APIRouter, Depends
 from ispyb.sqlalchemy import (
-    Atlas,
     BLSample,
     BLSampleGroup,
     BLSampleGroupHasBLSample,
@@ -75,6 +74,7 @@ from murfey.util.db import (
     TiltSeries,
 )
 from murfey.util.models import (
+    AtlasParameters,
     ProcessingParametersSPA,
     ProcessingParametersTomo,
     SearchMapParameters,
@@ -273,12 +273,12 @@ def register_dc_group(
                     )
                 else:
                     atlas_id_response = murfey.server._transport_object.do_insert_atlas(
-                        Atlas(
-                            dataCollectionGroupId=dcg_instance.id,
-                            atlasImage=dcg_params.atlas,
-                            pixelSize=dcg_params.atlas_pixel_size,
-                            cassetteSlot=dcg_params.sample,
-                        )
+                        dcg_instance.id,
+                        AtlasParameters(
+                            image=dcg_params.atlas,
+                            pixel_size=dcg_params.atlas_pixel_size,
+                            cassette_slot=dcg_params.sample,
+                        ),
                     )
                     dcg_instance.atlas_id = atlas_id_response["return_value"]
             db.add(dcg_instance)

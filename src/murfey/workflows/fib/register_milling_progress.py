@@ -72,7 +72,7 @@ def _ensure_prerequisites(
             "atlas": "",
             "atlas_pixel_size": 0.0,
             "sample": slot_number,
-            "color_flags": None,
+            "colour_flags": None,
             "collection_mode": None,
         }
         register_dcg(
