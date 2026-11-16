@@ -16,6 +16,9 @@ from murfey.util.db import ImagingSite
 logger = logging.getLogger("murfey.workflows.clem.register_align_and_merge_results")
 
 
+CC_MODES = ("_ICC", "_Lng_LVCC", "_Lng_SVCC")
+
+
 class AlignAndMergeResult(BaseModel):
     series_name: str
     image_stacks: list[Path]
@@ -35,7 +38,19 @@ class AlignAndMergeResult(BaseModel):
         that it's a denoised image set of the same position. These results should
         override or supersede the original ones once they're available.
         """
-        return "_Lng_LVCC" in self.series_name
+        return any(self.series_name.endswith(pattern) for pattern in CC_MODES)
+
+    # Valid Pydantic decorator not supported by MyPy
+    @computed_field  # type: ignore
+    @cached_property
+    def cc_mode(self) -> str | None:
+        """
+        Store the computational clearing mode used as an attribute
+        """
+        for pattern in CC_MODES:
+            if self.series_name.endswith(pattern):
+                return pattern[1:]
+        return None
 
     # Valid Pydantic decorator not supported by MyPy
     @computed_field  # type: ignore
@@ -45,7 +60,9 @@ class AlignAndMergeResult(BaseModel):
         Extract just the name of the site by removing the "_Lng_LVCC" suffix from
         the series name.
         """
-        return self.series_name.replace("_Lng_LVCC", "")
+        if self.cc_mode is not None:
+            return self.series_name[: -(len(self.cc_mode) + 1)]
+        return self.series_name
 
     @field_validator("image_stacks", mode="before")
     @classmethod
