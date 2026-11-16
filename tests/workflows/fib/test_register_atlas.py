@@ -201,9 +201,7 @@ def test_run_with_db(
 
     # Mock 'PIL.Image.open' and create a test image
     mock_open = mocker.patch("murfey.workflows.fib.register_atlas.PIL.Image.open")
-    mock_open.__enter__.return_value = PIL.Image.fromarray(
-        np.ones((1500, 1000), dtype=np.uint8)
-    )
+    mock_open.return_value = PIL.Image.fromarray(np.ones((1500, 1000), dtype=np.uint8))
     # Build the name of the expected test images
     thumbnails: list[Path] = []
     for file in atlas_files:

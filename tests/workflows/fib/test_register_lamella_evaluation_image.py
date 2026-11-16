@@ -320,9 +320,7 @@ def test_run_with_db(
     mock_open = mocker.patch(
         "murfey.workflows.fib.register_lamella_evaluation_image.PIL.Image.open"
     )
-    mock_open.__enter__.return_value = PIL.Image.fromarray(
-        np.ones((1500, 1000), dtype=np.uint8)
-    )
+    mock_open.return_value = PIL.Image.fromarray(np.ones((1500, 1000), dtype=np.uint8))
 
     # Set up spies for the functions called by 'run()'
     spy_thumbnail = mocker.spy(
