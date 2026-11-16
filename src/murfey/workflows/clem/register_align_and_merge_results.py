@@ -34,9 +34,9 @@ class AlignAndMergeResult(BaseModel):
     @cached_property
     def is_denoised(self) -> bool:
         """
-        The "_Lng_LVCC" suffix appended to a CLEM dataset's position name indicates
-        that it's a denoised image set of the same position. These results should
-        override or supersede the original ones once they're available.
+        The '_ICC', '_Lng_LVCC' and '_Lng_SVCC' suffixes appended to a CLEM dataset's
+        position name indicate that they have undergone computational clearing. These
+        results should override or supersede the original ones once they're available.
         """
         return any(self.series_name.endswith(pattern) for pattern in CC_MODES)
 
@@ -45,7 +45,7 @@ class AlignAndMergeResult(BaseModel):
     @cached_property
     def cc_mode(self) -> str | None:
         """
-        Store the computational clearing mode used as an attribute
+        Store the CC mode used as an attribute.
         """
         for pattern in CC_MODES:
             if self.series_name.endswith(pattern):
@@ -57,8 +57,7 @@ class AlignAndMergeResult(BaseModel):
     @cached_property
     def site_name(self) -> str:
         """
-        Extract just the name of the site by removing the "_Lng_LVCC" suffix from
-        the series name.
+        Extract the name of the site by removing the CC suffix from the series name.
         """
         if self.cc_mode is not None:
             return self.series_name[: -(len(self.cc_mode) + 1)]
