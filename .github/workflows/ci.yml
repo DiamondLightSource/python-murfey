@@ -8,9 +8,6 @@ on:
       CODECOV_TOKEN:
         required: true
 
-env:
-  MARIADB_VERSION: "12.3"
-
 jobs:
   test:
     name: Run tests
@@ -18,19 +15,13 @@ jobs:
     strategy:
       matrix:
         python-version: ["3.11", "3.12", "3.13", "3.14"]
+        mariadb-version:
+          - "12.3" # Latest version supported by shogo82148/actions-setup-mysql@v1
     services:
       mariadb:
-        image: mariadb:${{ env.MARIADB_VERSION }} # released 2026-10-17
+        image: mariadb:${{ matrix.mariadb-version }}
         # Pulls image from DockerHub
         # Docker images: https://hub.docker.com/_/mariadb
-        # Previous version(s):
-        # 12.2.2 # released 2026-05-30
-        # 12.1.2 # released 2026-02-09
-        # 11.7.2 # released 2025-06-10
-        # 11.6.2 # released 2025-02-14
-        # 11.5.2 # released 2024-11-16
-        # 11.3.2 # released 2024-05-29
-        # 10.8 # released 2023-06-02
         env:
           MARIADB_DATABASE: ispybtest
           MARIADB_ROOT_PASSWORD: mariadb_root_pwd
@@ -91,7 +82,7 @@ jobs:
       - uses: shogo82148/actions-setup-mysql@v1
         with:
           distribution: "mariadb"
-          mysql-version: ${{ env.MARIADB_VERSION }}
+          mysql-version: ${{ matrix.mariadb-version }}
           auto-start: false
 
       - name: Set up test ISPyB database
