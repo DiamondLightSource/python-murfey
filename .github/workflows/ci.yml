@@ -17,6 +17,8 @@ jobs:
         python-version: ["3.11", "3.12", "3.13", "3.14"]
         mariadb-version:
           - "12.3" # Latest version supported by shogo82148/actions-setup-mysql@v1
+        rabbitmq-version:
+          - "4.4.0-management"
     services:
       mariadb:
         image: mariadb:${{ matrix.mariadb-version }}
@@ -60,7 +62,7 @@ jobs:
           EOF
 
           cat <<EOF >Dockerfile
-          FROM rabbitmq:3.13-management
+          FROM rabbitmq:${{ matrix.rabbitmq-version }}
           COPY rabbitmq.conf /etc/rabbitmq/rabbitmq.conf
           EOF
 
