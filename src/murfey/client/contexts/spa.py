@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from itertools import count
 from pathlib import Path
-from typing import Any, Optional, OrderedDict
+from typing import Optional, OrderedDict
 
 import xmltodict
 
@@ -430,6 +430,76 @@ class SPAContext(Context):
             environment=environment,
             **kwargs,
         )
+        if self._acquisition_software == "serialem":
+            return self.post_transfer_serialem(
+                transferred_file, environment=environment, **kwargs
+            )
+        else:
+            return self.post_transfer_epu(
+                transferred_file, environment=environment, **kwargs
+            )
+
+    def post_transfer_serialem(
+        self,
+        transferred_file: Path,
+        environment: MurfeyInstanceEnvironment | None = None,
+        **kwargs,
+    ) -> bool:
+        source = None
+        if environment:
+            source = _get_source(transferred_file, environment)
+        if not source or not environment:
+            logger.error(f"No source or environment for {transferred_file}")
+            return False
+        if transferred_file.suffix == ".tif":
+            file_transferred_to = _file_transferred_to(
+                environment,
+                source,
+                transferred_file,
+                Path(self._machine_config.get("rsync_basepath", "")),
+            )
+            environment.movies[file_transferred_to] = MovieTracker(
+                movie_number=next(environment.movie_counters[str(source)]),
+                motion_correction_uuid=next(MurfeyID),
+            )
+            preproc_data = {
+                "path": str(file_transferred_to),
+                "description": "",
+                "processing_job": None,
+                "data_collection_id": None,
+                "image_number": environment.movies[file_transferred_to].movie_number,
+                # TODO pixel size
+                "pixel_size": self.data_collection_parameters.get(
+                    "pixel_size_on_image"
+                ),
+                "autoproc_program_id": None,
+                "dose_per_frame": environment.dose_per_frame,
+                "mc_binning": 1,
+                "gain_ref": environment.gain_ref,
+                "extract_downscale": True,
+                "eer_fractionation_file": None,
+                "tag": str(source),
+                "foil_hole_id": transferred_file.stem.split("_")[1],
+            }
+            capture_post(
+                base_url=str(environment.url.geturl()),
+                router_name="workflow.spa_router",
+                function_name="request_spa_preprocessing",
+                token=self._token,
+                instrument_name=environment.instrument_name,
+                visit_name=environment.visit,
+                session_id=environment.murfey_session,
+                data={k: None if v == "None" else v for k, v in preproc_data.items()},
+            )
+        return True
+
+    def post_transfer_epu(
+        self,
+        transferred_file: Path,
+        environment: MurfeyInstanceEnvironment | None = None,
+        **kwargs,
+    ) -> bool:
+
         data_suffixes = (".mrc", ".tiff", ".tif", ".eer")
         if "gain" not in transferred_file.name:
             if transferred_file.suffix in data_suffixes:
@@ -557,29 +627,3 @@ class SPAContext(Context):
                         )
 
         return True
-
-    def _register_data_collection(
-        self,
-        tag: str,
-        url: str,
-        data: dict,
-        environment: MurfeyInstanceEnvironment,
-    ):
-        return
-
-    def _register_processing_job(
-        self,
-        tag: str,
-        environment: MurfeyInstanceEnvironment,
-        parameters: dict[str, Any] | None = None,
-    ):
-        return
-
-    def _launch_spa_pipeline(
-        self,
-        tag: str,
-        jobid: int,
-        environment: MurfeyInstanceEnvironment,
-        url: str = "",
-    ):
-        return

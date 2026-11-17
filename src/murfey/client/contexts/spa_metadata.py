@@ -133,34 +133,45 @@ class SPAMetadataContext(Context):
         environment: Optional[MurfeyInstanceEnvironment] = None,
         **kwargs,
     ):
-        if environment and transferred_file.suffix == ".mrc":
+        source = None
+        if environment:
             source = _get_source(transferred_file, environment)
-            if source:
-                visitless_source = _get_visitless_source(
-                    source, environment, skip_search=True
-                )
-                destination_file = _file_transferred_to(
-                    environment,
-                    source,
-                    transferred_file,
-                    Path(self._machine_config.get("rsync_basepath", "")),
-                )
-                capture_post(
-                    base_url=str(environment.url.geturl()),
-                    router_name="session_control.spa_router",
-                    function_name="register_square",
-                    token=self._token,
-                    instrument_name=environment.instrument_name,
-                    session_id=environment.murfey_session,
-                    gsid=transferred_file.stem,
-                    data={
-                        "tag": visitless_source,
-                        "image_path": str(destination_file),
-                        "count": len(self._registered_squares_serialem) + 1,
-                        "serialem": self._acquisition_software == "serialem",
-                    },
-                )
-                self._registered_squares_serialem.add(transferred_file.stem)
+        if not source or not environment:
+            logger.error(f"No source or environment for {transferred_file}")
+            return
+        if (
+            "gridsquares" in transferred_file.parts
+            and transferred_file.suffix == ".mrc"
+        ):
+            visitless_source = _get_visitless_source(
+                source, environment, skip_search=True
+            )
+            destination_file = _file_transferred_to(
+                environment,
+                source,
+                transferred_file,
+                Path(self._machine_config.get("rsync_basepath", "")),
+            )
+            capture_post(
+                base_url=str(environment.url.geturl()),
+                router_name="session_control.spa_router",
+                function_name="register_square",
+                token=self._token,
+                instrument_name=environment.instrument_name,
+                session_id=environment.murfey_session,
+                gsid=transferred_file.stem,
+                data={
+                    "tag": visitless_source,
+                    "image_path": str(destination_file),
+                    "count": len(self._registered_squares_serialem) + 1,
+                    "serialem": self._acquisition_software == "serialem",
+                },
+            )
+            self._registered_squares_serialem.add(transferred_file.stem)
+        elif (
+            "foilholes" in transferred_file.parts and transferred_file.suffix == ".mrc"
+        ):
+            logger.info("Found foil hole")
 
     def post_transfer_epu(
         self,
