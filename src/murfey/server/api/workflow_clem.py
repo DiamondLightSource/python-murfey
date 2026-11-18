@@ -11,6 +11,7 @@ from sqlmodel import Session, select
 import murfey.server
 import murfey.util.db as MurfeyDB
 from murfey.server.murfey_db import murfey_db
+from murfey.util.config import get_machine_config
 
 # Set up logger
 logger = getLogger("murfey.server.api.workflow_clem")
@@ -41,22 +42,18 @@ def process_raw_lifs(
         select(MurfeyDB.Session).where(MurfeyDB.Session.id == session_id)
     ).one()
     visit_name = murfey_session.visit
+    instrument_name = murfey_session.instrument_name
 
-    # Find the visit directory, the raw directory name, and the job name
+    # Load the machine config
+    machine_config = get_machine_config(instrument_name)[instrument_name]
+
+    # Get the visit directory, output directory, and job name
     visit_idx = lif_info.lif_file.parts.index(visit_name)
-    visit_dir = Path(
-        "/".join(
-            ""
-            if part == "/"  # Replace root "/" with "" for Linux paths
-            else part
-            for part in lif_info.lif_file.parts[: visit_idx + 1]
-        )
-    )
-    raw_dir = lif_info.lif_file.parts[visit_idx + 1]
+    visit_dir = Path(*lif_info.lif_file.parts[: visit_idx + 1])
+    output_dir = visit_dir / machine_config.processed_directory_name
     job_name = str(
-        (lif_info.lif_file.parent / lif_info.lif_file.stem).relative_to(
-            visit_dir.parent
-        )
+        (lif_info.lif_file.parent).relative_to(visit_dir.parent)
+        / lif_info.lif_file.stem
     )
 
     # Construct recipe and submit it for processing
@@ -65,7 +62,7 @@ def process_raw_lifs(
         "parameters": {
             # Job parameters
             "lif_file": f"{str(lif_info.lif_file)}",
-            "root_folder": raw_dir,
+            "output_dir": str(output_dir),
             # Other recipe parameters
             "session_dir": f"{str(visit_dir)}",
             "session_id": session_id,
@@ -109,21 +106,22 @@ def process_raw_tiffs(
         select(MurfeyDB.Session).where(MurfeyDB.Session.id == session_id)
     ).one()
     visit_name = murfey_session.visit
+    instrument_name = murfey_session.instrument_name
 
-    # Find the visit directory, the raw directory name, and the job name
+    # Load the machine config
+    machine_config = get_machine_config(instrument_name)[instrument_name]
+
+    # Get the visit directory, output directory, series name, and job name
     tiff_file = tiff_info.tiff_files[0]
     visit_idx = tiff_file.parts.index(visit_name)
-    visit_dir = Path(
-        "/".join(
-            ""
-            if part == "/"  # Replace root "/" with "" for Linux paths
-            else part
-            for part in tiff_file.parts[: visit_idx + 1]
-        )
+    raw_dir = Path(*tiff_file.parts[: visit_idx + 2])
+    visit_dir = raw_dir.parent
+    output_dir = visit_dir / machine_config.processed_directory_name
+    series_name = str(
+        tiff_file.parent.relative_to(raw_dir) / tiff_file.stem.split("--")[0]
     )
-    raw_dir = tiff_file.parts[visit_idx + 1]
     job_name = str(
-        (tiff_file.parent / tiff_file.stem.split("--")[0]).relative_to(visit_dir.parent)
+        (tiff_file.parent).relative_to(visit_dir.parent) / tiff_file.stem.split("--")[0]
     )
 
     # Construct recipe and submit it for processing
@@ -131,10 +129,11 @@ def process_raw_tiffs(
         "recipes": ["clem-process-raw-tiffs"],
         "parameters": {
             # Job parameters
-            "tiff_list": "null",
+            "tiff_list": None,
             "tiff_file": f"{str(tiff_file)}",
-            "root_folder": raw_dir,
             "metadata": f"{str(tiff_info.series_metadata)}",
+            "output_dir": output_dir,
+            "series_name": series_name,
             # Other recipe parameters
             "session_dir": f"{str(visit_dir)}",
             "session_id": session_id,
