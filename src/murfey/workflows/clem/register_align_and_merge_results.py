@@ -16,6 +16,9 @@ from murfey.util.db import ImagingSite
 logger = logging.getLogger("murfey.workflows.clem.register_align_and_merge_results")
 
 
+CC_MODES = ("_ICC", "_Lng_LVCC", "_Lng_SVCC")
+
+
 class AlignAndMergeResult(BaseModel):
     series_name: str
     image_stacks: list[Path]
@@ -31,21 +34,34 @@ class AlignAndMergeResult(BaseModel):
     @cached_property
     def is_denoised(self) -> bool:
         """
-        The "_Lng_LVCC" suffix appended to a CLEM dataset's position name indicates
-        that it's a denoised image set of the same position. These results should
-        override or supersede the original ones once they're available.
+        The '_ICC', '_Lng_LVCC' and '_Lng_SVCC' suffixes appended to a CLEM dataset's
+        position name indicate that they have undergone computational clearing. These
+        results should override or supersede the original ones once they're available.
         """
-        return "_Lng_LVCC" in self.series_name
+        return any(self.series_name.endswith(pattern) for pattern in CC_MODES)
+
+    # Valid Pydantic decorator not supported by MyPy
+    @computed_field  # type: ignore
+    @cached_property
+    def cc_mode(self) -> str | None:
+        """
+        Store the CC mode used as an attribute.
+        """
+        for pattern in CC_MODES:
+            if self.series_name.endswith(pattern):
+                return pattern[1:]
+        return None
 
     # Valid Pydantic decorator not supported by MyPy
     @computed_field  # type: ignore
     @cached_property
     def site_name(self) -> str:
         """
-        Extract just the name of the site by removing the "_Lng_LVCC" suffix from
-        the series name.
+        Extract the name of the site by removing the CC suffix from the series name.
         """
-        return self.series_name.replace("_Lng_LVCC", "")
+        if self.cc_mode is not None:
+            return self.series_name[: -(len(self.cc_mode) + 1)]
+        return self.series_name
 
     @field_validator("image_stacks", mode="before")
     @classmethod
@@ -111,7 +127,9 @@ def run(message: dict, murfey_db: Session) -> dict[str, bool]:
                     # Raw dataset result should only be considered
                     # If the current entry is also a raw dataset
                     not result.is_denoised
-                    and "_Lng_LVCC" not in clem_img_site.image_path
+                    and not any(
+                        cc_mode in clem_img_site.image_path for cc_mode in CC_MODES
+                    )
                 )
             ):
                 clem_img_site.composite_created = True

@@ -16,10 +16,16 @@ project_name = "Grid_1"
 @pytest.mark.parametrize(
     "test_params",
     [  # Registered data | Incoming data
-        ["_Lng_LVCC", ""],
-        ["_Lng_LVCC", "_Lng_LVCC"],
         ["", ""],
         ["", "_Lng_LVCC"],
+        ["_Lng_LVCC", ""],
+        ["_Lng_LVCC", "_Lng_LVCC"],
+        ["", "_Lng_SVCC"],
+        ["_Lng_SVCC", ""],
+        ["_Lng_SVCC", "_Lng_SVCC"],
+        ["", "_ICC"],
+        ["_ICC", ""],
+        ["_ICC", "_ICC"],
     ],
 )
 def test_run(
