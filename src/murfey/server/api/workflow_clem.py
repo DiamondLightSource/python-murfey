@@ -11,7 +11,6 @@ from sqlmodel import Session, select
 import murfey.server
 import murfey.util.db as MurfeyDB
 from murfey.server.murfey_db import murfey_db
-from murfey.util import sanitise_path
 
 # Set up logger
 logger = getLogger("murfey.server.api.workflow_clem")
@@ -35,43 +34,30 @@ def process_raw_lifs(
 ):
     if murfey.server._transport_object is None:
         logger.error("No TransportManager object was set up")
-        return False
+        return {"success": False}
 
     # Load the visit name from the database
-    try:
-        murfey_session = murfey_db.exec(
-            select(MurfeyDB.Session).where(MurfeyDB.Session.id == session_id)
-        ).one()
-        visit_name = murfey_session.visit
-    except Exception as e:
-        logger.error("Error querying session information from database", exc_info=True)
-        print(e)
-        return False
+    murfey_session = murfey_db.exec(
+        select(MurfeyDB.Session).where(MurfeyDB.Session.id == session_id)
+    ).one()
+    visit_name = murfey_session.visit
 
     # Find the visit directory, the raw directory name, and the job name
-    try:
-        visit_idx = lif_info.lif_file.parts.index(visit_name)
-        visit_dir = Path(
-            "/".join(
-                ""
-                if part == "/"  # Replace root "/" with "" for Linux paths
-                else part
-                for part in lif_info.lif_file.parts[: visit_idx + 1]
-            )
+    visit_idx = lif_info.lif_file.parts.index(visit_name)
+    visit_dir = Path(
+        "/".join(
+            ""
+            if part == "/"  # Replace root "/" with "" for Linux paths
+            else part
+            for part in lif_info.lif_file.parts[: visit_idx + 1]
         )
-        raw_dir = lif_info.lif_file.parts[visit_idx + 1]
-        job_name = str(
-            (lif_info.lif_file.parent / lif_info.lif_file.stem).relative_to(
-                visit_dir.parent
-            )
+    )
+    raw_dir = lif_info.lif_file.parts[visit_idx + 1]
+    job_name = str(
+        (lif_info.lif_file.parent / lif_info.lif_file.stem).relative_to(
+            visit_dir.parent
         )
-    except Exception:
-        logger.error(
-            "Could not determine the visit directory from LIF file "
-            f"{sanitise_path(lif_info.lif_file)}",
-            exc_info=True,
-        )
-        return False
+    )
 
     # Construct recipe and submit it for processing
     recipe = {
@@ -96,7 +82,7 @@ def process_raw_lifs(
         message=recipe,
         new_connection=True,
     )
-    return True
+    return {"success": True}
 
 
 class TIFFSeriesInfo(BaseModel):
@@ -113,47 +99,32 @@ def process_raw_tiffs(
 ):
     if murfey.server._transport_object is None:
         logger.error("No TransportManager object was set up")
-        return False
+        return {"success": False}
     if not tiff_info.tiff_files:
         logger.error("No TIFF files were included in the incoming message")
-        return False
+        return {"success": False}
 
     # Load the visit name from the database
-    try:
-        murfey_session = murfey_db.exec(
-            select(MurfeyDB.Session).where(MurfeyDB.Session.id == session_id)
-        ).one()
-        visit_name = murfey_session.visit
-    except Exception as e:
-        logger.error("Error querying session information from database", exc_info=True)
-        print(e)
-        return False
+    murfey_session = murfey_db.exec(
+        select(MurfeyDB.Session).where(MurfeyDB.Session.id == session_id)
+    ).one()
+    visit_name = murfey_session.visit
 
     # Find the visit directory, the raw directory name, and the job name
-    try:
-        tiff_file = tiff_info.tiff_files[0]
-        visit_idx = tiff_file.parts.index(visit_name)
-        visit_dir = Path(
-            "/".join(
-                ""
-                if part == "/"  # Replace root "/" with "" for Linux paths
-                else part
-                for part in tiff_file.parts[: visit_idx + 1]
-            )
+    tiff_file = tiff_info.tiff_files[0]
+    visit_idx = tiff_file.parts.index(visit_name)
+    visit_dir = Path(
+        "/".join(
+            ""
+            if part == "/"  # Replace root "/" with "" for Linux paths
+            else part
+            for part in tiff_file.parts[: visit_idx + 1]
         )
-        raw_dir = tiff_file.parts[visit_idx + 1]
-        job_name = str(
-            (tiff_file.parent / tiff_file.stem.split("--")[0]).relative_to(
-                visit_dir.parent
-            )
-        )
-    except Exception:
-        logger.error(
-            "Could not determine the visit directory from TIFF file "
-            f"{sanitise_path(tiff_file)}",
-            exc_info=True,
-        )
-        return False
+    )
+    raw_dir = tiff_file.parts[visit_idx + 1]
+    job_name = str(
+        (tiff_file.parent / tiff_file.stem.split("--")[0]).relative_to(visit_dir.parent)
+    )
 
     # Construct recipe and submit it for processing
     recipe = {
@@ -180,4 +151,4 @@ def process_raw_tiffs(
         message=recipe,
         new_connection=True,
     )
-    return True
+    return {"success": True}
