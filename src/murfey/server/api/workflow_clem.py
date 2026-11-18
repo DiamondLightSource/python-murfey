@@ -61,10 +61,10 @@ def process_raw_lifs(
         "recipes": ["clem-process-raw-lifs"],
         "parameters": {
             # Job parameters
-            "lif_file": f"{str(lif_info.lif_file)}",
+            "lif_file": str(lif_info.lif_file),
             "output_dir": str(output_dir),
             # Other recipe parameters
-            "session_dir": f"{str(visit_dir)}",
+            "session_dir": str(visit_dir),
             "session_id": session_id,
             "job_name": job_name,
             "feedback_queue": murfey.server._transport_object.feedback_queue,
@@ -116,10 +116,12 @@ def process_raw_tiffs(
     visit_idx = tiff_file.parts.index(visit_name)
     raw_dir = Path(*tiff_file.parts[: visit_idx + 2])
     visit_dir = raw_dir.parent
-    output_dir = visit_dir / machine_config.processed_directory_name
     series_name = str(
         tiff_file.parent.relative_to(raw_dir) / tiff_file.stem.split("--")[0]
     )
+    output_dir = (
+        visit_dir / machine_config.processed_directory_name / series_name
+    ).parent
     job_name = str(
         (tiff_file.parent).relative_to(visit_dir.parent) / tiff_file.stem.split("--")[0]
     )
@@ -130,12 +132,12 @@ def process_raw_tiffs(
         "parameters": {
             # Job parameters
             "tiff_list": None,
-            "tiff_file": f"{str(tiff_file)}",
-            "metadata": f"{str(tiff_info.series_metadata)}",
-            "output_dir": output_dir,
+            "tiff_file": str(tiff_file),
+            "metadata": str(tiff_info.series_metadata),
+            "output_dir": str(output_dir),
             "series_name": series_name,
             # Other recipe parameters
-            "session_dir": f"{str(visit_dir)}",
+            "session_dir": str(visit_dir),
             "session_id": session_id,
             "job_name": job_name,
             "feedback_queue": murfey.server._transport_object.feedback_queue,
