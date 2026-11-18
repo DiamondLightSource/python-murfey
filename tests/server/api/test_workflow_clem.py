@@ -156,7 +156,7 @@ def test_process_raw_tiffs(
     )
 
     # Construct the expected series name and output directory
-    series_name = "grid_1/TileScan 1/Position 1"
+    series_name = "grid_1/TileScan_1/Position_1"
     output_dir = (
         visit_dir / machine_config.processed_directory_name / series_name
     ).parent

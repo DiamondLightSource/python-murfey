@@ -118,7 +118,7 @@ def process_raw_tiffs(
     visit_dir = raw_dir.parent
     series_name = str(
         tiff_file.parent.relative_to(raw_dir) / tiff_file.stem.split("--")[0]
-    )
+    ).replace(" ", "_")  # Remove all spaces
     output_dir = (
         visit_dir / machine_config.processed_directory_name / series_name
     ).parent
