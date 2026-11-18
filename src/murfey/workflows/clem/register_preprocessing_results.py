@@ -756,6 +756,7 @@ def run(message: dict, murfey_db: Session) -> dict[str, bool]:
                     "series_name": result.series_name,
                     "images": [str(file) for file in image_combo],
                     "metadata": str(result.metadata),
+                    "output_dir": None,  # Part of recipe, but not strictly needed
                     # Other recipe parameters
                     "session_dir": str(visit_dir),
                     "session_id": session_id,
