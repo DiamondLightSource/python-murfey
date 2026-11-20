@@ -166,7 +166,7 @@ def test_ensure_dcg_exists_spa_missing_xml(mock_capture_post, tmp_path):
 
     dcg_data = {
         "experiment_type_id": 37,
-        "tag": f"{tmp_path}/metadata_folder",
+        "tag": f"{tmp_path}/metadata_folder/Images-Disc1",
         "comments": "metadata_folder",
     }
     mock_capture_post.assert_called_once_with(
