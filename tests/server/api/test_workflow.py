@@ -24,6 +24,7 @@ def test_register_dc_group_new_dcg(mock_transport, murfey_db_session: Session):
         atlas="/path/to/Sample10/Atlas/Atlas_1.jpg",
         sample=10,
         atlas_pixel_size=1e-5,
+        comments="folder",
     )
     register_dc_group(
         visit_name="cm12345-6",
@@ -52,6 +53,7 @@ def test_register_dc_group_new_dcg(mock_transport, murfey_db_session: Session):
             "proposal_code": ExampleVisit.proposal_code,
             "proposal_number": str(ExampleVisit.proposal_number),
             "visit_number": str(ExampleVisit.visit_number),
+            "comments": "folder",
         },
     )
 
@@ -279,6 +281,7 @@ def test_register_dc_group_new_dcg_old_atlas(
             "proposal_code": ExampleVisit.proposal_code,
             "proposal_number": str(ExampleVisit.proposal_number),
             "visit_number": str(ExampleVisit.visit_number),
+            "comments": None,
         },
     )
 

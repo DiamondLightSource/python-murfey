@@ -66,6 +66,7 @@ def test_sxt_context_xrm_atlas(mock_ole_file, mock_post, tmp_path):
         json={
             "experiment_type_id": 47,
             "tag": f"{tmp_path}/cm12345-6/grid1",
+            "comments": None,
         },
         headers={"Authorization": "Bearer "},
     )
@@ -146,6 +147,7 @@ def test_sxt_context_xrm_roi(mock_ole_file, mock_post, tmp_path):
         json={
             "experiment_type_id": 47,
             "tag": f"{tmp_path}/cm12345-6/grid1",
+            "comments": None,
         },
         headers={"Authorization": "Bearer "},
     )
@@ -243,6 +245,7 @@ def test_sxt_context_txrm(mock_ole_file, mock_post, tmp_path):
         json={
             "experiment_type_id": 47,
             "tag": f"{tmp_path}/cm12345-6/grid1",
+            "comments": None,
         },
         headers={"Authorization": "Bearer "},
     )
@@ -361,6 +364,7 @@ def test_sxt_context_txrm_external_ref(mock_ole_file, mock_post, tmp_path):
         json={
             "experiment_type_id": 47,
             "tag": f"{tmp_path}/cm12345-6/grid1",
+            "comments": None,
         },
         headers={"Authorization": "Bearer "},
     )

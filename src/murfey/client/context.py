@@ -77,13 +77,17 @@ def ensure_dcg_exists(
 ) -> str | None:
     """Create  a data collection group"""
     session_file: Path | None = None
+    dcg_comments: str | None = None
     if collection_type == "tomo":
         experiment_type_id = 36
+        # For Tomo the metadata source is the session name
+        dcg_comments = metadata_source.name
         session_file = metadata_source / "Session.dm"
         source_visit_dir = metadata_source.parent
     elif collection_type == "spa":
         experiment_type_id = 37
         # For SPA the metadata source sent should include the Images-Disc
+        dcg_comments = metadata_source.parent.name
         session_file = metadata_source.parent / "EpuSession.dm"
         source_visit_dir = metadata_source.parent.parent
         for h in entry_points(group="murfey.hooks"):
@@ -108,6 +112,7 @@ def ensure_dcg_exists(
         dcg_data = {
             "experiment_type_id": experiment_type_id,
             "tag": dcg_tag,
+            "comments": dcg_comments,
         }
     elif not session_file.is_file():
         logger.warning(f"Cannot find session file {str(session_file)}")
@@ -117,6 +122,7 @@ def ensure_dcg_exists(
         dcg_data = {
             "experiment_type_id": experiment_type_id,
             "tag": dcg_tag,
+            "comments": dcg_comments,
         }
     else:
         with open(session_file, "r") as session_xml:
@@ -201,12 +207,14 @@ def ensure_dcg_exists(
                 ).replace("//", "/"),
                 "sample": environment.samples[metadata_source].sample,
                 "atlas_pixel_size": atlas_pixel_size,
+                "comments": dcg_comments,
             }
         else:
             dcg_data = {
                 "experiment_type_id": experiment_type_id,
                 "tag": dcg_tag,
                 "sample": environment.samples[metadata_source].sample,
+                "comments": dcg_comments,
             }
     capture_post(
         base_url=str(environment.url.geturl()),

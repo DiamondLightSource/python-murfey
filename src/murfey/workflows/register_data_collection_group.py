@@ -42,6 +42,7 @@ def register_dcg(
         record = ISPyBDB.DataCollectionGroup(
             sessionId=ispyb_session_id,
             experimentTypeId=message["experiment_type_id"],
+            comments=message.get("comments"),
         )
 
         dcgid = murfey.server._transport_object.do_insert_data_collection_group(
