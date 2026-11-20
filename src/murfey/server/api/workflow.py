@@ -102,14 +102,15 @@ class DCGroupParameters(BaseModel):
     tag: str
     atlas_type: Literal["ROI", "Tilescan"]
     atlas: str = ""
-    sample: Optional[int] = None
+    sample: int | None = None
     atlas_pixel_size: float = 0
     atlas_x_stage_position: float | None = None
     atlas_y_stage_position: float | None = None
     atlas_width: int | None = None
     atlas_height: int | None = None
     create_smartem_grid: bool = False
-    acquisition_uuid: Optional[str] = None
+    acquisition_uuid: str | None = None
+    comments: str | None = None
 
 
 def _register_smartem_grid(
@@ -346,6 +347,7 @@ def register_dc_group(
             "atlas_y_stage_position": dcg_params.atlas_y_stage_position,
             "atlas_width": dcg_params.atlas_width,
             "atlas_height": dcg_params.atlas_height,
+            "comments": dcg_params.comments,
         }
 
         if murfey.server._transport_object:
