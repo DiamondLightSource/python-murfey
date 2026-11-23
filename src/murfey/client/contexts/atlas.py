@@ -7,7 +7,10 @@ import xmltodict
 from murfey.client.context import Context, _atlas_destination, _get_source
 from murfey.client.instance_environment import MurfeyInstanceEnvironment
 from murfey.util.client import capture_post
-from murfey.util.spa_metadata import get_grid_square_atlas_positions
+from murfey.util.spa_metadata import (
+    get_grid_square_atlas_positions,
+    get_tile_atlas_positions,
+)
 
 logger = logging.getLogger("murfey.client.contexts.atlas")
 
@@ -193,18 +196,25 @@ class AtlasContext(Context):
                 )
 
         elif environment and transferred_file.name == "Atlas.dm":
-            # Register all grid squares on this atlas
-            try:
-                gs_pix_positions = get_grid_square_atlas_positions(transferred_file)
-            except KeyError:
-                logger.info("Unable to read grid square locations from Atlas.dm")
-                return
             for p in transferred_file.parts:
                 if p.startswith("Sample"):
                     sample = int(p.replace("Sample", ""))
                     break
             else:
                 logger.warning(f"Sample could not be identified for {transferred_file}")
+                return
+
+            # Register all grid squares on this atlas
+            try:
+                gs_pix_positions = get_grid_square_atlas_positions(transferred_file)
+            except KeyError:
+                logger.info("Unable to read grid square locations from Atlas.dm")
+                return
+
+            try:
+                tile_pix_positions = get_tile_atlas_positions(transferred_file, sample)
+            except KeyError:
+                logger.info("Unable to read tile locations from Atlas.dm")
                 return
 
             # Make sure a dcg is requested before doing grid squares
@@ -221,24 +231,26 @@ class AtlasContext(Context):
                     ) / atlas_jpg.relative_to(source.parent)
                 else:
                     transferred_atlas = ""
-                capture_post(
-                    base_url=str(environment.url.geturl()),
-                    router_name="workflow.router",
-                    function_name="register_dc_group",
-                    token=self._token,
-                    instrument_name=environment.instrument_name,
-                    visit_name=environment.visit,
-                    session_id=environment.murfey_session,
-                    data={
-                        "experiment_type_id": 44,  # Atlas
-                        "tag": str(transferred_file.parent),
-                        "atlas_type": "ROI",
-                        "atlas": str(transferred_atlas).replace("//", "/"),
-                        "sample": sample,
-                        "create_smartem_grid": bool(environment.acquisition_uuid),
-                        "acquisition_uuid": environment.acquisition_uuid,
-                    },
-                )
+                for atlas_type in ["ROI", "TileScan"]:
+                    # Register atlas for both tiles and grid squares
+                    capture_post(
+                        base_url=str(environment.url.geturl()),
+                        router_name="workflow.router",
+                        function_name="register_dc_group",
+                        token=self._token,
+                        instrument_name=environment.instrument_name,
+                        visit_name=environment.visit,
+                        session_id=environment.murfey_session,
+                        data={
+                            "experiment_type_id": 44,  # Atlas
+                            "tag": str(transferred_file.parent),
+                            "atlas_type": atlas_type,
+                            "atlas": str(transferred_atlas).replace("//", "/"),
+                            "sample": sample,
+                            "create_smartem_grid": bool(environment.acquisition_uuid),
+                            "acquisition_uuid": environment.acquisition_uuid,
+                        },
+                    )
             # Register all grid squares on this atlas
             for gs, pos_data in gs_pix_positions.items():
                 if pos_data:
@@ -262,6 +274,16 @@ class AtlasContext(Context):
                             "angle": pos_data[6],
                         },
                     )
+            # Register all tiles on this atlas
+            capture_post(
+                base_url=str(environment.url.geturl()),
+                router_name="session_control.spa_router",
+                function_name="register_tiles",
+                token=self._token,
+                instrument_name=environment.instrument_name,
+                session_id=environment.murfey_session,
+                data=tile_pix_positions,
+            )
             # Register atlas in smartem
             if gs_pix_positions:
                 capture_post(

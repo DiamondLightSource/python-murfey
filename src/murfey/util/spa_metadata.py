@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import Dict, NamedTuple, Optional, Tuple, Union
+from typing import NamedTuple, Union
 
 import xmltodict
 
@@ -10,30 +10,30 @@ logger = logging.getLogger("murfey.util.spa_metadata")
 class FoilHoleInfo(NamedTuple):
     id: int
     grid_square_id: int
-    x_location: Optional[float] = None
-    y_location: Optional[float] = None
-    x_stage_position: Optional[float] = None
-    y_stage_position: Optional[float] = None
-    readout_area_x: Optional[int] = None
-    readout_area_y: Optional[int] = None
-    thumbnail_size_x: Optional[int] = None
-    thumbnail_size_y: Optional[int] = None
-    pixel_size: Optional[float] = None
+    x_location: float | None = None
+    y_location: float | None = None
+    x_stage_position: float | None = None
+    y_stage_position: float | None = None
+    readout_area_x: int | None = None
+    readout_area_y: int | None = None
+    thumbnail_size_x: int | None = None
+    thumbnail_size_y: int | None = None
+    pixel_size: float | None = None
     image: str = ""
-    diameter: Optional[float] = None
+    diameter: float | None = None
 
 
 class GridSquareInfo(NamedTuple):
     id: int
-    x_location: Optional[float] = None
-    y_location: Optional[float] = None
-    x_stage_position: Optional[float] = None
-    y_stage_position: Optional[float] = None
-    readout_area_x: Optional[int] = None
-    readout_area_y: Optional[int] = None
-    thumbnail_size_x: Optional[int] = None
-    thumbnail_size_y: Optional[int] = None
-    pixel_size: Optional[float] = None
+    x_location: float | None = None
+    y_location: float | None = None
+    x_stage_position: float | None = None
+    y_stage_position: float | None = None
+    readout_area_x: int | None = None
+    readout_area_y: int | None = None
+    thumbnail_size_x: int | None = None
+    thumbnail_size_y: int | None = None
+    pixel_size: float | None = None
     image: str = ""
     tag: str = ""
 
@@ -49,38 +49,61 @@ def foil_hole_from_file(f: Path) -> int:
     return int(f.name.split("_")[1])
 
 
-def get_grid_square_atlas_positions(
-    xml_path: Path, grid_square: str = ""
-) -> Dict[
-    str,
-    Tuple[
-        Optional[int],
-        Optional[int],
-        Optional[float],
-        Optional[float],
-        Optional[int],
-        Optional[int],
-        Optional[float],
-    ],
-]:
-    with open(
-        xml_path,
-        "r",
-    ) as dm:
+def get_tile_atlas_positions(xml_path: Path, sample: int) -> dict[str, dict]:
+    with open(xml_path, "r") as dm:
         atlas_data = xmltodict.parse(dm.read())
     tile_info = atlas_data["AtlasSessionXml"]["Atlas"]["TilesEfficient"]["_items"][
         "TileXml"
     ]
-    gs_pix_positions: Dict[
+    tile_pix_positions: dict[str, dict] = {}
+    for tile in tile_info:
+        tile_pix_positions[tile["Id"]] = {
+            "tag": str(xml_path.parent),
+            "sample": sample,
+            "image": str(
+                xml_path.parent
+                / (tile["TileImageReference"]["a:BaseFileName"] + ".jpg")
+            ),
+            "x_location": int(float(tile["AtlasPixelPosition"]["a:x"])),
+            "y_location": int(float(tile["AtlasPixelPosition"]["b:y"])),
+            "x_stage_position": float(tile["StagePosition"]["a:X"]) * 1e9,
+            "y_stage_position": float(tile["StagePosition"]["a:Y"]) * 1e9,
+            "width": int(float(tile["AtlasPixelPosition"]["a:width"])),
+            "height": int(float(tile["AtlasPixelPosition"]["a:height"])),
+            "angle": 0,
+        }
+    return tile_pix_positions
+
+
+def get_grid_square_atlas_positions(
+    xml_path: Path, grid_square: str = ""
+) -> dict[
+    str,
+    tuple[
+        int | None,
+        int | None,
+        float | None,
+        float | None,
+        int | None,
+        int | None,
+        float | None,
+    ],
+]:
+    with open(xml_path, "r") as dm:
+        atlas_data = xmltodict.parse(dm.read())
+    tile_info = atlas_data["AtlasSessionXml"]["Atlas"]["TilesEfficient"]["_items"][
+        "TileXml"
+    ]
+    gs_pix_positions: dict[
         str,
-        Tuple[
-            Optional[int],
-            Optional[int],
-            Optional[float],
-            Optional[float],
-            Optional[int],
-            Optional[int],
-            Optional[float],
+        tuple[
+            int | None,
+            int | None,
+            float | None,
+            float | None,
+            int | None,
+            int | None,
+            float | None,
         ],
     ] = {}
     for ti in tile_info:

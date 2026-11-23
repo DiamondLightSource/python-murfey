@@ -457,6 +457,23 @@ def make_atlas_jpg(
     )
 
 
+@spa_router.post("/sessions/{session_id}/tiles")
+def register_tiles(
+    session_id: MurfeySessionID,
+    tile_group: dict[int, GridSquareParameters],
+    db=murfey_db,
+):
+    if murfey.server._transport_object:
+        murfey.server._transport_object.send(
+            murfey.server._transport_object.feedback_queue,
+            {
+                "register": "spa.register_tiles",
+                "session_id": session_id,
+                "tile_group": {k: v.model_dump() for k, v in tile_group.items()},
+            },
+        )
+
+
 @spa_router.post("/sessions/{session_id}/grid_square/{gsid}")
 def register_grid_square(
     session_id: MurfeySessionID,
