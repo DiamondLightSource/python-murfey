@@ -75,7 +75,6 @@ def test_register_dc_group_atlas_to_processing(
         id=1,
         session_id=ExampleVisit.murfey_session_id,
         tag="initial_processing_tag",
-        atlas_id=90,
         atlas_pixel_size=1e-5,
         sample=10,
         atlas="/path/to/Sample10/Atlas/Atlas_1.jpg",
@@ -86,7 +85,6 @@ def test_register_dc_group_atlas_to_processing(
         id=2,
         session_id=ExampleVisit.murfey_session_id,
         tag="/path/to/Sample10/Atlas",
-        atlas_id=90,
         atlas_pixel_size=1e-5,
         sample=10,
         atlas="/path/to/Sample10/Atlas/Atlas_1.jpg",
@@ -146,7 +144,6 @@ def test_register_dc_group_processing_to_atlas(
         id=1,
         session_id=ExampleVisit.murfey_session_id,
         tag="processing_tag",
-        atlas_id=90,
         atlas_pixel_size=1e-5,
         sample=10,
         atlas="/path/to/Sample10/Atlas/Atlas_1.jpg",
@@ -156,7 +153,6 @@ def test_register_dc_group_processing_to_atlas(
         id=2,
         session_id=ExampleVisit.murfey_session_id,
         tag="second_processing_tag",
-        atlas_id=90,
         atlas_pixel_size=1e-5,
         sample=10,
         atlas="/path/to/Sample10/Atlas/Atlas_1.jpg",
@@ -242,7 +238,6 @@ def test_register_dc_group_new_dcg_old_atlas(
         id=1,
         session_id=ExampleVisit.murfey_session_id,
         tag="processing_tag",
-        atlas_id=90,
         atlas_pixel_size=1e-5,
         sample=10,
         atlas="/path/to/Sample10/Atlas/Atlas_1.jpg",
@@ -553,7 +548,7 @@ def test_register_dc_group_new_atlas_with_sxt_roi(
     assert new_dcg.sample == 12
     assert new_dcg.atlas_pixel_size == 1e-4
     assert new_dcg.tag == "processing_tag"
-    assert new_dcg.atlas_id == 90
+    assert new_dcg.atlas_type == "ROI"
 
     # Check the imaging site insert
     image_site = murfey_db_session.exec(
@@ -670,7 +665,7 @@ def test_register_dc_group_roi_update(
     assert new_dcg.sample == 12
     assert new_dcg.atlas_pixel_size == 1e-4
     assert new_dcg.tag == "processing_tag"
-    assert new_dcg.atlas_id == 90
+    assert new_dcg.atlas_type == "ROI"
 
     # Check the imaging site insert
     image_site = murfey_db_session.exec(
