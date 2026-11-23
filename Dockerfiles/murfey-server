@@ -40,11 +40,16 @@ RUN \
         build \
         && \
     /venv/bin/python -m pip install /tmp/python-murfey[server] && \
-    echo "Installing SmartEM..." && \
-    git clone https://github.com/DiamondLightSource/smartem-decisions.git /tmp/smartem-decisions && \
-    /venv/bin/python -m pip install \
-        /tmp/smartem-decisions[backend,core,agent] \
-        &&\
+    if [ -d /mnt/python-murfey/installers/smartem-decisions ]; then \
+        echo "Installing SmartEM Decisions..."; \
+        cp -r /mnt/python-murfey/installers/smartem-decisions /tmp/; \
+        /venv/bin/python -m pip install /tmp/smartem-decisions[backend,core,agent]; \
+    fi && \
+    if [ -d /mnt/python-murfey/installers/murfey-dls-extras ]; then \
+        echo "Installing Murfey DLS Extras..."; \
+        cp -r /mnt/python-murfey/installers/murfey-dls-extras /tmp/; \
+        /venv/bin/python -m pip install /tmp/murfey-dls-extras; \
+    fi && \
     echo "Installing IMOD..." && \
     mkdir /imod && \
     if [ -f /mnt/python-murfey/installers/${IMOD_INSTALLER} ]; then \
