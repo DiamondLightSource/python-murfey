@@ -1,6 +1,14 @@
 # Template build command
 # podman build --build-arg groupid=<groupid> --build-arg userid=<userid> --build-arg groupname=<groupname> --no-cache -f path/to/Dockerfiles/murfey-server -t murfey-server:<version> path/to/python-murfey
 
+# =====================================================================================
+# README
+# =====================================================================================
+# This Dockerfile makes use of the optional private packages 'smartem-decisions'
+# and 'murfey-dls-extras'. When building 'murfey-server' for use at Diamond, the
+# private repos should be cloned into './installers'. If the folders are present,
+# they will be installed as part of the build.
+
 # Set up the base image to build with
 FROM docker.io/library/python:3.12-slim-bookworm AS base
 
