@@ -29,6 +29,7 @@ def set_up_db(murfey_db_session: Session):
         murfey_db_session,
         Atlas,
         lookup_kwargs={
+            "id": 10,
             "dcg_id": dcg_entry.id,
             "atlas_type": "ROI",
         },

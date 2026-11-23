@@ -287,14 +287,19 @@ def populate_fib_grid_square_entry(
         )
     else:
         # Look up data collection group for current series
-        dcg_entry = murfey_db.exec(
-            select(MurfeyDB.DataCollectionGroup)
+        atlas_row = murfey_db.exec(
+            select(MurfeyDB.Atlas)
+            .join(
+                MurfeyDB.DataCollectionGroup,
+                MurfeyDB.DataCollectionGroup.id == MurfeyDB.Atlas.dcg_id,
+            )
             .where(MurfeyDB.DataCollectionGroup.session_id == session_id)
             .where(MurfeyDB.DataCollectionGroup.tag == grid_square_params.tag)
+            .where(MurfeyDB.Atlas.atlas_type == "ROI")
         ).one()
         # Register to ISPyB
         grid_square_ispyb_result = transport_object.do_insert_grid_square(
-            atlas_id=dcg_entry.atlas_id,
+            atlas_id=atlas_row.id,
             grid_square_id=lamella_number,
             grid_square_parameters=grid_square_params,
         )

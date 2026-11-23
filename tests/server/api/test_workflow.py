@@ -432,7 +432,6 @@ def test_register_dc_group_new_atlas_with_searchmaps(
     assert new_dcg.sample == 12
     assert new_dcg.atlas_pixel_size == 1e-4
     assert new_dcg.tag == "processing_tag"
-    assert new_dcg.atlas_type == "ROI"
 
     # Check the search map update calls
     assert mock_register_search_map.call_count == 2
@@ -548,7 +547,6 @@ def test_register_dc_group_new_atlas_with_sxt_roi(
     assert new_dcg.sample == 12
     assert new_dcg.atlas_pixel_size == 1e-4
     assert new_dcg.tag == "processing_tag"
-    assert new_dcg.atlas_type == "ROI"
 
     # Check the imaging site insert
     image_site = murfey_db_session.exec(
@@ -665,7 +663,6 @@ def test_register_dc_group_roi_update(
     assert new_dcg.sample == 12
     assert new_dcg.atlas_pixel_size == 1e-4
     assert new_dcg.tag == "processing_tag"
-    assert new_dcg.atlas_type == "ROI"
 
     # Check the imaging site insert
     image_site = murfey_db_session.exec(
