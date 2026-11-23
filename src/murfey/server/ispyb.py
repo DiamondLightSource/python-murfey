@@ -198,8 +198,8 @@ class TransportManager:
                 with ISPyBSession() as db:
                     db.add(record)
                     db.commit()
-                log.info(f"Created Atlas {record.atlasId}")
-                return {"success": True, "return_value": record.atlasId}
+                    log.info(f"Created Atlas {record.atlasId}")
+                    return {"success": True, "return_value": record.atlasId}
             except ispyb.ISPyBException as e:
                 log.error(
                     "Inserting Atlas entry caused exception '%s'.",
