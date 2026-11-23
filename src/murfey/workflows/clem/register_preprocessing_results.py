@@ -550,14 +550,14 @@ def _register_single_grid_square(
     else:
         # Look up data collection group for current series
         atlas = murfey_db.exec(
-            select(murfey_db.Atlas)
+            select(MurfeyDB.Atlas)
             .join(
                 MurfeyDB.DataCollectionGroup,
                 MurfeyDB.DataCollectionGroup.id == MurfeyDB.Atlas.dcg_id,
             )
             .where(MurfeyDB.DataCollectionGroup.session_id == session_id)
             .where(MurfeyDB.DataCollectionGroup.tag == grid_square_params.tag)
-            .where(murfey_db.Atlas.atlas_type == "ROI")
+            .where(MurfeyDB.Atlas.atlas_type == "ROI")
         ).one()
         # Register to ISPyB
         grid_square_ispyb_result = transport_object.do_insert_grid_square(
