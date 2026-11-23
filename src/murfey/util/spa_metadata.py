@@ -65,7 +65,7 @@ def get_tile_atlas_positions(xml_path: Path, sample: int) -> dict[str, dict]:
                 / (tile["TileImageReference"]["a:BaseFileName"] + ".jpg")
             ),
             "x_location": int(float(tile["AtlasPixelPosition"]["a:x"])),
-            "y_location": int(float(tile["AtlasPixelPosition"]["b:y"])),
+            "y_location": int(float(tile["AtlasPixelPosition"]["a:y"])),
             "x_stage_position": float(tile["StagePosition"]["a:X"]) * 1e9,
             "y_stage_position": float(tile["StagePosition"]["a:Y"]) * 1e9,
             "width": int(float(tile["AtlasPixelPosition"]["a:width"])),

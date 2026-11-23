@@ -231,7 +231,7 @@ class AtlasContext(Context):
                     ) / atlas_jpg.relative_to(source.parent)
                 else:
                     transferred_atlas = ""
-                for atlas_type in ["ROI", "TileScan"]:
+                for atlas_type in ["ROI", "Tilescan"]:
                     # Register atlas for both tiles and grid squares
                     capture_post(
                         base_url=str(environment.url.geturl()),
@@ -247,7 +247,9 @@ class AtlasContext(Context):
                             "atlas_type": atlas_type,
                             "atlas": str(transferred_atlas).replace("//", "/"),
                             "sample": sample,
-                            "create_smartem_grid": bool(environment.acquisition_uuid),
+                            "create_smartem_grid": bool(
+                                environment.acquisition_uuid and atlas_type == "ROI"
+                            ),
                             "acquisition_uuid": environment.acquisition_uuid,
                         },
                     )
