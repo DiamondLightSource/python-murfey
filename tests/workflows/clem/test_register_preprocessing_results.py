@@ -453,6 +453,3 @@ def test_run_with_db(
         for flag, value in colour_flags.items():
             assert getattr(gs, flag) == value
         assert gs.mode == collection_mode
-
-    murfey_db_session.close()
-    ispyb_db_session.close()

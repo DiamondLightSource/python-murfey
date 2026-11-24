@@ -10,31 +10,23 @@ from murfey.server.api.workflow_clem import (
     process_raw_lifs,
     process_raw_tiffs,
 )
-from murfey.util import sanitise_path
+from murfey.util.config import MachineConfig
+from tests.conftest import ExampleVisit
 
-session_id = 1
-visit_name = "cm12345-6"
+session_id = ExampleVisit.murfey_session_id
+visit_name = f"{ExampleVisit.proposal_code}{ExampleVisit.proposal_number}-{ExampleVisit.visit_number}"
+instrument_name = ExampleVisit.instrument_name
 
 
 @pytest.mark.parametrize(
-    "test_params",
-    (  # Has transport object | DB query success | Visits match
-        # Successful case
-        (True, True, True),
-        # Fail cases (one False at a time)
-        (False, True, True),
-        (True, False, True),
-        (True, True, False),
-    ),
+    "has_transport",
+    (True, False),
 )
 def test_process_raw_lifs(
     mocker: MockerFixture,
     tmp_path: Path,
-    test_params: tuple[bool, bool, bool],
+    has_transport: bool,
 ):
-    # Unpack test params
-    has_transport, query_successful, visits_match = test_params
-
     # Mock the transport object
     mock_transport = MagicMock(feedback_queue="clem")
     mocker.patch(
@@ -45,17 +37,21 @@ def test_process_raw_lifs(
     # Mock the Murfey DB
     mock_murfey_session = MagicMock(
         visit=visit_name,
+        instrument_name=instrument_name,
     )
     mock_db = MagicMock()
-    if query_successful:
-        mock_db.exec.return_value.one.return_value = mock_murfey_session
-    else:
-        mock_db.exec.return_value.one.side_effect = Exception("Something went wrong")
+    mock_db.exec.return_value.one.return_value = mock_murfey_session
+
+    # Mock the machine config
+    machine_config = MachineConfig(processed_directory_name="processed")
+    mocker.patch(
+        "murfey.server.api.workflow_clem.get_machine_config",
+        return_value={instrument_name: machine_config},
+    )
 
     # Create the test LIF file
-    visit_dir = (
-        tmp_path / "data" / "some_year" / (visit_name if visits_match else "cm12345-5")
-    )
+    visit_dir = tmp_path / "data" / "2020" / visit_name
+    output_dir = visit_dir / machine_config.processed_directory_name
     test_file = visit_dir / "images" / "SomeLifProject.lif"
     lif_file = LifFileInfo(**{"lif_file": str(test_file)})
 
@@ -71,18 +67,6 @@ def test_process_raw_lifs(
 
     if not has_transport:
         mock_logger.error.assert_called_with("No TransportManager object was set up")
-    elif not query_successful:
-        mock_logger.error.assert_called_with(
-            "Error querying session information from database", exc_info=True
-        )
-        mock_transport.send.assert_not_called()
-    elif not visits_match:
-        mock_logger.error.assert_called_with(
-            "Could not determine the visit directory from LIF file "
-            f"{sanitise_path(lif_file.lif_file)}",
-            exc_info=True,
-        )
-        mock_transport.send.assert_not_called()
     else:
         # Construct the expected recipe
         recipe = {
@@ -90,7 +74,7 @@ def test_process_raw_lifs(
             "parameters": {
                 # Job parameters
                 "lif_file": f"{str(lif_file.lif_file)}",
-                "root_folder": "images",
+                "output_dir": str(output_dir),
                 # Other recipe parameters
                 "session_dir": f"{str(visit_dir)}",
                 "session_id": session_id,
@@ -107,23 +91,21 @@ def test_process_raw_lifs(
 
 @pytest.mark.parametrize(
     "test_params",
-    (  # Has transport object | Has TIFF files | DB query success | Visits match
+    (  # Has transport object | Has TIFF files
         # Successful case
-        (True, True, True, True),
+        (True, True),
         # Fail cases (one False at a time)
-        (False, True, True, True),
-        (True, False, True, True),
-        (True, True, False, True),
-        (True, True, True, False),
+        (False, True),
+        (True, False),
     ),
 )
 def test_process_raw_tiffs(
     mocker: MockerFixture,
     tmp_path: Path,
-    test_params: tuple[bool, bool, bool, bool],
+    test_params: tuple[bool, bool],
 ):
     # Unpack test params
-    has_transport, has_tiffs, query_successful, visits_match = test_params
+    has_transport, has_tiffs = test_params
 
     # Mock the transport object
     mock_transport = MagicMock(feedback_queue="clem")
@@ -135,18 +117,21 @@ def test_process_raw_tiffs(
     # Mock the Murfey DB
     mock_murfey_session = MagicMock(
         visit=visit_name,
+        instrument_name=instrument_name,
     )
     mock_db = MagicMock()
-    if query_successful:
-        mock_db.exec.return_value.one.return_value = mock_murfey_session
-    else:
-        mock_db.exec.return_value.one.side_effect = Exception("Something went wrong")
+    mock_db.exec.return_value.one.return_value = mock_murfey_session
+
+    # Mock the machine config
+    machine_config = MachineConfig(processed_directory_name="processed")
+    mocker.patch(
+        "murfey.server.api.workflow_clem.get_machine_config",
+        return_value={instrument_name: machine_config},
+    )
 
     # Create the test TIFF files
-    visit_dir = (
-        tmp_path / "data" / "some_year" / (visit_name if visits_match else "cm12345-5")
-    )
-    series_name = f"{visit_name}/images/grid_1/TileScan 1/Position 1"
+    visit_dir = tmp_path / "data" / "2020" / visit_name
+    job_name = f"{visit_name}/images/grid_1/TileScan 1/Position 1"
     tiff_files = (
         [
             visit_dir
@@ -164,11 +149,17 @@ def test_process_raw_tiffs(
     )
     tiff_info = TIFFSeriesInfo(
         **{
-            "series_name": series_name,
+            "series_name": job_name,
             "tiff_files": tiff_files,
             "series_metadata": metadata_file,
         }
     )
+
+    # Construct the expected series name and output directory
+    series_name = "grid_1/TileScan_1/Position_1"
+    output_dir = (
+        visit_dir / machine_config.processed_directory_name / series_name
+    ).parent
 
     # Mock the logger (check what the final logs are)
     mock_logger = mocker.patch("murfey.server.api.workflow_clem.logger")
@@ -187,32 +178,21 @@ def test_process_raw_tiffs(
             "No TIFF files were included in the incoming message"
         )
         mock_transport.send.assert_not_called()
-    elif not query_successful:
-        mock_logger.error.assert_called_with(
-            "Error querying session information from database", exc_info=True
-        )
-        mock_transport.send.assert_not_called()
-    elif not visits_match:
-        mock_logger.error.assert_called_with(
-            "Could not determine the visit directory from TIFF file "
-            f"{sanitise_path(tiff_files[0])}",
-            exc_info=True,
-        )
-        mock_transport.send.assert_not_called()
     else:
         # Construct the expected recipe
         recipe = {
             "recipes": ["clem-process-raw-tiffs"],
             "parameters": {
                 # Job parameters
-                "tiff_list": "null",
-                "tiff_file": f"{str(tiff_files[0])}",
-                "root_folder": "images",
-                "metadata": f"{str(metadata_file)}",
+                "tiff_list": None,
+                "tiff_file": str(tiff_files[0]),
+                "metadata": str(metadata_file),
+                "output_dir": str(output_dir),
+                "series_name": series_name,
                 # Other recipe parameters
-                "session_dir": f"{str(visit_dir)}",
+                "session_dir": str(visit_dir),
                 "session_id": session_id,
-                "job_name": series_name,
+                "job_name": job_name,
                 "feedback_queue": "clem",
             },
         }
