@@ -257,11 +257,11 @@ class Atlas(SQLModel, table=True):  # type: ignore
     cassette_slot: int | None = None
 
     grid_squares: Optional[List["GridSquare"]] = Relationship(
-        back_populates="data_collection_group",
+        back_populates="atlas",
         sa_relationship_kwargs={"cascade": "delete"},
     )
     search_maps: Optional[List["SearchMap"]] = Relationship(
-        back_populates="data_collection_group",
+        back_populates="atlas",
         sa_relationship_kwargs={"cascade": "delete"},
     )
     data_collection_group: Optional["DataCollectionGroup"] = Relationship(
@@ -307,9 +307,7 @@ class GridSquare(SQLModel, table=True):  # type: ignore
     foil_holes: List["FoilHole"] = Relationship(
         back_populates="grid_square", sa_relationship_kwargs={"cascade": "delete"}
     )
-    data_collection_group: Optional["Atlas"] = Relationship(
-        back_populates="grid_squares"
-    )
+    atlas: Optional["Atlas"] = Relationship(back_populates="grid_squares")
 
 
 """
@@ -689,9 +687,7 @@ class SearchMap(SQLModel, table=True):  # type: ignore
     scaled_width: int | None = None
     angle: float | None = None
     quality_indicator: float | None = None
-    data_collection_group: Optional["Atlas"] = Relationship(
-        back_populates="search_maps"
-    )
+    atlas: Optional["Atlas"] = Relationship(back_populates="search_maps")
     tomogram: Optional[List["Tomogram"]] = Relationship(back_populates="search_map")
 
 

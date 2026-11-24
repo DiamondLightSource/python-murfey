@@ -30,7 +30,7 @@ def run(
             .where(Atlas.atlas_type == message["atlas_type"])
         ).one_or_none()
     ):
-        atlas_murfey.image = message["atlas"] or atlas_murfey.image
+        atlas_murfey.atlas_image = message["atlas"] or atlas_murfey.image
         atlas_murfey.cassette_slot = message["sample"] or atlas_murfey.cassette_slot
         atlas_murfey.pixel_size = (
             message["atlas_pixel_size"] or atlas_murfey.atlas_pixel_size
@@ -52,7 +52,7 @@ def run(
             AtlasParameters(
                 atlas_type=message["atlas_type"],
                 image=message["atlas"],
-                pixel_size=-message["atlas_pixel_size"],
+                pixel_size=message["atlas_pixel_size"],
                 cassette_slot=message["sample"],
             ),
         ).get("return_value")
@@ -60,7 +60,7 @@ def run(
             id=atlas_id,
             dcg_id=message["dcgid"],
             atlas_type=message["atlas_type"],
-            image=message["atlas"],
+            atlas_image=message["atlas"],
             cassette_slot=message["sample"],
             pixel_size=message["atlas_pixel_size"],
         )
