@@ -2,7 +2,7 @@ from unittest import mock
 
 from sqlmodel import Session, select
 
-from murfey.util.db import DataCollectionGroup, GridSquare
+from murfey.util.db import Atlas, DataCollectionGroup, GridSquare
 from murfey.util.models import GridSquareParameters
 from murfey.workflows.spa import flush_spa_preprocess
 from tests.conftest import ExampleVisit
@@ -18,7 +18,6 @@ def test_register_grid_square_update_add_locations(
         id=1,
         session_id=ExampleVisit.murfey_session_id,
         tag="session_tag",
-        atlas_id=90,
         sample=2,
     )
     murfey_db_session.add(dcg)
@@ -70,7 +69,6 @@ def test_register_grid_square_update_add_nothing(
         id=1,
         session_id=ExampleVisit.murfey_session_id,
         tag="session_tag",
-        atlas_id=90,
         sample=2,
     )
     murfey_db_session.add(dcg)
@@ -115,10 +113,15 @@ def test_register_grid_square_insert_with_ispyb(
         id=1,
         session_id=ExampleVisit.murfey_session_id,
         tag="session_tag",
-        atlas_id=90,
         sample=2,
     )
     murfey_db_session.add(dcg)
+    atlas = Atlas(
+        id=90,
+        dcg_id=1,
+        atlas_type="ROI",
+    )
+    murfey_db_session.add(atlas)
     murfey_db_session.commit()
 
     # Set the ispyb return
