@@ -990,6 +990,13 @@ murfey.server.api.session_control.spa_router:
         type: int
     methods:
       - POST
+  - path: /session_control/spa/sessions/{session_id}/tiles
+    function: register_tiles
+    path_params:
+      - name: session_id
+        type: int
+    methods:
+      - POST
   - path: /session_control/spa/sessions/{session_id}/grid_square/{gsid}
     function: register_grid_square
     path_params:

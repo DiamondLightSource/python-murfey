@@ -4,6 +4,7 @@ from unittest import mock
 from sqlmodel import Session, select
 
 from murfey.util.db import (
+    Atlas,
     DataCollectionGroup,
     ImagingSite,
     SearchMap,
@@ -22,7 +23,15 @@ def set_up_db(murfey_db_session: Session):
             "id": 0,
             "session_id": ExampleVisit.murfey_session_id,
             "tag": "/path/to/tomogram_source",
-            "atlas_id": 10,
+        },
+    )
+    get_or_create_db_entry(
+        murfey_db_session,
+        Atlas,
+        lookup_kwargs={
+            "id": 10,
+            "dcg_id": dcg_entry.id,
+            "atlas_type": "ROI",
         },
     )
     get_or_create_db_entry(

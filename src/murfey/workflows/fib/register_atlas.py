@@ -136,7 +136,7 @@ def _register_dcg_and_atlas(
         atlas_message = {
             "session_id": session_id,
             "dcgid": dcg_entry.id,
-            "atlas_id": dcg_entry.atlas_id,
+            "atlas_type": "ROI",
             "atlas": atlas_name,
             "atlas_pixel_size": atlas_pixel_size,
             "sample": dcg_entry.sample,

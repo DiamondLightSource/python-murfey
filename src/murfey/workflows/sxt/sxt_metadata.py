@@ -5,7 +5,7 @@ from sqlmodel.orm.session import Session as SQLModelSession
 
 import murfey.server
 from murfey.util import sanitise
-from murfey.util.db import DataCollectionGroup, ImagingSite, SearchMap
+from murfey.util.db import Atlas, DataCollectionGroup, ImagingSite, SearchMap
 from murfey.util.models import SearchMapParameters
 
 logger = logging.getLogger("murfey.workflows.sxt.sxt_metadata")
@@ -21,6 +21,9 @@ def register_sxt_roi(
         select(DataCollectionGroup)
         .where(DataCollectionGroup.session_id == session_id)
         .where(DataCollectionGroup.tag == roi_parameters.tag)
+    ).one()
+    atlas = murfey_db.exec(
+        select(Atlas).where(Atlas.dcg_id == dcg.id).where(Atlas.atlas_type == "ROI")
     ).one()
     roi = murfey_db.exec(
         select(SearchMap)
@@ -42,7 +45,7 @@ def register_sxt_roi(
         logger.info(f"Registering new sxt roi {sanitise(roi_name)}")
         if murfey.server._transport_object:
             roi_ispyb_response = murfey.server._transport_object.do_insert_sxt_roi(
-                dcg.atlas_id, roi_parameters
+                atlas.id, roi_parameters
             )
         else:
             # mock up response so that below still works

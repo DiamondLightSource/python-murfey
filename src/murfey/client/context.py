@@ -112,6 +112,7 @@ def ensure_dcg_exists(
         dcg_data = {
             "experiment_type_id": experiment_type_id,
             "tag": dcg_tag,
+            "atlas_type": "ROI",
             "comments": dcg_comments,
         }
     elif not session_file.is_file():
@@ -122,6 +123,7 @@ def ensure_dcg_exists(
         dcg_data = {
             "experiment_type_id": experiment_type_id,
             "tag": dcg_tag,
+            "atlas_type": "ROI",
             "comments": dcg_comments,
         }
     else:
@@ -196,6 +198,7 @@ def ensure_dcg_exists(
             dcg_data = {
                 "experiment_type_id": experiment_type_id,
                 "tag": dcg_tag,
+                "atlas_type": "ROI",
                 "atlas": str(
                     _atlas_destination(
                         environment,
@@ -213,6 +216,7 @@ def ensure_dcg_exists(
             dcg_data = {
                 "experiment_type_id": experiment_type_id,
                 "tag": dcg_tag,
+                "atlas_type": "ROI",
                 "sample": environment.samples[metadata_source].sample,
                 "comments": dcg_comments,
             }

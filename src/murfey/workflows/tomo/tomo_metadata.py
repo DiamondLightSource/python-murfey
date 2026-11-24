@@ -10,6 +10,7 @@ from murfey.server.gain import Camera
 from murfey.util import sanitise
 from murfey.util.config import get_machine_config
 from murfey.util.db import (
+    Atlas,
     DataCollectionGroup,
     SearchMap,
     Session as MurfeySession,
@@ -27,10 +28,12 @@ def register_search_map_in_database(
     murfey_db: Session,
     close_db: bool = True,
 ):
-    dcg = murfey_db.exec(
-        select(DataCollectionGroup)
+    atlas = murfey_db.exec(
+        select(Atlas)
+        .join(DataCollectionGroup, Atlas.dcg_id == DataCollectionGroup.id)
         .where(DataCollectionGroup.session_id == session_id)
         .where(DataCollectionGroup.tag == search_map_params.tag)
+        .where(Atlas.atlas_type == "ROI")
     ).one()
     search_map_query = murfey_db.exec(
         select(SearchMap)
@@ -109,7 +112,7 @@ def register_search_map_in_database(
         logger.info(f"Registering new search map {sanitise(search_map_name)}")
         if murfey.server._transport_object:
             sm_ispyb_response = murfey.server._transport_object.do_insert_search_map(
-                dcg.atlas_id, search_map_params
+                atlas.id, search_map_params
             )
         else:
             # mock up response so that below still works
@@ -169,7 +172,7 @@ def register_search_map_in_database(
             search_map.pixel_size,
             search_map.height,
             search_map.width,
-            dcg.atlas_pixel_size,
+            atlas.pixel_size,
         ]
     ):
         # Work out the shifted positions if all required information is present
@@ -221,16 +224,16 @@ def register_search_map_in_database(
 
         # Convert from metres to pixels
         search_map_params.height_on_atlas = int(
-            search_map.height * search_map.pixel_size / dcg.atlas_pixel_size * 7.8
+            search_map.height * search_map.pixel_size / atlas.pixel_size * 7.8
         )
         search_map_params.width_on_atlas = int(
-            search_map.width * search_map.pixel_size / dcg.atlas_pixel_size * 7.8
+            search_map.width * search_map.pixel_size / atlas.pixel_size * 7.8
         )
         search_map_params.x_location = float(
-            corrected_vector[0] / dcg.atlas_pixel_size * 7.8 + 2003
+            corrected_vector[0] / atlas.pixel_size * 7.8 + 2003
         )
         search_map_params.y_location = float(
-            corrected_vector[1] / dcg.atlas_pixel_size * 7.8 + 2003
+            corrected_vector[1] / atlas.pixel_size * 7.8 + 2003
         )
         search_map.x_location = search_map_params.x_location
         search_map.y_location = search_map_params.y_location
@@ -243,7 +246,7 @@ def register_search_map_in_database(
             f"Unable to register search map {sanitise(search_map_name)} position yet: "
             f"stage {sanitise(str(search_map_params.x_stage_position))}, "
             f"width {sanitise(str(search_map_params.width))}, "
-            f"atlas pixel size {sanitise(str(dcg.atlas_pixel_size))}"
+            f"atlas pixel size {sanitise(str(atlas.pixel_size))}"
         )
     murfey_db.add(search_map)
     murfey_db.commit()
