@@ -113,7 +113,7 @@ def register_grid_square(
                 )
                 .where(DataCollectionGroup.session_id == session_id)
                 .where(DataCollectionGroup.tag == grid_square_params.tag)
-                .where(Atlas.atlas_type == "TileScan" if is_tile else "ROI")
+                .where(Atlas.atlas_type == ("Tilescan" if is_tile else "ROI"))
             ).one()
             gs_ispyb_response = murfey.server._transport_object.do_insert_grid_square(
                 atlas.id, gsid, grid_square_params

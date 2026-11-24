@@ -15,7 +15,7 @@ def register_tiles(
 ):
     for tile_id, tile_params in tile_group.items():
         # Tiles get registered in murfey and ispyb as grid squares
-        # Attached to Atlas with type "TileScan"
+        # Attached to Atlas with type "Tilescan"
         register_grid_square(session_id, tile_id, tile_params, murfey_db, is_tile=True)
     murfey_db.close()
     return {"success": True}
