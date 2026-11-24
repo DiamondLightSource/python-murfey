@@ -2,7 +2,7 @@ from unittest import mock
 
 from sqlmodel import Session, select
 
-from murfey.util.db import DataCollectionGroup, SearchMap, TiltSeries
+from murfey.util.db import Atlas, DataCollectionGroup, SearchMap, TiltSeries
 from murfey.util.models import BatchPositionParameters, SearchMapParameters
 from murfey.workflows.tomo import tomo_metadata
 from tests.conftest import ExampleVisit
@@ -33,6 +33,13 @@ def test_register_search_map_update_with_dimensions(
         atlas_pixel_size=1e-5,
     )
     murfey_db_session.add(dcg)
+    atlas = Atlas(
+        id=90,
+        dcg_id=1,
+        atlas_type="ROI",
+        pixel_size=1e-5,
+    )
+    murfey_db_session.add(atlas)
     murfey_db_session.commit()
 
     # Parameters to update with
@@ -86,6 +93,13 @@ def test_register_search_map_update_with_all_parameters(
         atlas_pixel_size=1e-5,
     )
     murfey_db_session.add(dcg)
+    atlas = Atlas(
+        id=90,
+        dcg_id=1,
+        atlas_type="ROI",
+        pixel_size=1e-5,
+    )
+    murfey_db_session.add(atlas)
     murfey_db_session.commit()
 
     # Parameters to update with
@@ -158,6 +172,13 @@ def test_register_search_map_insert_with_ispyb(
         atlas_pixel_size=1e-5,
     )
     murfey_db_session.add(dcg)
+    atlas = Atlas(
+        id=90,
+        dcg_id=1,
+        atlas_type="ROI",
+        pixel_size=1e-5,
+    )
+    murfey_db_session.add(atlas)
     murfey_db_session.commit()
 
     # Set the ispyb return

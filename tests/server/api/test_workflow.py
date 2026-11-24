@@ -326,10 +326,10 @@ def test_register_dc_group_new_atlas(mock_transport, murfey_db_session: Session)
         "mock_feedback_queue",
         {
             "register": "atlas_update",
-            "atlas_type": "ROI",
+            "atlas_type": "Tilescan",
             "atlas": "/path/to/Sample10/Atlas/Atlas_2.jpg",
             "sample": 10,
-            "sample_registered": True,
+            "sample_registered": False,
             "atlas_pixel_size": 1e-4,
             "dcgid": 1,
             "session_id": ExampleVisit.murfey_session_id,

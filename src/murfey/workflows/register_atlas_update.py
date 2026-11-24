@@ -38,7 +38,7 @@ def run(
 
         murfey.server._transport_object.do_update_atlas(
             dcg_id=message["dcgid"],
-            atlas_id=message["atlas_id"],
+            atlas_id=atlas_murfey.id,
             atlas_image=message["atlas"],
             pixel_size=message["atlas_pixel_size"],
             slot=message["sample"],

@@ -24,7 +24,6 @@ def test_run_insert(
         "register": "atlas_update",
         "session_id": 1,
         "atlas_type": "ROI",
-        "atlas_id": mock.sentinel,
         "atlas": "image",
         "atlas_pixel_size": 0.1,
         "sample": 2,
@@ -72,7 +71,6 @@ def test_run_update(
         "register": "atlas_update",
         "session_id": 1,
         "atlas_type": "ROI",
-        "atlas_id": mock.sentinel,
         "atlas": mock.sentinel,
         "atlas_pixel_size": mock.sentinel,
         "sample": mock.sentinel,
@@ -82,7 +80,7 @@ def test_run_update(
     result = run(message, mock_murfey_db)
     mock_transport_object.do_update_atlas.assert_called_once_with(
         dcg_id=1,
-        atlas_id=message["atlas_id"],
+        atlas_id=1,
         atlas_image=message["atlas"],
         pixel_size=message["atlas_pixel_size"],
         slot=message["sample"],
