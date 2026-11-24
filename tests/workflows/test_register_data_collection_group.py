@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 import pytest
 from pytest_mock import MockerFixture
 
-from murfey.util.db import DataCollectionGroup, ImagingSite
+from murfey.util.db import Atlas, DataCollectionGroup, ImagingSite
 from murfey.workflows.register_data_collection_group import run
 from tests.conftest import ExampleVisit
 
@@ -69,6 +69,7 @@ def test_run(
         "session_id": ExampleVisit.murfey_session_id,
         "tag": "some_text",
         "experiment_type_id": 0,
+        "atlas_type": "ROI",
         "atlas": "some_file",
         "atlas_pixel_size": 1e-9,
         "sample": 0,
@@ -92,12 +93,22 @@ def test_run(
                         session_id=ExampleVisit.murfey_session_id,
                         tag="some_text",
                         smartem_grid_uuid=None,
-                        atlas_id=insert_atlas,
                         atlas_pixel_size=1e-9,
                         atlas="some_file",
                         sample=0,
                     )
                 )
+                if insert_atlas is not None:
+                    mock_murfey_db.add.assert_any_call(
+                        Atlas(
+                            id=insert_atlas,
+                            dcg_id=insert_dcg,
+                            atlas_type="ROI",
+                            pixel_size=1e-9,
+                            atlas_image="some_file",
+                            cassette_slot=0,
+                        )
+                    )
                 assert result == {"success": True}
             else:
                 assert result == {"success": False, "requeue": True}
@@ -107,6 +118,18 @@ def test_run(
                     session_id=ExampleVisit.murfey_session_id,
                     tag="some_text",
                     smartem_grid_uuid=None,
+                    atlas_pixel_size=1e-9,
+                    atlas="some_file",
+                    sample=0,
+                )
+            )
+            mock_murfey_db.add.assert_any_call(
+                Atlas(
+                    dcg_id=None,
+                    atlas_type="ROI",
+                    pixel_size=1e-9,
+                    atlas_image="some_file",
+                    cassette_slot=0,
                 )
             )
             assert result == {"success": True}

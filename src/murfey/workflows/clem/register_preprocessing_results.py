@@ -357,9 +357,14 @@ def _register_dcg_and_atlas(
         dcg_entry = dcg_search[0]
         # Update if current dataset is atlas and data collection group exists
         if is_atlas:
+            atlas = murfey_db.exec(
+                select(MurfeyDB.Atlas)
+                .where(MurfeyDB.Atlas.dcg_id == dcg_entry.id)
+                .where(MurfeyDB.Atlas.atlas_type == "ROI")
+            ).one()
             transport_object.do_update_atlas(
                 dcg_id=dcg_entry.id,
-                atlas_id=dcg_entry.atlas_id,
+                atlas_id=atlas.id,
                 atlas_image=atlas_path,
                 pixel_size=atlas_pixel_size,
                 slot=dcg_entry.sample,
@@ -544,14 +549,19 @@ def _register_single_grid_square(
         )
     else:
         # Look up data collection group for current series
-        dcg_entry = murfey_db.exec(
-            select(MurfeyDB.DataCollectionGroup)
+        atlas = murfey_db.exec(
+            select(MurfeyDB.Atlas)
+            .join(
+                MurfeyDB.DataCollectionGroup,
+                MurfeyDB.DataCollectionGroup.id == MurfeyDB.Atlas.dcg_id,
+            )
             .where(MurfeyDB.DataCollectionGroup.session_id == session_id)
             .where(MurfeyDB.DataCollectionGroup.tag == grid_square_params.tag)
+            .where(MurfeyDB.Atlas.atlas_type == "ROI")
         ).one()
         # Register to ISPyB
         grid_square_ispyb_result = transport_object.do_insert_grid_square(
-            atlas_id=dcg_entry.atlas_id,
+            atlas_id=atlas.id,
             grid_square_id=imaging_site.id,
             grid_square_parameters=grid_square_params,
             colour_flags=colour_flags,
@@ -756,6 +766,7 @@ def run(message: dict, murfey_db: Session) -> dict[str, bool]:
                     "series_name": result.series_name,
                     "images": [str(file) for file in image_combo],
                     "metadata": str(result.metadata),
+                    "output_dir": None,  # Part of recipe, but not strictly needed
                     # Other recipe parameters
                     "session_dir": str(visit_dir),
                     "session_id": session_id,

@@ -21,6 +21,7 @@ def test_register_dc_group_new_dcg(mock_transport, murfey_db_session: Session):
     dcg_params = DCGroupParameters(
         experiment_type_id=44,
         tag="/path/to/Sample10/Atlas",
+        atlas_type="ROI",
         atlas="/path/to/Sample10/Atlas/Atlas_1.jpg",
         sample=10,
         atlas_pixel_size=1e-5,
@@ -40,6 +41,7 @@ def test_register_dc_group_new_dcg(mock_transport, murfey_db_session: Session):
             "register": "data_collection_group",
             "start_time": mock.ANY,
             "experiment_type_id": 44,
+            "atlas_type": "ROI",
             "tag": "/path/to/Sample10/Atlas",
             "session_id": ExampleVisit.murfey_session_id,
             "atlas": "/path/to/Sample10/Atlas/Atlas_1.jpg",
@@ -73,7 +75,6 @@ def test_register_dc_group_atlas_to_processing(
         id=1,
         session_id=ExampleVisit.murfey_session_id,
         tag="initial_processing_tag",
-        atlas_id=90,
         atlas_pixel_size=1e-5,
         sample=10,
         atlas="/path/to/Sample10/Atlas/Atlas_1.jpg",
@@ -84,7 +85,6 @@ def test_register_dc_group_atlas_to_processing(
         id=2,
         session_id=ExampleVisit.murfey_session_id,
         tag="/path/to/Sample10/Atlas",
-        atlas_id=90,
         atlas_pixel_size=1e-5,
         sample=10,
         atlas="/path/to/Sample10/Atlas/Atlas_1.jpg",
@@ -96,6 +96,7 @@ def test_register_dc_group_atlas_to_processing(
     dcg_params = DCGroupParameters(
         experiment_type_id=36,
         tag="processing_tag",
+        atlas_type="Tilescan",
         atlas="/path/to/Sample10/Atlas/Atlas_1.jpg",
         sample=10,
         atlas_pixel_size=1e-5,
@@ -143,7 +144,6 @@ def test_register_dc_group_processing_to_atlas(
         id=1,
         session_id=ExampleVisit.murfey_session_id,
         tag="processing_tag",
-        atlas_id=90,
         atlas_pixel_size=1e-5,
         sample=10,
         atlas="/path/to/Sample10/Atlas/Atlas_1.jpg",
@@ -153,7 +153,6 @@ def test_register_dc_group_processing_to_atlas(
         id=2,
         session_id=ExampleVisit.murfey_session_id,
         tag="second_processing_tag",
-        atlas_id=90,
         atlas_pixel_size=1e-5,
         sample=10,
         atlas="/path/to/Sample10/Atlas/Atlas_1.jpg",
@@ -165,6 +164,7 @@ def test_register_dc_group_processing_to_atlas(
     dcg_params = DCGroupParameters(
         experiment_type_id=44,
         tag="/path/to/Sample10/Atlas",
+        atlas_type="ROI",
         atlas="/path/to/Sample10/Atlas/Atlas_2.jpg",
         sample=10,
         atlas_pixel_size=1e-4,
@@ -182,7 +182,7 @@ def test_register_dc_group_processing_to_atlas(
         "mock_feedback_queue",
         {
             "register": "atlas_update",
-            "atlas_id": 90,
+            "atlas_type": "ROI",
             "atlas": "/path/to/Sample10/Atlas/Atlas_2.jpg",
             "sample": 10,
             "sample_registered": True,
@@ -196,7 +196,7 @@ def test_register_dc_group_processing_to_atlas(
         "mock_feedback_queue",
         {
             "register": "atlas_update",
-            "atlas_id": 90,
+            "atlas_type": "ROI",
             "atlas": "/path/to/Sample10/Atlas/Atlas_2.jpg",
             "sample": 10,
             "sample_registered": True,
@@ -238,7 +238,6 @@ def test_register_dc_group_new_dcg_old_atlas(
         id=1,
         session_id=ExampleVisit.murfey_session_id,
         tag="processing_tag",
-        atlas_id=90,
         atlas_pixel_size=1e-5,
         sample=10,
         atlas="/path/to/Sample10/Atlas/Atlas_1.jpg",
@@ -250,6 +249,7 @@ def test_register_dc_group_new_dcg_old_atlas(
     dcg_params = DCGroupParameters(
         experiment_type_id=37,
         tag="second_processing_tag",
+        atlas_type="ROI",
         atlas="/path/to/Sample10/Atlas/Atlas_1.jpg",
         sample=10,
         atlas_pixel_size=1e-5,
@@ -270,6 +270,7 @@ def test_register_dc_group_new_dcg_old_atlas(
             "experiment_type_id": 37,
             "tag": "second_processing_tag",
             "session_id": ExampleVisit.murfey_session_id,
+            "atlas_type": "ROI",
             "atlas": "/path/to/Sample10/Atlas/Atlas_1.jpg",
             "sample": 10,
             "atlas_pixel_size": 1e-5,
@@ -308,6 +309,7 @@ def test_register_dc_group_new_atlas(mock_transport, murfey_db_session: Session)
     dcg_params = DCGroupParameters(
         experiment_type_id=36,
         tag="processing_tag",
+        atlas_type="Tilescan",
         atlas="/path/to/Sample10/Atlas/Atlas_2.jpg",
         sample=10,
         atlas_pixel_size=1e-4,
@@ -319,26 +321,21 @@ def test_register_dc_group_new_atlas(mock_transport, murfey_db_session: Session)
         db=murfey_db_session,
     )
 
-    # Check no sends are made by the transport object
-    mock_transport.send.assert_not_called()
-
-    # Check the call to insert the atlas into ispyb
-    atlas_args = mock_transport.do_insert_atlas.call_args_list
-    assert len(atlas_args) == 1
-    assert atlas_args[0][0][0] == 1
-    assert atlas_args[0][0][1].image == "/path/to/Sample10/Atlas/Atlas_2.jpg"
-    assert atlas_args[0][0][1].pixel_size == 1e-4
-    assert atlas_args[0][0][1].cassette_slot == 10
-
-    # Check the data collection group atlas was updated
-    new_dcg = murfey_db_session.exec(
-        select(DataCollectionGroup).where(DataCollectionGroup.id == 1)
-    ).one()
-    assert new_dcg.atlas == "/path/to/Sample10/Atlas/Atlas_2.jpg"
-    assert new_dcg.sample == 10
-    assert new_dcg.atlas_pixel_size == 1e-4
-    assert new_dcg.tag == "processing_tag"
-    assert new_dcg.atlas_id == 5
+    # Should request atlas insert
+    mock_transport.send.assert_called_once_with(
+        "mock_feedback_queue",
+        {
+            "register": "atlas_update",
+            "atlas_type": "Tilescan",
+            "atlas": "/path/to/Sample10/Atlas/Atlas_2.jpg",
+            "sample": 10,
+            "sample_registered": False,
+            "atlas_pixel_size": 1e-4,
+            "dcgid": 1,
+            "session_id": ExampleVisit.murfey_session_id,
+            "tag": "processing_tag",
+        },
+    )
 
 
 @mock.patch("murfey.server._transport_object")
@@ -364,7 +361,6 @@ def test_register_dc_group_new_atlas_with_searchmaps(
         id=1,
         session_id=ExampleVisit.murfey_session_id,
         tag="processing_tag",
-        atlas_id=90,
         atlas_pixel_size=1e-5,
         sample=10,
         atlas="/path/to/Sample10/Atlas/Atlas_1.jpg",
@@ -400,6 +396,7 @@ def test_register_dc_group_new_atlas_with_searchmaps(
     dcg_params = DCGroupParameters(
         experiment_type_id=37,
         tag="processing_tag",
+        atlas_type="ROI",
         atlas="/path/to/Sample12/Atlas/Atlas_2.jpg",
         sample=12,
         atlas_pixel_size=1e-4,
@@ -416,7 +413,7 @@ def test_register_dc_group_new_atlas_with_searchmaps(
         "mock_feedback_queue",
         {
             "register": "atlas_update",
-            "atlas_id": 90,
+            "atlas_type": "ROI",
             "atlas": "/path/to/Sample12/Atlas/Atlas_2.jpg",
             "sample": 12,
             "sample_registered": False,
@@ -435,7 +432,6 @@ def test_register_dc_group_new_atlas_with_searchmaps(
     assert new_dcg.sample == 12
     assert new_dcg.atlas_pixel_size == 1e-4
     assert new_dcg.tag == "processing_tag"
-    assert new_dcg.atlas_id == 90
 
     # Check the search map update calls
     assert mock_register_search_map.call_count == 2
@@ -476,7 +472,6 @@ def test_register_dc_group_new_atlas_with_sxt_roi(
         id=1,
         session_id=ExampleVisit.murfey_session_id,
         tag="processing_tag",
-        atlas_id=90,
         atlas_pixel_size=1e-5,
         sample=10,
         atlas="/path/to/Sample10/Atlas/Atlas_1.jpg",
@@ -512,6 +507,7 @@ def test_register_dc_group_new_atlas_with_sxt_roi(
     dcg_params = DCGroupParameters(
         experiment_type_id=37,
         tag="processing_tag",
+        atlas_type="ROI",
         atlas="/path/to/Sample12/Atlas/Atlas_2.jpg",
         sample=12,
         atlas_pixel_size=1e-4,
@@ -532,7 +528,7 @@ def test_register_dc_group_new_atlas_with_sxt_roi(
         "mock_feedback_queue",
         {
             "register": "atlas_update",
-            "atlas_id": 90,
+            "atlas_type": "ROI",
             "atlas": "/path/to/Sample12/Atlas/Atlas_2.jpg",
             "sample": 12,
             "sample_registered": False,
@@ -551,7 +547,6 @@ def test_register_dc_group_new_atlas_with_sxt_roi(
     assert new_dcg.sample == 12
     assert new_dcg.atlas_pixel_size == 1e-4
     assert new_dcg.tag == "processing_tag"
-    assert new_dcg.atlas_id == 90
 
     # Check the imaging site insert
     image_site = murfey_db_session.exec(
@@ -609,7 +604,6 @@ def test_register_dc_group_roi_update(
         id=1,
         session_id=ExampleVisit.murfey_session_id,
         tag="processing_tag",
-        atlas_id=90,
         atlas_pixel_size=1e-5,
         sample=10,
         atlas="/path/to/Sample10/Atlas/Atlas_1.jpg",
@@ -629,6 +623,7 @@ def test_register_dc_group_roi_update(
     dcg_params = DCGroupParameters(
         experiment_type_id=37,
         tag="processing_tag",
+        atlas_type="ROI",
         atlas="/path/to/Sample12/Atlas/Atlas_2.jpg",
         sample=12,
         atlas_pixel_size=1e-4,
@@ -649,7 +644,7 @@ def test_register_dc_group_roi_update(
         "mock_feedback_queue",
         {
             "register": "atlas_update",
-            "atlas_id": 90,
+            "atlas_type": "ROI",
             "atlas": "/path/to/Sample12/Atlas/Atlas_2.jpg",
             "sample": 12,
             "sample_registered": False,
@@ -668,7 +663,6 @@ def test_register_dc_group_roi_update(
     assert new_dcg.sample == 12
     assert new_dcg.atlas_pixel_size == 1e-4
     assert new_dcg.tag == "processing_tag"
-    assert new_dcg.atlas_id == 90
 
     # Check the imaging site insert
     image_site = murfey_db_session.exec(

@@ -69,6 +69,7 @@ def test_atlas_context_xml(mock_capture_post, tmp_path):
     dcg_data = {
         "experiment_type_id": 44,  # Atlas
         "tag": str(atlas_xml.parent),
+        "atlas_type": "ROI",
         "atlas": f"/base/destination/{atlas_xml.relative_to(tmp_path).with_suffix('.jpg')}",
         "sample": 2,
         "atlas_pixel_size": atlas_pixel_size * 7.8,
@@ -115,17 +116,32 @@ def test_atlas_context_dm(mock_capture_post, tmp_path):
         new_xml.write(
             "<AtlasSessionXml><Atlas><TilesEfficient><_items>"
             # First tile with two grid squares
-            "<TileXml><Nodes><KeyValuePairs><KeyValuePairOfintNodeXml1>"
+            '<TileXml><Id z:Id="1">12345</Id>'
+            '<TileImageReference><a:BaseFileName z:Id="1">Tile_123_4_5'
+            "</a:BaseFileName></TileImageReference>"
+            "<AtlasPixelPosition><a:height>592</a:height><a:width>833</a:width>"
+            "<a:x>1584</a:x><a:y>1687</a:y></AtlasPixelPosition>"
+            "<StagePosition><a:X>1.8E-09</a:X><a:Y>9.4E-09</a:Y></StagePosition>"
+            # Grid squares for first tile
+            "<Nodes><KeyValuePairs><KeyValuePairOfintNodeXml1>"
             f"<key>101</key>{grid_square_values}"
             "</KeyValuePairOfintNodeXml1><KeyValuePairOfintNodeXml1>"
             f"<key>102</key>{grid_square_values}"
             "</KeyValuePairOfintNodeXml1></KeyValuePairs></Nodes></TileXml>"
             # Second tile with two grid squares
-            "<TileXml><Nodes><KeyValuePairs><KeyValuePairOfintNodeXml1>"
+            '<TileXml><Id z:Id="1">23456</Id>'
+            '<TileImageReference><a:BaseFileName z:Id="1">Tile_234_5_6'
+            "</a:BaseFileName></TileImageReference>"
+            "<AtlasPixelPosition><a:height>60</a:height><a:width>80</a:width>"
+            "<a:x>1500</a:x><a:y>1600</a:y></AtlasPixelPosition>"
+            "<StagePosition><a:X>1.2E-09</a:X><a:Y>9.2E-09</a:Y></StagePosition>"
+            # Grid squares for second tile
+            "<Nodes><KeyValuePairs><KeyValuePairOfintNodeXml1>"
             f"<key>103</key>{grid_square_values}"
             "</KeyValuePairOfintNodeXml1><KeyValuePairOfintNodeXml1>"
             f"<key>104</key>{grid_square_values}"
-            "</KeyValuePairOfintNodeXml1></KeyValuePairs></Nodes></TileXml>"
+            "</KeyValuePairOfintNodeXml1></KeyValuePairs></Nodes>"
+            "</TileXml>"
             # Close all
             "</_items></TilesEfficient></Atlas></AtlasSessionXml>"
         )
@@ -134,24 +150,26 @@ def test_atlas_context_dm(mock_capture_post, tmp_path):
     assert context._machine_config.get("rsync_basepath") == "/base"
     context.post_transfer(atlas_dm, environment=env)
 
-    assert mock_capture_post.call_count == 6
-    mock_capture_post.assert_any_call(
-        base_url="http://localhost:8000",
-        router_name="workflow.router",
-        function_name="register_dc_group",
-        token="token",
-        instrument_name="m01",
-        visit_name="cm12345-6",
-        session_id=1,
-        data={
-            "experiment_type_id": 44,  # Atlas
-            "tag": str(atlas_dm.parent),
-            "sample": 2,
-            "atlas": "/base/destination/cm12345-6/Supervisor_atlas/Sample2/Atlas/Atlas_01.jpg",
-            "create_smartem_grid": True,
-            "acquisition_uuid": "uuid1",
-        },
-    )
+    assert mock_capture_post.call_count == 8
+    for atlas_type in ["ROI", "Tilescan"]:
+        mock_capture_post.assert_any_call(
+            base_url="http://localhost:8000",
+            router_name="workflow.router",
+            function_name="register_dc_group",
+            token="token",
+            instrument_name="m01",
+            visit_name="cm12345-6",
+            session_id=1,
+            data={
+                "experiment_type_id": 44,  # Atlas
+                "tag": str(atlas_dm.parent),
+                "sample": 2,
+                "atlas_type": atlas_type,
+                "atlas": "/base/destination/cm12345-6/Supervisor_atlas/Sample2/Atlas/Atlas_01.jpg",
+                "create_smartem_grid": True if atlas_type == "ROI" else False,
+                "acquisition_uuid": "uuid1",
+            },
+        )
     mock_capture_post.assert_any_call(
         base_url="http://localhost:8000",
         router_name="session_control.spa_router",
@@ -170,6 +188,40 @@ def test_atlas_context_dm(mock_capture_post, tmp_path):
             "width": 130,
             "height": 560,
             "angle": 0.14,
+        },
+    )
+    mock_capture_post.assert_any_call(
+        base_url="http://localhost:8000",
+        router_name="session_control.spa_router",
+        function_name="register_tiles",
+        token="token",
+        instrument_name="m01",
+        session_id=1,
+        data={
+            "12345": {
+                "tag": str(atlas_dm.parent),
+                "sample": 2,
+                "image": f"{atlas_dm.parent}/Tile_123_4_5.jpg",
+                "x_location": 1584,
+                "y_location": 1687,
+                "x_stage_position": 1.8,
+                "y_stage_position": 9.4,
+                "width": 833,
+                "height": 592,
+                "angle": 0,
+            },
+            "23456": {
+                "tag": str(atlas_dm.parent),
+                "sample": 2,
+                "image": f"{atlas_dm.parent}/Tile_234_5_6.jpg",
+                "x_location": 1500,
+                "y_location": 1600,
+                "x_stage_position": 1.2,
+                "y_stage_position": 9.2,
+                "width": 80,
+                "height": 60,
+                "angle": 0,
+            },
         },
     )
     mock_capture_post.assert_any_call(

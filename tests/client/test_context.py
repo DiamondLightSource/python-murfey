@@ -66,6 +66,7 @@ def test_ensure_dcg_exists_tomo(mock_capture_post, lamella, tmp_path):
         "atlas": f"{tmp_path}/destination/{atlas_xml.relative_to(tmp_path).with_suffix('.jpg')}",
         "sample": 6,
         "atlas_pixel_size": 4.7 * 7.8,
+        "atlas_type": "ROI",
         "comments": "metadata_folder",
     }
     mock_capture_post.assert_called_once_with(
@@ -129,6 +130,7 @@ def test_ensure_dcg_exists_spa(mock_capture_post, tmp_path):
         "atlas": f"{tmp_path}/destination/{atlas_xml.relative_to(tmp_path).with_suffix('.jpg')}",
         "sample": 6,
         "atlas_pixel_size": 4.7 * 7.8,
+        "atlas_type": "ROI",
         "comments": "metadata_folder",
     }
     mock_capture_post.assert_called_once_with(
@@ -167,6 +169,7 @@ def test_ensure_dcg_exists_spa_missing_xml(mock_capture_post, tmp_path):
     dcg_data = {
         "experiment_type_id": 37,
         "tag": f"{tmp_path}/metadata_folder/Images-Disc1",
+        "atlas_type": "ROI",
         "comments": "metadata_folder",
     }
     mock_capture_post.assert_called_once_with(

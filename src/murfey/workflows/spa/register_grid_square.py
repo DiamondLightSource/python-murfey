@@ -25,7 +25,12 @@ except ImportError:
 import murfey.server
 from murfey.util import secure_path
 from murfey.util.config import get_machine_config
-from murfey.util.db import DataCollectionGroup, GridSquare, Session as MurfeySession
+from murfey.util.db import (
+    Atlas,
+    DataCollectionGroup,
+    GridSquare,
+    Session as MurfeySession,
+)
 from murfey.util.models import GridSquareParameters
 
 logger = logging.getLogger("murfey.workflows.spa.register_grid_square")
@@ -36,6 +41,7 @@ def register_grid_square(
     gsid: int,
     grid_square_params: GridSquareParameters,
     murfey_db: SQLModelSession,
+    is_tile: bool = False,
 ):
     # Calculate scaled down version of the image for registration to ISPyB first
     if grid_square_params.x_location is not None:
@@ -99,13 +105,18 @@ def register_grid_square(
     else:
         # No existing grid square in the murfey database
         if murfey.server._transport_object:
-            dcg = murfey_db.exec(
-                select(DataCollectionGroup)
+            atlas = murfey_db.exec(
+                select(Atlas)
+                .join(
+                    DataCollectionGroup,
+                    DataCollectionGroup.id == Atlas.dcg_id,
+                )
                 .where(DataCollectionGroup.session_id == session_id)
                 .where(DataCollectionGroup.tag == grid_square_params.tag)
+                .where(Atlas.atlas_type == ("Tilescan" if is_tile else "ROI"))
             ).one()
             gs_ispyb_response = murfey.server._transport_object.do_insert_grid_square(
-                dcg.atlas_id, gsid, grid_square_params
+                atlas.id, gsid, grid_square_params
             )
         else:
             # mock up response so that below still works
@@ -138,7 +149,7 @@ def register_grid_square(
     murfey_db.add(grid_square)
     murfey_db.commit()
 
-    if SMARTEM_ACTIVE:
+    if SMARTEM_ACTIVE and not is_tile:
         try:
             murfey_session = murfey_db.exec(
                 select(MurfeySession).where(MurfeySession.id == session_id)
@@ -211,15 +222,39 @@ def register_grid_square(
                         murfey_db.commit()
         except Exception:
             logger.warning("Failed to register grid square with smartem", exc_info=True)
+    return {"success": True}
 
+
+def register_tiles(
+    session_id: int,
+    tile_group: dict[int, GridSquareParameters],
+    murfey_db: SQLModelSession,
+):
+    for tile_id, tile_params in tile_group.items():
+        # Tiles get registered in murfey and ispyb as grid squares
+        # Attached to Atlas with type "Tilescan"
+        register_grid_square(session_id, tile_id, tile_params, murfey_db, is_tile=True)
     murfey_db.close()
     return {"success": True}
 
 
-def run(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
+def run_register_grid_square(
+    message: dict, murfey_db: SQLModelSession
+) -> dict[str, bool]:
     return register_grid_square(
         int(message["session_id"]),
         message["gsid"],
         GridSquareParameters(**message["grid_square_params"]),
+        murfey_db,
+    )
+
+
+def run_register_tiles(message: dict, murfey_db: SQLModelSession) -> dict[str, bool]:
+    return register_tiles(
+        int(message["session_id"]),
+        {
+            tile_id: GridSquareParameters(**tile_params)
+            for tile_id, tile_params in message["tile_group"]
+        },
         murfey_db,
     )

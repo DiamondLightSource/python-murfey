@@ -88,13 +88,18 @@ def _ensure_prerequisites(
         .where(MurfeyDB.GridSquare.tag == dcg_tag)
     ).one_or_none()
     if grid_square_entry is None:
-        dcg_entry = murfey_db.exec(
-            select(MurfeyDB.DataCollectionGroup)
+        atlas = murfey_db.exec(
+            select(MurfeyDB.Atlas)
+            .join(
+                MurfeyDB.DataCollectionGroup,
+                MurfeyDB.DataCollectionGroup.id == MurfeyDB.Atlas.dcg_id,
+            )
             .where(MurfeyDB.DataCollectionGroup.session_id == session_id)
             .where(MurfeyDB.DataCollectionGroup.tag == dcg_tag)
+            .where(MurfeyDB.Atlas.atlas_type == "ROI")
         ).one()
         grid_square_ispyb_result = transport_object.do_insert_grid_square(
-            atlas_id=dcg_entry.atlas_id,
+            atlas_id=atlas.id,
             grid_square_id=site_number,
             grid_square_parameters=GridSquareParameters(
                 tag=dcg_tag,

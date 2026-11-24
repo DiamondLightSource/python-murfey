@@ -293,6 +293,7 @@ class SXTContext(Context):
                     dcg_data = {
                         "experiment_type_id": 44,  # Atlas
                         "tag": dcg_tag,
+                        "atlas_type": "ROI",
                         "atlas": str(thumbnail_path),
                         "atlas_pixel_size": float(thumbnail_pixel_size),
                         "atlas_x_stage_position": metadata.get("x_position", None),

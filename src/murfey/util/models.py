@@ -323,6 +323,7 @@ Models related to the single-particle analysis workflow.
 
 
 class AtlasParameters(BaseModel):
+    atlas_type: str
     image: str | None = None
     pixel_size: float | None = None
     cassette_slot: int | None = None
