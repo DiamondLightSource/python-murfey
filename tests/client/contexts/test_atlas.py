@@ -116,8 +116,8 @@ def test_atlas_context_dm(mock_capture_post, tmp_path):
         new_xml.write(
             "<AtlasSessionXml><Atlas><TilesEfficient><_items>"
             # First tile with two grid squares
-            "<TileXml><Id>12345</Id>"
-            "<TileImageReference><a:BaseFileName>Tile_123_4_5"
+            '<TileXml><Id z:Id="1">12345</Id>'
+            '<TileImageReference><a:BaseFileName z:Id="1">Tile_123_4_5'
             "</a:BaseFileName></TileImageReference>"
             "<AtlasPixelPosition><a:height>592</a:height><a:width>833</a:width>"
             "<a:x>1584</a:x><a:y>1687</a:y></AtlasPixelPosition>"
@@ -129,8 +129,8 @@ def test_atlas_context_dm(mock_capture_post, tmp_path):
             f"<key>102</key>{grid_square_values}"
             "</KeyValuePairOfintNodeXml1></KeyValuePairs></Nodes></TileXml>"
             # Second tile with two grid squares
-            "<TileXml><Id>23456</Id>"
-            "<TileImageReference><a:BaseFileName>Tile_234_5_6"
+            '<TileXml><Id z:Id="1">23456</Id>'
+            '<TileImageReference><a:BaseFileName z:Id="1">Tile_234_5_6'
             "</a:BaseFileName></TileImageReference>"
             "<AtlasPixelPosition><a:height>60</a:height><a:width>80</a:width>"
             "<a:x>1500</a:x><a:y>1600</a:y></AtlasPixelPosition>"

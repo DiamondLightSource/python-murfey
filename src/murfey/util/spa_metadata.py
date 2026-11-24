@@ -57,21 +57,22 @@ def get_tile_atlas_positions(xml_path: Path, sample: int) -> dict[str, dict]:
     ]
     tile_pix_positions: dict[str, dict] = {}
     for tile in tile_info:
-        tile_pix_positions[tile["Id"]] = {
-            "tag": str(xml_path.parent),
-            "sample": sample,
-            "image": str(
-                xml_path.parent
-                / (tile["TileImageReference"]["a:BaseFileName"] + ".jpg")
-            ),
-            "x_location": int(float(tile["AtlasPixelPosition"]["a:x"])),
-            "y_location": int(float(tile["AtlasPixelPosition"]["a:y"])),
-            "x_stage_position": float(tile["StagePosition"]["a:X"]) * 1e9,
-            "y_stage_position": float(tile["StagePosition"]["a:Y"]) * 1e9,
-            "width": int(float(tile["AtlasPixelPosition"]["a:width"])),
-            "height": int(float(tile["AtlasPixelPosition"]["a:height"])),
-            "angle": 0,
-        }
+        if tile.get("Id"):
+            tile_pix_positions[tile["Id"]["#text"]] = {
+                "tag": str(xml_path.parent),
+                "sample": sample,
+                "image": str(
+                    xml_path.parent
+                    / (tile["TileImageReference"]["a:BaseFileName"]["#text"] + ".jpg")
+                ),
+                "x_location": int(float(tile["AtlasPixelPosition"]["a:x"])),
+                "y_location": int(float(tile["AtlasPixelPosition"]["a:y"])),
+                "x_stage_position": float(tile["StagePosition"]["a:X"]) * 1e9,
+                "y_stage_position": float(tile["StagePosition"]["a:Y"]) * 1e9,
+                "width": int(float(tile["AtlasPixelPosition"]["a:width"])),
+                "height": int(float(tile["AtlasPixelPosition"]["a:height"])),
+                "angle": 0,
+            }
     return tile_pix_positions
 
 
