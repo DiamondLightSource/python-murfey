@@ -2515,4 +2515,4 @@ def feedback_listen():
                     logger.info("RabbitMQ has been reconnected")
                 except Disconnected:
                     logger.warning("RabbitMQ is not connected")
-                    time.sleep(30)
+            time.sleep(30)
