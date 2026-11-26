@@ -72,6 +72,7 @@ def render_path(path_template: str, kwargs: dict) -> str:
     return pattern.sub(replace, path_template)
 
 
+@lru_cache()
 def url_path_for(
     router_name: str,  # With logic for partial matches
     function_name: str,  # With logic for partial matches
