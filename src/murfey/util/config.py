@@ -1,15 +1,17 @@
 from __future__ import annotations
 
-import configparser
 import copy
 import os
 import socket
+import time
+from configparser import ConfigParser
 from functools import lru_cache
 from importlib.metadata import entry_points
 from pathlib import Path
 from typing import Any, Literal, Optional
 from urllib.parse import quote
 
+import requests
 import yaml
 from pydantic import BaseModel, ConfigDict, RootModel, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings
@@ -272,8 +274,9 @@ class Security(BaseModel):
     session_token_timeout: Optional[int] = None
     allow_origins: list[str] = ["*"]
 
-    # SmartEM keycloak config file
-    smartem_keycloak_config: str = ""
+    # Keycloak config files
+    murfey_keycloak_config: Path | None = None
+    smartem_keycloak_config: Path | None = None
 
     # RabbitMQ settings
     rabbitmq_credentials: Path
@@ -306,6 +309,87 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+class MurfeyKeycloakConfig:
+    def __init__(self, file: Path | None = None):
+        # Declare attributes
+        self.url: str = ""
+        self.realm: str = ""
+        self.client_id: str = ""
+        self.client_secret: str = ""
+
+        if file:
+            self.load(file)
+
+    def load(self, file: Path):
+        """
+        Parses a Murfey Keycloak config file and loads up the keys needed to generate
+        an access token for requests to be sent to the backend server.
+        """
+        # Load the config as a dict
+        parser = ConfigParser()
+        parser.read_string(
+            "[default]\n" + open(file, "r").read()  # Use placeholder header
+        )
+        config = dict(parser["default"])  # Convert to dict
+
+        # Populate the class
+        required_keys = ("url", "realm", "client_id", "client_secret")
+        for key in required_keys:
+            try:
+                setattr(self, key, config[key].strip())
+            except KeyError:
+                raise KeyError(f"Missing key {key} from config file {file}")
+
+
+class MurfeyKeycloakClient:
+    """
+    Class to handle the generation of an access token to pass along to the
+    Murfey backend server.
+    """
+
+    def __init__(
+        self,
+        config_file: Path,
+        refresh_buffer: int = 30,  # Seconds
+        timeout: float = 10,  # Seconds (with split seconds)
+    ):
+        self._config: MurfeyKeycloakConfig = MurfeyKeycloakConfig(config_file)
+        self._token_url = f"{self._config.url.rstrip('/')}/realms/{self._config.realm}/protocol/openid-connect/token"
+        self._refresh_buffer: int = refresh_buffer
+        self._token: str = ""
+        self._token_expires_at: float = 0  # Seconds (with split seconds)
+        self._timeout = timeout
+        self.session = requests.Session()  # Reuseable session to make requests with
+
+    def get_token(self):
+        """Returns the existing token, or fetches a new one from the identity provider"""
+        now = time.time()
+        # Reuse token if it's still valid
+        if self._token and (now + self._refresh_buffer) < self._token_expires_at:
+            return self._token
+        return self._fetch_token()
+
+    def _fetch_token(self):
+        """Request for a new token from the configured identity provider"""
+        response = self.session.post(
+            self._token_url,
+            data={
+                "grant_type": "client_credentials",
+                "client_id": self._config.client_id,
+                "client_secret": self._config.client_secret,
+            },
+            timeout=self._timeout,
+        )
+        response.raise_for_status()
+
+        # Extract response contents
+        data: dict[str, Any] = response.json()
+        self._token = data["access_token"]
+        self._token_expires_at = time.time() + int(data.get("expires_in", 300))
+
+        return self._token
 
 
 @lru_cache()
@@ -367,6 +451,13 @@ def get_extended_machine_config(
 
 
 @lru_cache(maxsize=1)
+def get_murfey_keycloak_client():
+    if keycloak_config := get_security_config().murfey_keycloak_config:
+        return MurfeyKeycloakClient(keycloak_config)
+    return None
+
+
+@lru_cache(maxsize=1)
 def get_smartem_keycloak_client():
     keycloak_client = None
     if SMARTEM_ACTIVE:
@@ -390,7 +481,7 @@ def get_rabbitmq_url() -> str:
         "vhost": "/",
     }
     rabbitmq_credentials_file = get_security_config().rabbitmq_credentials
-    cfgparser = configparser.ConfigParser(allow_no_value=True)
+    cfgparser = ConfigParser(allow_no_value=True)
     if rabbitmq_credentials_file:
         cfgparser.read(rabbitmq_credentials_file)
         rabbitmq_creds = (
