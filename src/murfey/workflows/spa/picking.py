@@ -15,7 +15,11 @@ from murfey.server.feedback import (
     _pj_id,
 )
 from murfey.util.api import url_path_for
-from murfey.util.config import get_machine_config, get_rabbitmq_url
+from murfey.util.config import (
+    get_machine_config,
+    get_murfey_keycloak_client,
+    get_rabbitmq_url,
+)
 from murfey.util.db import (
     AutoProcProgram,
     ClassificationFeedbackParameters,
@@ -504,6 +508,11 @@ def particles_picked(message: dict, murfey_db: Session) -> dict[str, bool]:
         session_id=session.id,
     )
     murfey_url = urlparse(machine_config.murfey_url).geturl()
+    # Add authorisation header to request where possible
+    headers: dict[str, str] = {}
+    if murfey_keycloak_client := get_murfey_keycloak_client():
+        token = murfey_keycloak_client.get_token()
+        headers["Authorization"] = f"Bearer {token}"
     response = requests.post(
         url=f"{murfey_url}{url_path}",
         json={
@@ -511,9 +520,10 @@ def particles_picked(message: dict, murfey_db: Session) -> dict[str, bool]:
             "visit_name": session.visit,
             "rsync_source": dcg.tag,
         },
+        headers=headers,
     )
     if response.status_code != 200:
-        raise RuntimeError(
+        logger.error(
             f"Preprocessed movies update request failed with status code {response.status_code}"
         )
 

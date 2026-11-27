@@ -35,6 +35,7 @@ def test_run(
     ispyb_session, dc_result, pj_result, app_result, insert_job, update_status = (
         test_params
     )
+    token = "dummy"
 
     # Create mocks
     # Transport object functions
@@ -79,6 +80,15 @@ def test_run(
         "murfey.workflows.register_processing_job.get_machine_config",
         return_value={instrument_name: mock_machine_config},
     )
+
+    # Mock the Keycloak client
+    mock_keycloak_client = MagicMock()
+    mock_keycloak_client.get_token.return_value = token
+    mocker.patch(
+        "murfey.workflows.register_processing_job.get_murfey_keycloak_client",
+        return_value=mock_keycloak_client,
+    )
+
     # Mock the POST request
     mock_response = MagicMock(status_code=200)
     mock_post = mocker.patch(
@@ -98,6 +108,7 @@ def test_run(
     result = run(message=message, murfey_db=mock_murfey_db)
     if dc_result is not None:
         if pj_result is not None:
+            # Check that the expected backend post was made
             url_path = url_path_for(
                 "prometheus.feedback_router",
                 "increment_preprocessed_movies_prometheus",
@@ -111,6 +122,7 @@ def test_run(
                     "visit_name": visit_name,
                     "rsync_source": message["tag"],
                 },
+                headers={"Authorization": f"Bearer {token}"},
             )
             if app_result is not None:
                 assert {"success": True}

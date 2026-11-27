@@ -10,15 +10,12 @@ from __future__ import annotations
 
 import re
 from functools import lru_cache
-from logging import getLogger
 from pathlib import Path
 from typing import Any
 
 import yaml
 
 import murfey.util
-
-logger = getLogger("murfey.util.api")
 
 route_manifest_file = Path(murfey.util.__path__[0]) / "route_manifest.yaml"
 
@@ -48,13 +45,9 @@ def find_unique_index(
             matches.append(candidate)
             index = i
     if counter == 0:
-        message = f"No match found for {pattern!r}"
-        logger.error(message)
-        raise KeyError(message)
+        raise KeyError(f"No match found for {pattern!r}")
     if counter > 1:
-        message = f"Ambiguous match for {pattern!r}: {matches}"
-        logger.error(message)
-        raise KeyError(message)
+        raise KeyError(f"Ambiguous match for {pattern!r}: {matches}")
     return index
 
 
@@ -70,17 +63,16 @@ def render_path(path_template: str, kwargs: dict) -> str:
         raw_str = match.group(1)
         param_name = raw_str.split(":")[0]  # Ignore :converter in the field
         if param_name not in kwargs:
-            message = (
+            raise KeyError(
                 f"Error constructing URL for {path_template!r}; "
                 f"missing path parameter {param_name!r}"
             )
-            logger.error(message)
-            raise KeyError(message)
         return str(kwargs[param_name])
 
     return pattern.sub(replace, path_template)
 
 
+@lru_cache()
 def url_path_for(
     router_name: str,  # With logic for partial matches
     function_name: str,  # With logic for partial matches
@@ -115,24 +107,20 @@ def url_path_for(
             param_name = path_param["name"]
             param_type = path_param["type"]
             if param_name not in kwargs.keys():
-                message = (
+                raise KeyError(
                     f"Error validating parameters for {function_name!r}; "
                     f"path parameter {param_name!r} was not provided"
                 )
-                logger.error(message)
-                raise KeyError(message)
             # Skip complicated type resolution
             if param_type.startswith("typing."):
                 continue
             # Validate incoming type against allowed ones
             if type(kwargs[param_name]).__name__ not in param_type:
-                message = (
+                raise TypeError(
                     f"Error validating parameters for {function_name!r}; "
                     f"{param_name!r} must be {param_type!r}, "
                     f"received {type(kwargs[param_name]).__name__!r}"
                 )
-                logger.error(message)
-                raise TypeError(message)
 
     # Render and return the path
     return render_path(route_path, kwargs)

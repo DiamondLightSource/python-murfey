@@ -12,7 +12,7 @@ import murfey.util.db as MurfeyDB
 from murfey.server.ispyb import ISPyBSession
 from murfey.util import sanitise
 from murfey.util.api import url_path_for
-from murfey.util.config import get_machine_config
+from murfey.util.config import get_machine_config, get_murfey_keycloak_client
 
 logger = logging.getLogger("murfey.workflows.register_processing_job")
 
@@ -91,6 +91,11 @@ def run(message: dict, murfey_db: SQLModelSession):
         session_id=murfey_session_id,
     )
     murfey_url = urlparse(machine_config.murfey_url).geturl()
+    # Add authorisation header to request where possible
+    headers: dict[str, str] = {}
+    if murfey_keycloak_client := get_murfey_keycloak_client():
+        token = murfey_keycloak_client.get_token()
+        headers["Authorization"] = f"Bearer {token}"
     response = requests.post(
         url=f"{murfey_url}{url_path}",
         json={
@@ -98,9 +103,10 @@ def run(message: dict, murfey_db: SQLModelSession):
             "visit_name": session.visit,
             "rsync_source": message["tag"],
         },
+        headers=headers,
     )
     if response.status_code != 200:
-        raise RuntimeError(
+        logger.error(
             f"Preprocessed movies update request failed with status code {response.status_code}"
         )
 

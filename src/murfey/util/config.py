@@ -1,15 +1,17 @@
 from __future__ import annotations
 
-import configparser
 import copy
 import os
 import socket
+import time
+from configparser import ConfigParser
 from functools import lru_cache
 from importlib.metadata import entry_points
 from pathlib import Path
 from typing import Any, Literal, Optional
 from urllib.parse import quote
 
+import requests
 import yaml
 from pydantic import BaseModel, ConfigDict, RootModel, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings
@@ -20,6 +22,19 @@ try:
     SMARTEM_ACTIVE = True
 except ImportError:
     SMARTEM_ACTIVE = False
+
+
+class Settings(BaseSettings):
+    murfey_machine_configuration: str = ""
+    murfey_security_configuration: str = ""
+
+
+settings = Settings()
+
+
+@lru_cache()
+def get_hostname():
+    return socket.gethostname()
 
 
 class MagnificationTable(RootModel[dict[int, float]]):
@@ -247,6 +262,38 @@ def machine_config_from_file(
     return all_machine_configs
 
 
+@lru_cache(maxsize=1)
+def get_machine_config(instrument_name: str = "") -> dict[str, MachineConfig]:
+    # Create an empty machine config as a placeholder
+    machine_configs = {instrument_name: MachineConfig()}
+    if settings.murfey_machine_configuration:
+        machine_configs = machine_config_from_file(
+            Path(settings.murfey_machine_configuration), instrument_name
+        )
+    return machine_configs
+
+
+def get_microscope(machine_config: MachineConfig | None = None) -> str:
+    if machine_config:
+        microscope_name = machine_config.machine_override or os.getenv("BEAMLINE", "")
+    else:
+        microscope_name = os.getenv("BEAMLINE", "")
+    return microscope_name
+
+
+def get_extended_machine_config(
+    extension_name: str, instrument_name: str = ""
+) -> Optional[BaseModel]:
+    machine_config = get_machine_config(instrument_name=instrument_name).get(
+        instrument_name or get_microscope()
+    )
+    if not machine_config:
+        return None
+    model = list(entry_points(group="murfey.config", name=extension_name))[0].load()
+    data = getattr(machine_config, extension_name, {})
+    return model(**data)
+
+
 class Security(BaseModel):
     # Murfey database settings
     murfey_db_credentials: Path
@@ -272,8 +319,9 @@ class Security(BaseModel):
     session_token_timeout: Optional[int] = None
     allow_origins: list[str] = ["*"]
 
-    # SmartEM keycloak config file
-    smartem_keycloak_config: str = ""
+    # Keycloak config files
+    murfey_keycloak_config: Path | None = None
+    smartem_keycloak_config: Path | None = None
 
     # RabbitMQ settings
     rabbitmq_credentials: Path
@@ -300,27 +348,6 @@ def security_from_file(config_file_path: Path) -> Security:
     return Security(**config)
 
 
-class Settings(BaseSettings):
-    murfey_machine_configuration: str = ""
-    murfey_security_configuration: str = ""
-
-
-settings = Settings()
-
-
-@lru_cache()
-def get_hostname():
-    return socket.gethostname()
-
-
-def get_microscope(machine_config: MachineConfig | None = None) -> str:
-    if machine_config:
-        microscope_name = machine_config.machine_override or os.getenv("BEAMLINE", "")
-    else:
-        microscope_name = os.getenv("BEAMLINE", "")
-    return microscope_name
-
-
 @lru_cache(maxsize=1)
 def get_security_config() -> Security:
     if settings.murfey_security_configuration:
@@ -342,28 +369,92 @@ def get_security_config() -> Security:
     )
 
 
-@lru_cache(maxsize=1)
-def get_machine_config(instrument_name: str = "") -> dict[str, MachineConfig]:
-    # Create an empty machine config as a placeholder
-    machine_configs = {instrument_name: MachineConfig()}
-    if settings.murfey_machine_configuration:
-        machine_configs = machine_config_from_file(
-            Path(settings.murfey_machine_configuration), instrument_name
+class MurfeyKeycloakConfig:
+    def __init__(self, file: Path | None = None):
+        # Declare attributes
+        self.url: str = ""
+        self.realm: str = ""
+        self.client_id: str = ""
+        self.client_secret: str = ""
+
+        if file:
+            self.load(file)
+
+    def load(self, file: Path):
+        """
+        Parses a Murfey Keycloak config file and loads up the keys needed to generate
+        an access token for requests to be sent to the backend server.
+        """
+        # Load the config as a dict
+        with open(file, "r") as f:
+            contents = f.read()
+        parser = ConfigParser()
+        parser.read_string("[default]\n" + contents)  # Use placeholder header
+        config = dict(parser["default"])  # Convert to dict
+
+        # Populate the class
+        required_keys = ("url", "realm", "client_id", "client_secret")
+        for key in required_keys:
+            try:
+                setattr(self, key, config[key].strip())
+            except KeyError:
+                raise KeyError(f"Missing key {key} from config file {file}")
+
+
+class MurfeyKeycloakClient:
+    """
+    Class to handle the generation of an access token to pass along to the
+    Murfey backend server.
+    """
+
+    def __init__(
+        self,
+        config_file: Path,
+        refresh_buffer: int = 30,  # Seconds
+        timeout: float = 10,  # Seconds (with split seconds)
+    ):
+        self._config: MurfeyKeycloakConfig = MurfeyKeycloakConfig(config_file)
+        self._token_url = f"{self._config.url.rstrip('/')}/realms/{self._config.realm}/protocol/openid-connect/token"
+        self._refresh_buffer: int = refresh_buffer
+        self._token: str = ""
+        self._token_expires_at: float = 0  # Seconds (with split seconds)
+        self._timeout = timeout
+        self.session = requests.Session()  # Reuseable session to make requests with
+
+    def get_token(self):
+        """Returns the existing token, or fetches a new one from the identity provider"""
+        now = time.time()
+        # Reuse token if it's still valid
+        if self._token and (now + self._refresh_buffer) < self._token_expires_at:
+            return self._token
+        return self._fetch_token()
+
+    def _fetch_token(self):
+        """Request for a new token from the configured identity provider"""
+        response = self.session.post(
+            self._token_url,
+            data={
+                "grant_type": "client_credentials",
+                "client_id": self._config.client_id,
+                "client_secret": self._config.client_secret,
+            },
+            timeout=self._timeout,
         )
-    return machine_configs
+        response.raise_for_status()
+
+        # Extract response contents
+        data: dict[str, Any] = response.json()
+        self._token = data["access_token"]
+        self._token_expires_at = time.time() + int(data.get("expires_in", 300))
+
+        return self._token
 
 
-def get_extended_machine_config(
-    extension_name: str, instrument_name: str = ""
-) -> Optional[BaseModel]:
-    machine_config = get_machine_config(instrument_name=instrument_name).get(
-        instrument_name or get_microscope()
-    )
-    if not machine_config:
-        return None
-    model = list(entry_points(group="murfey.config", name=extension_name))[0].load()
-    data = getattr(machine_config, extension_name, {})
-    return model(**data)
+@lru_cache(maxsize=1)
+def get_murfey_keycloak_client():
+    if keycloak_config := get_security_config().murfey_keycloak_config:
+        return MurfeyKeycloakClient(keycloak_config)
+    return None
 
 
 @lru_cache(maxsize=1)
@@ -390,7 +481,7 @@ def get_rabbitmq_url() -> str:
         "vhost": "/",
     }
     rabbitmq_credentials_file = get_security_config().rabbitmq_credentials
-    cfgparser = configparser.ConfigParser(allow_no_value=True)
+    cfgparser = ConfigParser(allow_no_value=True)
     if rabbitmq_credentials_file:
         cfgparser.read(rabbitmq_credentials_file)
         rabbitmq_creds = (

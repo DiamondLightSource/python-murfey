@@ -45,6 +45,7 @@ from murfey.util.config import (
     MachineConfig,
     get_machine_config,
     get_microscope,
+    get_murfey_keycloak_client,
     get_security_config,
 )
 from murfey.util.processing_params import default_spa_parameters, motion_corrected_mrc
@@ -2187,6 +2188,11 @@ def feedback_callback(
                     session_id=murfey_session.id,
                 )
                 murfey_url = urlparse(machine_config.murfey_url).geturl()
+                # Add authorisation header to request where possible
+                headers: dict[str, str] = {}
+                if murfey_keycloak_client := get_murfey_keycloak_client():
+                    token = murfey_keycloak_client.get_token()
+                    headers["Authorization"] = f"Bearer {token}"
                 response = requests.post(
                     url=f"{murfey_url}{url_path}",
                     json={
@@ -2194,9 +2200,10 @@ def feedback_callback(
                         "visit_name": murfey_session.visit,
                         "rsync_source": collected_ids[0].tag,
                     },
+                    headers=headers,
                 )
                 if response.status_code != 200:
-                    raise RuntimeError(
+                    logger.error(
                         f"Preprocessed movies update request failed with status code {response.status_code}"
                     )
 
