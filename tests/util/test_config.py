@@ -210,14 +210,14 @@ def mock_standard_machine_config_yaml(
     return config_file
 
 
-get_machine_config_test_matrix: tuple[tuple[str, list[str]], ...] = (
-    # Config to test | Instrument names to pass to function
-    ("hierarchical", ["", "m01", "m02"]),
-    ("standard", ["", "m01", "m02"]),
+@pytest.mark.parametrize(
+    "test_params",
+    (
+        # Config to test | Instrument names to pass to function
+        ("hierarchical", ["", "m01", "m02"]),
+        ("standard", ["", "m01", "m02"]),
+    ),
 )
-
-
-@pytest.mark.parametrize("test_params", get_machine_config_test_matrix)
 def test_get_machine_config(
     mocker: MockerFixture,
     mock_general_config: dict[str, Any],
