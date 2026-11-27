@@ -1,12 +1,19 @@
 import copy
+import time
 from pathlib import Path
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 import yaml
 from pytest_mock import MockerFixture
 
-from murfey.util.config import MurfeyKeycloakConfig, Settings, get_machine_config
+from murfey.util.config import (
+    MurfeyKeycloakClient,
+    MurfeyKeycloakConfig,
+    Settings,
+    get_machine_config,
+)
 
 
 @pytest.fixture
@@ -433,3 +440,71 @@ def test_murfey_keycloak_config(tmp_path: Path, error_state: str):
             assert config.realm == realm
             assert config.client_id == client_id
             assert config.client_secret == client_secret
+
+
+@pytest.mark.parametrize(
+    "current_time",
+    (
+        0,  # Should trigger a fetch
+        time.time(),  # Will be fine
+    ),
+)
+def test_murfey_keycloak_client(tmp_path: Path, current_time: int):
+    url = "https://murfey.com"
+    realm = "murfey"
+    client_id = "murfey-client"
+    client_secret = "pneumonoultramicroscopicsilicovolcanoconiosis"
+
+    old_token = "supercalifragilisticexpialidocious"
+    new_token = "eventhoughthesoundofitissomethingquiteatrocious"
+
+    file = tmp_path / "config"
+    with open(tmp_path / "config", "w") as f:
+        f.write(f"url={url}\n")
+        f.write(f"realm={realm}\n")
+        f.write(f"client_id={client_id}\n")
+        f.write(f"client_secret={client_secret}\n")
+
+    # Load the Keycloak client and check that it's populated correctly
+    client = MurfeyKeycloakClient(config_file=file)
+    assert (
+        client._token_url
+        == f"{url.rstrip('/')}/realms/{realm}/protocol/openid-connect/token"
+    )
+    assert client._refresh_buffer == 30
+    assert client._timeout == 10
+
+    # Give it an old token and expiry time
+    client._token = old_token
+    client._token_expires_at = current_time + 300
+
+    # Create a mock HTTP Response
+    mock_response = MagicMock(
+        status_code=200,
+    )
+    mock_response.json.return_value = {
+        "access_token": new_token,
+        "expires_in": 300,
+    }
+
+    # Create a mock HTTP Session
+    mock_session = MagicMock()
+    mock_session.post.return_value = mock_response
+    client.session = mock_session
+
+    # Run 'get_token' and check that the client attributes are updated correctly
+    assert client.get_token() == (new_token if current_time == 0 else old_token)
+    assert client._token == (new_token if current_time == 0 else old_token)
+    # Check that a post was called only when needed
+    if current_time == 0:
+        mock_session.post.assert_called_once_with(
+            client._token_url,
+            data={
+                "grant_type": "client_credentials",
+                "client_id": client_id,
+                "client_secret": client_secret,
+            },
+            timeout=client._timeout,
+        )
+    else:
+        mock_session.post.assert_not_called()
