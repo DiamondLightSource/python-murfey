@@ -6,7 +6,7 @@ import pytest
 import yaml
 from pytest_mock import MockerFixture
 
-from murfey.util.config import Settings, get_machine_config
+from murfey.util.config import MurfeyKeycloakConfig, Settings, get_machine_config
 
 
 @pytest.fixture
@@ -390,3 +390,46 @@ def test_get_machine_config(
                     "step_size": 100,
                 }
             assert config[i].pkg_2 == mock_general_config["pkg_2"]
+
+
+@pytest.mark.parametrize(
+    "error_state",
+    (  # Loading state
+        "no_file",
+        "missing_keys",
+        "",
+    ),
+)
+def test_murfey_keycloak_config(tmp_path: Path, error_state: str):
+    url = "https://murfey.com"
+    realm = "murfey"
+    client_id = "murfey-client"
+    client_secret = "pneumonoultramicroscopicsilicovolcanoconiosis"
+
+    # Check the case with no config file
+    if error_state == "no_file":
+        config = MurfeyKeycloakConfig()
+        assert config.url == ""
+        assert config.realm == ""
+        assert config.client_id == ""
+        assert config.client_secret == ""
+    # Check the cases with a config file
+    else:
+        file = tmp_path / "config"
+        with open(tmp_path / "config", "w") as f:
+            f.write(f"url={url}\n")
+            f.write(f"realm={realm}\n")
+            if error_state != "missing_keys":
+                f.write(f"client_id={client_id}\n")
+                f.write(f"client_secret={client_secret}\n")
+        # If keys are missing, it should raise KeyError
+        if error_state == "missing_keys":
+            with pytest.raises(KeyError):
+                config = MurfeyKeycloakConfig(file)
+        # Otherwise, it should pass
+        else:
+            config = MurfeyKeycloakConfig(file)
+            assert config.url == url
+            assert config.realm == realm
+            assert config.client_id == client_id
+            assert config.client_secret == client_secret
