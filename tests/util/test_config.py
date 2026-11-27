@@ -13,6 +13,7 @@ from murfey.util.config import (
     MurfeyKeycloakConfig,
     Settings,
     get_machine_config,
+    get_murfey_keycloak_client,
 )
 
 
@@ -423,7 +424,7 @@ def test_murfey_keycloak_config(tmp_path: Path, error_state: str):
     # Check the cases with a config file
     else:
         file = tmp_path / "config"
-        with open(tmp_path / "config", "w") as f:
+        with open(file, "w") as f:
             f.write(f"url={url}\n")
             f.write(f"realm={realm}\n")
             if error_state != "missing_keys":
@@ -459,7 +460,7 @@ def test_murfey_keycloak_client(tmp_path: Path, current_time: int):
     new_token = "eventhoughthesoundofitissomethingquiteatrocious"
 
     file = tmp_path / "config"
-    with open(tmp_path / "config", "w") as f:
+    with open(file, "w") as f:
         f.write(f"url={url}\n")
         f.write(f"realm={realm}\n")
         f.write(f"client_id={client_id}\n")
@@ -508,3 +509,41 @@ def test_murfey_keycloak_client(tmp_path: Path, current_time: int):
         )
     else:
         mock_session.post.assert_not_called()
+
+
+@pytest.mark.parametrize("has_keycloak_config", (True, False))
+def test_get_murfey_keycloak_config(
+    mocker: MockerFixture,
+    tmp_path: Path,
+    has_keycloak_config: bool,
+):
+    # Clear the cache before using the function
+    get_murfey_keycloak_client.cache_clear()
+
+    # Create Keycloak config file as needed
+    keycloak_config: Path | None = None
+    if has_keycloak_config:
+        url = "https://murfey.com"
+        realm = "murfey"
+        client_id = "murfey-client"
+        client_secret = "pneumonoultramicroscopicsilicovolcanoconiosis"
+
+        keycloak_config = tmp_path / "config"
+        with open(keycloak_config, "w") as f:
+            f.write(f"url={url}\n")
+            f.write(f"realm={realm}\n")
+            f.write(f"client_id={client_id}\n")
+            f.write(f"client_secret={client_secret}\n")
+
+    # Mock the 'get_security_config' function
+    mocker.patch(
+        "murfey.util.config.get_security_config",
+        return_value=MagicMock(murfey_keycloak_config=keycloak_config),
+    )
+
+    # Check that the function returns the expected values
+    client = get_murfey_keycloak_client()
+    if has_keycloak_config:
+        assert isinstance(client, MurfeyKeycloakClient)
+    else:
+        assert client is None
