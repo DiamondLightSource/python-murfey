@@ -386,10 +386,10 @@ class MurfeyKeycloakConfig:
         an access token for requests to be sent to the backend server.
         """
         # Load the config as a dict
+        with open(file, "r") as f:
+            contents = f.read()
         parser = ConfigParser()
-        parser.read_string(
-            "[default]\n" + open(file, "r").read()  # Use placeholder header
-        )
+        parser.read_string("[default]\n" + contents)  # Use placeholder header
         config = dict(parser["default"])  # Convert to dict
 
         # Populate the class
