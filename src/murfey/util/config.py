@@ -24,6 +24,19 @@ except ImportError:
     SMARTEM_ACTIVE = False
 
 
+class Settings(BaseSettings):
+    murfey_machine_configuration: str = ""
+    murfey_security_configuration: str = ""
+
+
+settings = Settings()
+
+
+@lru_cache()
+def get_hostname():
+    return socket.gethostname()
+
+
 class MagnificationTable(RootModel[dict[int, float]]):
     pass
 
@@ -249,6 +262,38 @@ def machine_config_from_file(
     return all_machine_configs
 
 
+@lru_cache(maxsize=1)
+def get_machine_config(instrument_name: str = "") -> dict[str, MachineConfig]:
+    # Create an empty machine config as a placeholder
+    machine_configs = {instrument_name: MachineConfig()}
+    if settings.murfey_machine_configuration:
+        machine_configs = machine_config_from_file(
+            Path(settings.murfey_machine_configuration), instrument_name
+        )
+    return machine_configs
+
+
+def get_microscope(machine_config: MachineConfig | None = None) -> str:
+    if machine_config:
+        microscope_name = machine_config.machine_override or os.getenv("BEAMLINE", "")
+    else:
+        microscope_name = os.getenv("BEAMLINE", "")
+    return microscope_name
+
+
+def get_extended_machine_config(
+    extension_name: str, instrument_name: str = ""
+) -> Optional[BaseModel]:
+    machine_config = get_machine_config(instrument_name=instrument_name).get(
+        instrument_name or get_microscope()
+    )
+    if not machine_config:
+        return None
+    model = list(entry_points(group="murfey.config", name=extension_name))[0].load()
+    data = getattr(machine_config, extension_name, {})
+    return model(**data)
+
+
 class Security(BaseModel):
     # Murfey database settings
     murfey_db_credentials: Path
@@ -303,12 +348,25 @@ def security_from_file(config_file_path: Path) -> Security:
     return Security(**config)
 
 
-class Settings(BaseSettings):
-    murfey_machine_configuration: str = ""
-    murfey_security_configuration: str = ""
-
-
-settings = Settings()
+@lru_cache(maxsize=1)
+def get_security_config() -> Security:
+    if settings.murfey_security_configuration:
+        return security_from_file(Path(settings.murfey_security_configuration))
+    if settings.murfey_machine_configuration and os.getenv("BEAMLINE"):
+        machine_config = get_machine_config(instrument_name=os.getenv("BEAMLINE"))[
+            os.getenv("BEAMLINE", "")
+        ]
+        if machine_config.security_configuration_path:
+            return security_from_file(machine_config.security_configuration_path)
+    return Security(
+        rabbitmq_credentials="",
+        session_validation="",
+        murfey_db_credentials="",
+        crypto_key="",
+        auth_key="",
+        auth_algorithm="",
+        sqlalchemy_pooling=True,
+    )
 
 
 class MurfeyKeycloakConfig:
@@ -390,64 +448,6 @@ class MurfeyKeycloakClient:
         self._token_expires_at = time.time() + int(data.get("expires_in", 300))
 
         return self._token
-
-
-@lru_cache()
-def get_hostname():
-    return socket.gethostname()
-
-
-def get_microscope(machine_config: MachineConfig | None = None) -> str:
-    if machine_config:
-        microscope_name = machine_config.machine_override or os.getenv("BEAMLINE", "")
-    else:
-        microscope_name = os.getenv("BEAMLINE", "")
-    return microscope_name
-
-
-@lru_cache(maxsize=1)
-def get_security_config() -> Security:
-    if settings.murfey_security_configuration:
-        return security_from_file(Path(settings.murfey_security_configuration))
-    if settings.murfey_machine_configuration and os.getenv("BEAMLINE"):
-        machine_config = get_machine_config(instrument_name=os.getenv("BEAMLINE"))[
-            os.getenv("BEAMLINE", "")
-        ]
-        if machine_config.security_configuration_path:
-            return security_from_file(machine_config.security_configuration_path)
-    return Security(
-        rabbitmq_credentials="",
-        session_validation="",
-        murfey_db_credentials="",
-        crypto_key="",
-        auth_key="",
-        auth_algorithm="",
-        sqlalchemy_pooling=True,
-    )
-
-
-@lru_cache(maxsize=1)
-def get_machine_config(instrument_name: str = "") -> dict[str, MachineConfig]:
-    # Create an empty machine config as a placeholder
-    machine_configs = {instrument_name: MachineConfig()}
-    if settings.murfey_machine_configuration:
-        machine_configs = machine_config_from_file(
-            Path(settings.murfey_machine_configuration), instrument_name
-        )
-    return machine_configs
-
-
-def get_extended_machine_config(
-    extension_name: str, instrument_name: str = ""
-) -> Optional[BaseModel]:
-    machine_config = get_machine_config(instrument_name=instrument_name).get(
-        instrument_name or get_microscope()
-    )
-    if not machine_config:
-        return None
-    model = list(entry_points(group="murfey.config", name=extension_name))[0].load()
-    data = getattr(machine_config, extension_name, {})
-    return model(**data)
 
 
 @lru_cache(maxsize=1)
