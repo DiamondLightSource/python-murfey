@@ -523,7 +523,7 @@ def particles_picked(message: dict, murfey_db: Session) -> dict[str, bool]:
         headers=headers,
     )
     if response.status_code != 200:
-        raise RuntimeError(
+        logger.error(
             f"Preprocessed movies update request failed with status code {response.status_code}"
         )
 
